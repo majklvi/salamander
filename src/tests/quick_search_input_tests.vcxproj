@@ -5,8 +5,8 @@
     <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{17BDB368-AF41-4BA0-9B78-83C293FD43FB}</ProjectGuid>
-    <RootNamespace>filenamecasetests</RootNamespace>
+    <ProjectGuid>{3DD0E466-1947-40C2-8CE2-0B5836483692}</ProjectGuid>
+    <RootNamespace>quicksearchinputtests</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -23,7 +23,7 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
     <OutDir>$(OPENSAL_BUILD_DIR)tests\$(Configuration)_$(Platform)\</OutDir>
-    <IntDir>$(OPENSAL_BUILD_DIR)tests\$(Configuration)_$(Platform)\FilenameCaseIntermediate\</IntDir>
+    <IntDir>$(OPENSAL_BUILD_DIR)tests\$(Configuration)_$(Platform)\QuickSearchInputIntermediate\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -33,17 +33,13 @@
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
     </ClCompile>
-    <Link>
-      <AdditionalDependencies>user32.lib;normaliz.lib;%(AdditionalDependencies)</AdditionalDependencies>
-    </Link>
+    <Link><AdditionalDependencies>user32.lib;normaliz.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="filenamecase_tests.cpp" />
+    <ClCompile Include="quick_search_input_tests.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\filenamecase.h" />
     <ClInclude Include="..\panel_quick_search.h" />
-    <ClInclude Include="..\quick_search_match.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
