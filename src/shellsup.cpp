@@ -18,6 +18,8 @@ extern "C"
 }
 #include "salshlib.h"
 #include "tasklist.h"
+#include "common/widepath.h"
+#include "branchshell.h"
 //#include "drivelst.h"
 
 //
@@ -1073,15 +1075,25 @@ static std::vector<std::wstring> GetPanelShellPaths(int count, CTmpEnumData* dat
 }
 
 static IContextMenu2* CreatePanelShellMenu(HWND owner, const char* root, int count,
-                                          CEnumFileNamesFunction next, void* param)
+                                          CEnumFileNamesFunction next, void* param, BOOL quiet = FALSE)
 {
     CTmpEnumData* data = (CTmpEnumData*)param;
     if (!data->Panel->IsBranchView())
         return CreateIContextMenu2(owner, root, count, next, param);
     IContextMenu2* menu = CreateIContextMenu2ForPaths(owner, GetPanelShellPaths(count, data));
-    if (menu == NULL)
+    if (menu == NULL && !quiet)
         SalMessageBox(owner, GetErrorText(GetLastError()), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
     return menu;
+}
+
+static std::wstring GetPanelShellDirectoryW(const CTmpEnumData& data)
+{
+    if (!data.Panel->IsBranchView()) return std::wstring();
+    const int index = data.Indexes[0];
+    if (index < 0 || index >= data.Panel->Dirs->Count + data.Panel->Files->Count) return std::wstring();
+    const CFileData& file = index < data.Panel->Dirs->Count ? data.Panel->Dirs->At(index) :
+                           data.Panel->Files->At(index - data.Panel->Dirs->Count);
+    return data.Panel->GetItemDirectoryW(file);
 }
 
 static IDataObject* CreatePanelShellData(HWND owner, const char* root, int count,
@@ -1561,6 +1573,55 @@ BOOL GetACLUISecurityPageName(char* pageName, int pageNameMax)
     return ret;
 }
 
+// Native Shell menus require one parent folder. When that contract cannot be
+// met, retain the complete Branch selection and offer only host commands.
+static DWORD TrackBranchHostContextMenu(CFilesWindow* panel, const POINT& pt)
+{
+    CMenuPopup popup;
+    popup.SetUsePanelContextMenuFont(TRUE);
+    popup.SetImageList(HGrayToolBarImageList);
+    popup.SetHotImageList(HHotToolBarImageList);
+    const BOOL focusedFile = panel->GetCaretIndex() >= panel->Dirs->Count &&
+                             panel->GetCaretIndex() < panel->Dirs->Count + panel->Files->Count;
+    auto append = [&](UINT command, UINT textID, int image, BOOL enabled) {
+        MENU_ITEM_INFO item = {};
+        item.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STRING | MENU_MASK_STATE;
+        item.Type = MENU_TYPE_STRING;
+        item.ID = command;
+        item.String = LoadStr(textID);
+        item.State = enabled ? 0 : MENU_STATE_GRAYED;
+        if (image >= 0)
+        {
+            item.Mask |= MENU_MASK_IMAGEINDEX;
+            item.ImageIndex = image;
+        }
+        popup.InsertItem(-1, TRUE, &item);
+    };
+    auto separator = [&]() {
+        MENU_ITEM_INFO item = {};
+        item.Mask = MENU_MASK_TYPE;
+        item.Type = MENU_TYPE_SEPARATOR;
+        popup.InsertItem(-1, TRUE, &item);
+    };
+    // These commands intentionally retain Enter/F3/F4 focus semantics. The
+    // operation and clipboard commands below use the entire existing selection.
+    append(CM_OPEN, IDS_ARCHIVEMENU_OPEN, -1, focusedFile);
+    append(CM_VIEW, IDS_MENU_FILES_VIEW, IDX_TB_VIEW, focusedFile);
+    append(CM_EDIT, IDS_MENU_FILES_EDIT, IDX_TB_EDIT, focusedFile);
+    append(CM_BRANCH_OPENPARENT, IDS_BRANCH_OPENPARENT, IDX_TB_PARENTDIR, focusedFile);
+    separator();
+    append(CM_COPYFILES, IDS_MENU_FILES_COPY, IDX_TB_COPY, TRUE);
+    append(CM_MOVEFILES, IDS_MENU_FILES_MOVE, IDX_TB_MOVE, TRUE);
+    append(CM_DELETEFILES, IDS_MENU_FILES_DELETE, IDX_TB_DELETE, TRUE);
+    separator();
+    append(CM_CLIPCUT, IDS_MENU_EDIT_CUT, IDX_TB_CLIPBOARDCUT, TRUE);
+    append(CM_CLIPCOPY, IDS_MENU_EDIT_COPY, IDX_TB_CLIPBOARDCOPY, TRUE);
+    append(CM_PROPERTIES, IDS_MENU_FILES_PROPERTIES, IDX_TB_PROPERTIES, TRUE);
+    popup.SetDefaultItem(CM_OPEN, FALSE);
+    return popup.Track(MENU_TRACK_RETURNCMD | MENU_TRACK_RIGHTBUTTON,
+                       pt.x, pt.y, panel->GetListBoxHWND(), NULL);
+}
+
 void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                  BOOL posByMouse, BOOL onlyPanelMenu)
 {
@@ -1605,6 +1666,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 
     BeginStopRefresh(); // we do not need any refreshes
 
+    DWORD deferredBranchCommand = 0;
     int* indexes = NULL;
     int index = 0;
     int count = 0;
@@ -2021,7 +2083,21 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 data.Panel = panel;
                 IContextMenu2* menu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
                                                           (count == 0) ? 1 : count,
-                                                          EnumFileNames, &data);
+                                                          EnumFileNames, &data, panel->IsBranchView());
+                if (menu == NULL && panel->IsBranchView())
+                {
+                    IDataObject* object = CreatePanelShellData(MainWindow->HWindow, panel->GetPath(),
+                        (count == 0) ? 1 : count, EnumFileNames, &data);
+                    if (object != NULL)
+                    {
+                        // CFSTR_SHELLIDLIST contains all absolute child identities.
+                        HRESULT result = SHMultiFileProperties(object, 0);
+                        object->Release();
+                        if (FAILED(result))
+                            SalMessageBox(panel->HWindow, GetErrorText(HRESULT_FACILITY(result) == FACILITY_WIN32 ? HRESULT_CODE(result) : ERROR_GEN_FAILURE),
+                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    }
+                }
                 if (menu != NULL)
                 {
                     CShellExecuteWnd shellExecuteWnd;
@@ -2040,6 +2116,19 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                             lstrcpy(pageName, "Security"); // if the name could not be retrieved, use the English "Security" and accept that localized versions will quietly not work
                     }
                     ici.lpDirectory = panel->GetPath();
+                    const std::wstring branchDirectory = GetPanelShellDirectoryW(data);
+                    std::wstring pageNameW;
+                    if (!branchDirectory.empty())
+                    {
+                        ici.fMask |= CMIC_MASK_UNICODE;
+                        ici.lpVerbW = L"properties";
+                        ici.lpDirectoryW = branchDirectory.c_str();
+                        if (action == saPermissions)
+                        {
+                            pageNameW = SalMultiByteToWidePath(pageName);
+                            ici.lpParametersW = pageNameW.c_str();
+                        }
+                    }
                     ici.nShow = SW_SHOWNORMAL;
                     GetLeftTopCornert(&ici.ptInvoke, posByMouse, useSelection, panel);
 
@@ -2071,24 +2160,47 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 CTmpEnumData data;
                 data.Indexes = (count == 0) ? &index : indexes;
                 data.Panel = panel;
-                IContextMenu2* menu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
-                                                          EnumFileNames, &data);
-                if (menu != NULL)
+                BOOL clipboardReady = FALSE;
+                if (panel->IsBranchView())
                 {
-                    CShellExecuteWnd shellExecuteWnd;
-                    CMINVOKECOMMANDINFO ici;
-                    ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
-                    ici.fMask = 0;
-                    ici.lpVerb = (action == saCopyToClipboard) ? "copy" : "cut";
-                    ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: ShellAction::copy_cut_clipboard verb=%s", ici.lpVerb);
-                    ici.lpParameters = NULL;
-                    ici.lpDirectory = panel->GetPath();
-                    ici.nShow = SW_SHOWNORMAL;
-                    ici.dwHotKey = 0;
-                    ici.hIcon = 0;
+                    IDataObject* object = CreatePanelShellData(MainWindow->HWindow, panel->GetPath(),
+                        (count == 0) ? 1 : count, EnumFileNames, &data);
+                    if (object != NULL)
+                    {
+                        HRESULT result = SetShellDataDropEffect(object,
+                            action == saCopyToClipboard ? DROPEFFECT_COPY | DROPEFFECT_LINK : DROPEFFECT_MOVE);
+                        if (SUCCEEDED(result)) result = OleSetClipboard(object);
+                        clipboardReady = SUCCEEDED(result);
+                        object->Release(); // OLE owns its reference after successful publication.
+                        if (!clipboardReady)
+                            SalMessageBox(panel->HWindow, GetErrorText(HRESULT_FACILITY(result) == FACILITY_WIN32 ? HRESULT_CODE(result) : ERROR_GEN_FAILURE),
+                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    }
+                }
+                else
+                {
+                    IContextMenu2* menu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
+                        (count == 0) ? 1 : count, EnumFileNames, &data);
+                    if (menu != NULL)
+                    {
+                        CShellExecuteWnd shellExecuteWnd;
+                        CMINVOKECOMMANDINFO ici;
+                        ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
+                        ici.fMask = 0;
+                        ici.lpVerb = (action == saCopyToClipboard) ? "copy" : "cut";
+                        ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: ShellAction::copy_cut_clipboard verb=%s", ici.lpVerb);
+                        ici.lpParameters = NULL;
+                        ici.lpDirectory = panel->GetPath();
+                        ici.nShow = SW_SHOWNORMAL;
+                        ici.dwHotKey = 0;
+                        ici.hIcon = 0;
 
-                    AuxInvokeAndRelease(menu, &ici);
-
+                        AuxInvokeAndRelease(menu, &ici);
+                        clipboardReady = TRUE;
+                    }
+                }
+                if (clipboardReady)
+                {
                     // clipboard change, verify it...
                     IdleRefreshStates = TRUE;  // force a check of the state variables on the next Idle
                     IdleCheckClipboard = TRUE; // also let it check the clipboard
@@ -2350,7 +2462,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         {
 #endif // _WIN64
                             panel->ContextMenu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
-                                                                     EnumFileNames, &selectionEnumData);
+                                                                     EnumFileNames, &selectionEnumData, TRUE);
 #ifndef _WIN64
                         }
 #endif // _WIN64
@@ -2380,6 +2492,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 BOOL cmdDelete = FALSE;    // is it "our delete"?
                 BOOL cmdMapNetDrv = FALSE; // is this our "Map Network Drive"? (only for a UNC root, let us not complicate life)
                 DWORD cmd = 0;             // command number for the context menu (10000 = "our paste")
+                const UINT branchOpenParentCommand = 10002; // outside both Shell command ranges
+                BOOL openBranchParent = FALSE;
                 char pastePath[MAX_PATH];  // buffer for the path where "our paste" is executed (if it happens)
                 if (panel->ContextMenu != NULL && h != NULL)
                 {
@@ -2401,12 +2515,15 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                             {
                                 panel->ContextMenu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
                                                                          (count == 0) ? 1 : count, EnumFileNames,
-                                                                         &selectionEnumData);
+                                                                         &selectionEnumData, TRUE);
                                 if (panel->ContextMenu != NULL)
                                     ShellActionAux5(flags, panel, h);
                             }
                         }
                     }
+                }
+                if (panel->ContextMenu != NULL && h != NULL)
+                {
                     RemoveUselessSeparatorsFromMenu(h);
 
                     char cmdName[2000]; // we intentionally use 2000 instead of 200; shell extensions sometimes write twice as much (idea: Unicode = 2 * "number of characters"), etc.
@@ -2562,6 +2679,18 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                         }
                     }
 
+                    if (useSelection && !onlyPanelMenu && panel->IsBranchView() &&
+                        panel->GetCaretIndex() >= panel->Dirs->Count &&
+                        panel->GetCaretIndex() < panel->Dirs->Count + panel->Files->Count)
+                    {
+                        // This is a host action for the focused Branch row, not a
+                        // Shell verb or an action on the Branch root folder.
+                        if (GetMenuItemCount(h) > 0)
+                            AppendMenuW(h, MF_SEPARATOR, 0, NULL);
+                        const std::wstring label = SalMultiByteToWidePath(LoadStr(IDS_BRANCH_OPENPARENT), CP_UTF8);
+                        AppendMenuW(h, MF_STRING | MF_ENABLED, branchOpenParentCommand, label.c_str());
+                    }
+
                     if (GetMenuItemCount(h) > 0) // protection against a completely cut-out menu
                     {
                         // Native TrackPopupMenuEx always uses the system menu
@@ -2576,6 +2705,11 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                     }
                     else
                         cmd = 0;
+                    if (cmd == branchOpenParentCommand)
+                    {
+                        openBranchParent = TRUE;
+                        cmd = 0; // never pass this host command to a Shell handler
+                    }
                     if (cmd != 0)
                     {
                         BOOL handledByCompressedFolderFallback = IsWindows11CompressedFolderCommand(h, cmd) &&
@@ -2676,6 +2810,10 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 }
 
                                 CALL_STACK_MESSAGE1("ShellAction::context_menu::exec1");
+                                CTmpEnumData directoryData;
+                                directoryData.Panel = panel;
+                                directoryData.Indexes = count == 0 ? &index : indexes;
+                                const std::wstring branchDirectory = useSelection ? GetPanelShellDirectoryW(directoryData) : std::wstring();
                                 if (!useSelection || count == 0 && index < panel->Dirs->Count ||
                                     count == 1 && indexes[0] < panel->Dirs->Count)
                                 {
@@ -2683,7 +2821,8 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 }
                                 else
                                 {
-                                    SetCurrentDirectory(panel->GetPath()); // for files whose names contain spaces: to make Open With work even for Microsoft Paint (under W2K it failed – reported "d:\documents.bmp was not found" for the file "D:\Documents and Settings\petr\My Documents\example.bmp")
+                                    if (!branchDirectory.empty()) SetCurrentDirectoryW(SalPathAddExtendedPrefixW(branchDirectory.c_str()).c_str());
+                                    else SetCurrentDirectory(panel->GetPath()); // for files whose names contain spaces: to make Open With work even for Microsoft Paint (under W2K it failed – reported "d:\documents.bmp was not found" for the file "D:\Documents and Settings\petr\My Documents\example.bmp")
                                 }
 
                                 DWORD disks = GetLogicalDrives();
@@ -2702,6 +2841,12 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 else
                                     ici.lpVerb = MAKEINTRESOURCE(cmd - 5000);
                                 ici.lpDirectory = panel->GetPath();
+                                if (!branchDirectory.empty())
+                                {
+                                    ici.fMask |= CMIC_MASK_UNICODE;
+                                    ici.lpDirectoryW = branchDirectory.c_str();
+                                    ici.lpVerbW = MAKEINTRESOURCEW(cmd < 5000 ? cmd : cmd - 5000);
+                                }
                                 ici.nShow = SW_SHOWNORMAL;
                                 ici.ptInvoke = pt;
 
@@ -2766,6 +2911,10 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                         }
                     }
                 }
+                else if (panel->IsBranchView() && useSelection && !onlyPanelMenu)
+                {
+                    deferredBranchCommand = TrackBranchHostContextMenu(panel, pt);
+                }
                 {
                     CALL_STACK_MESSAGE1("ShellAction::context_menu::release");
                     ShellActionAux6(panel);
@@ -2773,7 +2922,9 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                         DestroyMenu(h);
                 }
 
-                if (cmd == 10000) // our own "paste" on pastePath
+                if (openBranchParent)
+                    panel->OpenBranchItemDirectory(); // Shell objects have been released above
+                else if (cmd == 10000) // our own "paste" on pastePath
                 {
                     if (!panel->ClipboardPaste(FALSE, FALSE, pastePath))
                         panel->ClipboardPastePath(); // regular paste failed, we probably just need to change the current path
@@ -2823,6 +2974,15 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
         delete[] (indexes);
 
     EndStopRefresh();
+    if (deferredBranchCommand != 0)
+    {
+        // Run after releasing all Shell objects and refresh suspension. Dispatch
+        // synchronously to the source panel so a queued focus change cannot
+        // redirect the command or substitute another panel's selection.
+        MainWindow->FocusPanel(panel);
+        MainWindow->RefreshCommandStates(); // selection may have changed without changing panels
+        SendMessage(MainWindow->HWindow, WM_COMMAND, deferredBranchCommand, 0);
+    }
 }
 
 const char* ReturnNameFromParam(int, void* param)

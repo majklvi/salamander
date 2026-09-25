@@ -20,6 +20,79 @@ static bool MakeFile(const std::wstring& path)
     CloseHandle(file);
     return true;
 }
+static bool SameFileIdentity(const std::wstring& first, const std::wstring& second)
+{
+    const auto open = [](const std::wstring& path) {
+        const std::wstring api = path.compare(0, 4, LR"(\\?\)") == 0 ? path : LR"(\\?\)" + path;
+        return CreateFileW(api.c_str(), FILE_READ_ATTRIBUTES,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+            FILE_FLAG_BACKUP_SEMANTICS, NULL);
+    };
+    HANDLE a = open(first), b = open(second);
+    BY_HANDLE_FILE_INFORMATION x = {}, y = {};
+    const bool same = a != INVALID_HANDLE_VALUE && b != INVALID_HANDLE_VALUE &&
+        GetFileInformationByHandle(a, &x) && GetFileInformationByHandle(b, &y) &&
+        x.dwVolumeSerialNumber == y.dwVolumeSerialNumber &&
+        x.nFileIndexHigh == y.nFileIndexHigh && x.nFileIndexLow == y.nFileIndexLow;
+    if (a != INVALID_HANDLE_VALUE) CloseHandle(a);
+    if (b != INVALID_HANDLE_VALUE) CloseHandle(b);
+    return same;
+}
+static void CheckPropertiesSelection(IDataObject* object, const std::vector<std::wstring>& paths)
+{
+    FORMATETC format = {(CLIPFORMAT)RegisterClipboardFormatW(L"Shell IDList Array"), NULL,
+                        DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+    STGMEDIUM medium = {};
+    const HRESULT result = object->GetData(&format, &medium);
+    Check(SUCCEEDED(result), "merged Properties receives a Shell IDList Array");
+    if (FAILED(result)) return;
+    const SIZE_T bytes = GlobalSize(medium.hGlobal);
+    const CIDA* cida = (const CIDA*)GlobalLock(medium.hGlobal);
+    bool valid = cida != NULL && bytes >= sizeof(CIDA) && cida->cidl == paths.size();
+    Check(valid, "Properties data contains the entire multi-parent selection");
+    if (valid)
+    {
+        valid = bytes >= sizeof(UINT) * (2 + (SIZE_T)cida->cidl) && cida->aoffset[0] < bytes;
+        for (UINT i = 0; valid && i < cida->cidl; ++i)
+        {
+            valid = cida->aoffset[i + 1] < bytes;
+            if (!valid) break;
+            PCIDLIST_ABSOLUTE parent = (PCIDLIST_ABSOLUTE)((const BYTE*)cida + cida->aoffset[0]);
+            PCUIDLIST_RELATIVE child = (PCUIDLIST_RELATIVE)((const BYTE*)cida + cida->aoffset[i + 1]);
+            PIDLIST_ABSOLUTE full = ILCombine(parent, child);
+            PWSTR parsed = NULL;
+            const HRESULT parsedResult = full != NULL ?
+                SHGetNameFromIDList(full, SIGDN_DESKTOPABSOLUTEPARSING, &parsed) : E_OUTOFMEMORY;
+            // Some Shell providers render a DOS alias for long paths. Prove the
+            // exact underlying file identity rather than accepting any basename.
+            valid = SUCCEEDED(parsedResult) && parsed != NULL &&
+                (paths[i] == parsed || SameFileIdentity(paths[i], parsed));
+            CoTaskMemFree(parsed);
+            CoTaskMemFree(full);
+        }
+    }
+    Check(valid, "every Properties PIDL names its intended Unicode/long-path file, including duplicates");
+    if (cida != NULL) GlobalUnlock(medium.hGlobal);
+    ReleaseStgMedium(&medium);
+}
+static void CheckDropEffect(IDataObject* object, DWORD effect)
+{
+    const HRESULT setResult = SetShellDataDropEffect(object, effect);
+    Check(SUCCEEDED(setResult), "preferred copy/cut effect is accepted by the complete data object");
+    FORMATETC format = {(CLIPFORMAT)RegisterClipboardFormatW(L"Preferred DropEffect"), NULL,
+                        DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+    STGMEDIUM medium = {};
+    const HRESULT readResult = object->GetData(&format, &medium);
+    Check(SUCCEEDED(readResult), "preferred drop effect remains readable after SetData ownership transfer");
+    if (SUCCEEDED(readResult))
+    {
+        const DWORD* stored = (const DWORD*)GlobalLock(medium.hGlobal);
+        Check(stored != NULL && GlobalSize(medium.hGlobal) >= sizeof(DWORD) && *stored == effect,
+              "copy/link and move effects round-trip exactly without modifying the clipboard");
+        if (stored != NULL) GlobalUnlock(medium.hGlobal);
+        ReleaseStgMedium(&medium);
+    }
+}
 int wmain()
 {
     HRESULT initialized = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
@@ -27,8 +100,11 @@ int wmain()
     std::vector<wchar_t> temp(32768);
     DWORD size = GetTempPathW((DWORD)temp.size(), temp.data());
     if (size == 0 || size >= temp.size()) return 2;
-    const std::filesystem::path root = std::filesystem::path(temp.data()) /
-        (L"samandarin-branch-operations-" + std::to_wstring(GetCurrentProcessId()));
+    std::filesystem::path testParent = std::filesystem::path(temp.data()).lexically_normal();
+    if (testParent.filename().empty()) testParent = testParent.parent_path();
+    const std::filesystem::path root = testParent /
+        (L"samandarin-branch-operations-" + std::to_wstring(GetCurrentProcessId()) +
+         L"-" + std::to_wstring(GetTickCount64()));
     std::error_code error;
     std::filesystem::create_directories(root / L"prvni-\u0161\u017e\u6f22", error);
     std::filesystem::create_directories(root / L"druhy-\u00e9\u03b1\U0001f600", error);
@@ -64,19 +140,16 @@ int wmain()
             Check(actual == std::set<std::wstring>(paths.begin(), paths.end()), "CF_HDROP preserves every exact Unicode and long path");
             ReleaseStgMedium(&medium);
         }
+        CheckPropertiesSelection(object, paths);
+        CheckDropEffect(object, DROPEFFECT_COPY | DROPEFFECT_LINK);
+        CheckDropEffect(object, DROPEFFECT_MOVE);
         object->Release();
     }
     IContextMenu2* menu = NULL;
     result = CreateShellObjectForPaths(NULL, paths, IID_IContextMenu2, (void**)&menu, TRUE);
-    Check(SUCCEEDED(result) && menu != NULL, "multi-parent default context menu");
-    if (menu != NULL)
-    {
-        HMENU popup = CreatePopupMenu();
-        result = menu->QueryContextMenu(popup, 0, 1, 1000, CMF_NORMAL);
-        Check(SUCCEEDED(result) && GetMenuItemCount(popup) > 0, "context menu populated without invoking actions");
-        DestroyMenu(popup);
-        menu->Release();
-    }
+    Check(result == HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED) && menu == NULL,
+          "mixed parents request a whole-selection host menu instead of an unrelated Shell menu");
+    if (menu != NULL) menu->Release();
     std::vector<std::wstring> broken = paths;
     broken.push_back((root / L"missing.txt").wstring());
     object = NULL;
@@ -124,8 +197,10 @@ int wmain()
           GetFileAttributesW(lockedPath.c_str()) != INVALID_FILE_ATTRIBUTES,
           "failed per-item recycle cannot silently report success");
     if (locked != INVALID_HANDLE_VALUE) CloseHandle(locked);
-    // Own unique test root only; no user files are used or removed.
-    std::filesystem::remove_all(std::filesystem::path(L"\\\\?\\" + root.wstring()), error);
+    // Verify the resolved target remains our newly created direct child.
+    if (root.parent_path() == testParent &&
+        root.filename().wstring().find(L"samandarin-branch-operations-") == 0)
+        std::filesystem::remove_all(std::filesystem::path(L"\\\\?\\" + root.wstring()), error);
     CoUninitialize();
     return failures == 0 ? 0 : 1;
 }

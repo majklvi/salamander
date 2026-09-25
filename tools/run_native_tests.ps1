@@ -197,8 +197,14 @@ try {
         }
 
         Write-Host "Running $testName..."
+        $nativeArguments = @()
+        if ($testName -eq 'branch_context_menu_tests') {
+            $contextFixtureRoot = Join-Path $ciBuildRoot 'fixtures\branch-context-menu'
+            New-Item -ItemType Directory -Path $contextFixtureRoot -Force | Out-Null
+            $nativeArguments = @($contextFixtureRoot)
+        }
         $testResult = Invoke-TestProcess -FilePath $testExecutable `
-            -WorkingDirectory $repositoryRoot
+            -Arguments $nativeArguments -WorkingDirectory $repositoryRoot
         Add-TestResult -ClassName 'native-test' -Name $testName `
             -ProcessResult $testResult
     }

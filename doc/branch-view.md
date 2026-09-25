@@ -28,7 +28,8 @@ folder or move any files.
   results and pending refresh requests, then pauses automatic refresh until an
   explicit Refresh. Filesystem changes below the root normally request a
   background refresh; they do not interrupt a scan already in progress.
-- **Open Containing Folder** opens the focused file's real parent and focuses
+- **Open Containing Folder**, in the file context menu and the main Files menu,
+  opens the focused file's real parent and focuses
   that file. Navigating elsewhere leaves Branch View. Ctrl+B returns to the
   ordinary folder listing and restores its sort settings. It preserves the
   current layout, including a layout selected while Branch View was active.
@@ -60,6 +61,14 @@ reparse directories, such as ordinary cloud-provider directories, are not
 blanket-excluded. File links remain file entries. Hidden/system folder exclusion
 follows the panel setting; file filters are applied to the collected files and
 do not prune ordinary subfolders based on filename masks.
+
+The file context menu uses the native Shell menu for one file or a selection
+from the same physical parent folder. It therefore includes the file-type verbs
+and installed Shell extensions available in ordinary folder browsing. For a
+selection spanning different folders, or when the Shell cannot provide a menu,
+Branch View offers the applicable Salamander commands instead. Third-party
+Shell extensions are not offered by this fallback. Open Containing Folder is
+available in both menus and acts on the focused file.
 
 The displayed list is a changing filesystem snapshot, not a transaction.
 Enumeration continues past inaccessible folders and reports their count. A
@@ -170,10 +179,20 @@ exercise the built application. Passing one does not imply the others passed.
 | --- | --- |
 | Native `branch_view_tests` | PASS: 605 files, zero failures; nested trees, duplicate basenames, Czech/CJK/emoji components, a 254-UTF-16-unit filename, UTF-8 paths over 260 bytes, full paths over 260 UTF-16 units, hidden-folder filtering, batching, replacement scan, cancellation, immediate scanner-owner destruction, UNC prefix construction, component-aware root checks, and a real directory-link cycle skipped. |
 | `branch_view_contract_tests.py` | Lifecycle ordering, operation-suspend guards, coalesced asynchronous refresh, exact selection identity, recursive watcher registration, mode restoration, history ownership, duplicate/closed tabs, Path column layout, saved selection, and stale Explorer-property results. |
-| Native action tests | PASS: viewer enumeration 11 checks, operation/shell/recycle 25, worker paths 9, file launching 12, copy/ADS paths 11. Launch tests use real processes; recycle tests use only disposable fixtures. |
+| Native action tests | PASS: viewer enumeration 11 checks, operation/shell/recycle 33, worker paths 9, file launching 12, copy/ADS paths 11. Launch tests use real processes; recycle tests use only disposable fixtures. |
+| Native `branch_context_menu_tests` | 28 checks PASS: named canonical verbs match the real parent menu for ASCII, Unicode and long paths; no Manage verb for files; mixed-parent selections require the host fallback. GUID-named extension verbs are excluded from equality because lazy extension initialization can change them between two queries. |
 | `branch_operations_contract_tests.py` | Separate action-boundary checks for viewing/editing, rename, operation sources, relative destinations, archive enumeration, recycling, clipboard and icon identities. |
 | Custom Explorer properties | Native `branch_properties_tests`: 17 checks PASS; `branch_properties_contract_tests.py`: 14 checks PASS. Coverage includes exact item paths/cache identities, loading visible custom columns independently of Path sorting, and guarding the row-publication/property-job boundary. |
 | GUI smoke verified during development | Ctrl+B produced eight files from four folders, including Unicode and a full path over `MAX_PATH`; Path text was elided for display; F3 opened the long-path file with correct full title/content and Space moved to `root.txt`; PictView displayed three different `same.png` images across nested Unicode folders with Space/Backspace and correct captions; thumbnails showed all three distinct colors. Rename changed only the intended duplicate, Path sorting and Ctrl+F9 retained its full-path focus, and a duplicated tab restored its view and focused file. The final build copied all eight files with preserved relative paths and matching SHA-256 hashes, including the Win32 long path; closing/reopening the duplicate tab, Open Containing Folder/history return, and application shutdown all passed after the teardown fix. |
+
+The context-menu follow-up was verified in an isolated Release x64 build:
+Open opened the correct contents of both `same.txt` files in different folders,
+including a nested Unicode path. Open Containing Folder worked in both native
+and mixed-parent menus and focused the intended file in its real folder.
+Properties for the two `same.txt` files reported 2 files, Various Folders and
+165 bytes. Context-menu Copy followed by Paste copied two distinct files from
+different parents, including a Czech/CJK filename, with matching SHA-256 hashes.
+All eight original fixture file hashes remained unchanged.
 
 Additional GUI checks passed for layout, properties and refresh behavior:
 

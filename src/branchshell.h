@@ -6,8 +6,29 @@
 #include <string>
 #include <vector>
 
-// Desktop-relative PIDLs retain the complete identity of each selected item. The
-// default shell menu/data object can therefore represent duplicate basenames.
+// Attach the intended transfer operation to the exact multi-parent data object.
+inline HRESULT SetShellDataDropEffect(IDataObject* object, DWORD effect)
+{
+    if (object == NULL) return E_INVALIDARG;
+    const UINT formatId = RegisterClipboardFormat(CFSTR_PREFERREDDROPEFFECT);
+    if (formatId == 0) return HRESULT_FROM_WIN32(GetLastError());
+    HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, sizeof(DWORD));
+    if (memory == NULL) return E_OUTOFMEMORY;
+    DWORD* value = (DWORD*)GlobalLock(memory);
+    if (value == NULL) { GlobalFree(memory); return E_OUTOFMEMORY; }
+    *value = effect;
+    GlobalUnlock(memory);
+    FORMATETC format = {(CLIPFORMAT)formatId, NULL, DVASPECT_CONTENT, -1, TYMED_HGLOBAL};
+    STGMEDIUM medium = {};
+    medium.tymed = TYMED_HGLOBAL;
+    medium.hGlobal = memory;
+    HRESULT result = object->SetData(&format, &medium, TRUE);
+    if (FAILED(result)) GlobalFree(memory);
+    return result;
+}
+
+// Absolute PIDLs retain complete identity. Context menus bind each item to its
+// real parent; desktop-relative data objects can represent mixed-parent selections.
 inline HRESULT CreateShellObjectForPaths(HWND owner, const std::vector<std::wstring>& paths,
                                          REFIID iid, void** object, BOOL contextMenu)
 {
@@ -44,12 +65,44 @@ inline HRESULT CreateShellObjectForPaths(HWND owner, const std::vector<std::wstr
     {
         if (contextMenu)
         {
-            DEFCONTEXTMENU menu = {};
-            menu.hwnd = owner;
-            menu.psf = desktop;
-            menu.cidl = (UINT)items.size();
-            menu.apidl = (PCUITEMID_CHILD_ARRAY)items.data();
-            result = SHCreateDefaultContextMenu(&menu, iid, object);
+            // GetUIObjectOf requires immediate children of the actual parent.
+            // Passing absolute PIDLs as Desktop children binds their first
+            // component (for example This PC), yielding unrelated menu verbs.
+            PIDLIST_ABSOLUTE parentId = ILCloneFull(items[0]);
+            if (parentId == NULL) result = E_OUTOFMEMORY;
+            else
+            {
+                ILRemoveLastID(parentId);
+                bool commonParent = true;
+                for (auto item : items)
+                    if (!ILIsParent(parentId, item, TRUE)) commonParent = false;
+                if (commonParent)
+                {
+                    IShellFolder* parent = NULL;
+                    result = SHBindToParent(items[0], IID_PPV_ARGS(&parent), NULL);
+                    if (SUCCEEDED(result))
+                    {
+                        std::vector<PCUITEMID_CHILD> children;
+                        for (auto item : items) children.push_back(ILFindLastID(item));
+                        IContextMenu* menu = NULL;
+                        result = parent->GetUIObjectOf(owner, (UINT)children.size(), children.data(),
+                                                       IID_IContextMenu, NULL, (void**)&menu);
+                        if (SUCCEEDED(result))
+                        {
+                            result = menu->QueryInterface(iid, object);
+                            menu->Release();
+                        }
+                        parent->Release();
+                    }
+                }
+                else
+                {
+                    // The caller must offer commands for the complete selection;
+                    // never silently bind a mixed selection to its first folder.
+                    result = HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED);
+                }
+                CoTaskMemFree(parentId);
+            }
         }
         else
         {
