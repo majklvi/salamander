@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: 2026 Open Salamander Authors
+﻿# SPDX-FileCopyrightText: 2026 Open Salamander Authors
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 [CmdletBinding()]
@@ -211,6 +211,14 @@ try {
                 '-B',
                 (Join-Path $repositoryRoot `
                     'src\tests\viewer_hex_contract_tests.py')
+            )
+        },
+        @{
+            Name = 'quick_search_unicode_contract_tests'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot `
+                    'src\tests\quick_search_unicode_contract_tests.py')
             )
         },
         @{
