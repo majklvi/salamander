@@ -8,6 +8,9 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
+#include <functional>
+#include <unordered_map>
 #include <iostream>
 #include <map>
 #include <new>
@@ -16,6 +19,8 @@
 
 using BOOL = int;
 using DWORD = uint32_t;
+using ULONGLONG = uint64_t;
+#define HAS_PREPARATION @HAS_PREPARATION@
 using LONG = int32_t;
 using UINT = unsigned int;
 using WPARAM = uintptr_t;
@@ -52,6 +57,9 @@ struct CAssociationsPixelIconSet { int PixelSize; std::vector<int> AssociationIn
 
 struct CAssociations
 {
+    struct CShellAssociationResult { BOOL Associated; BOOL CanOpen; };
+    std::unordered_map<std::string, CShellAssociationResult> PreparedShellAssociations;
+    ULONGLONG ShellAssociationEpoch = 1;
     std::vector<CAssociationData> Data;
     std::vector<CAssociationsPixelIconSet> PixelIconSets;
     std::map<int, CIconList> Icons;
@@ -60,6 +68,7 @@ struct CAssociations
     ~CAssociations() { Clear(); }
     void Clear()
     {
+        ++ShellAssociationEpoch; PreparedShellAssociations.clear();
         for (auto& data : Data) { free(data.ExtensionAndData); free(data.Type); }
         Data.clear(); PixelIconSets.clear(); Icons.clear(); Count = 0; Good = true; FailInsert = false;
     }
@@ -98,9 +107,18 @@ struct CAssociations
     int GetPixelIconIndex(int, int);
     BOOL SetPixelIconIndex(int, int, int);
     BOOL IsAssociated(char*, BOOL&, CIconSizeEnum, int);
+    BOOL QueryShellAssociationCached(const char*, BOOL&, BOOL prepare = FALSE);
+    void PrepareShellAssociation(const std::string&);
     void InsertData(const char*, int, BOOL, char*, char*, CAssociationData&, LONG&, const char*, const char*);
 };
-BOOL QueryShellAssociation(const char*, BOOL& canOpen) { canOpen = TRUE; return TRUE; }
+int ShellQueryCount = 0;
+std::function<void()> DuringShellQuery;
+BOOL QueryShellAssociation(const char*, BOOL& canOpen)
+{
+    ++ShellQueryCount;
+    if (DuringShellQuery) DuringShellQuery();
+    canOpen = TRUE; return TRUE;
+}
 @CACHE_METHODS@
 
 @INSERT_DATA@
@@ -108,12 +126,14 @@ BOOL QueryShellAssociation(const char*, BOOL& canOpen) { canOpen = TRUE; return 
 struct CFileData { char* Name; char* Ext; size_t NameLen; };
 struct CFilesArray
 {
+    std::deque<std::string> OwnedNames;
     std::vector<CFileData> Data;
     int Count = 0;
     CFileData& At(int index) { return Data.at(index); }
     void Add(const char* name)
     {
-        char* text = const_cast<char*>(name);
+        OwnedNames.emplace_back(name);
+        char* text = const_cast<char*>(OwnedNames.back().c_str());
         Data.push_back({text, strrchr(text, '.') + 1, strlen(text)}); ++Count;
     }
 };
@@ -124,11 +144,17 @@ struct CIconCache
     std::vector<CIconData> Data;
     CIconList List;
     CIconSizeEnum Size = ICONSIZE_16;
+    bool KeysPadded = true;
+    std::string LastLookup;
     CIconSizeEnum GetIconSize() const { return Size; }
     CIconData& At(int index) { return Data.at(index); }
     void Add(const char* name, int image) { Data.push_back({static_cast<int>(Data.size())}); Names.push_back(name); List.Images.push_back(image); }
     BOOL GetIndex(const char* name, int& index, void*, void*)
     {
+        LastLookup = name;
+        const size_t length = strlen(name);
+        for (size_t i = 0; i < sizeof(DWORD); ++i)
+            if (name[length + i] != 0) KeysPadded = false;
         auto found = std::find(Names.begin(), Names.end(), name);
         index = static_cast<int>(found - Names.begin()); return found != Names.end();
     }
@@ -142,6 +168,7 @@ MainWindowStub MainWindowObject;
 MainWindowStub* MainWindow = &MainWindowObject;
 struct CFilesWindow
 {
+    std::map<const char*, std::string> BranchKeys;
     CFilesArray FileStorage, DirStorage;
     CFilesArray* Files = &FileStorage;
     CFilesArray* Dirs = &DirStorage;
@@ -156,6 +183,16 @@ struct CFilesWindow
     void RepaintIconsForExtension(const char*) { ++ExtensionRepaints; }
     void RepaintIconOnly(int) {}
     void Add(const char* name, int image) { Files->Add(name); IconCache->Add(name, image); }
+    void AddBranch(const char* name, const std::string& fullPath, int image)
+    {
+        Files->Add(name); BranchKeys[Files->Data.back().Name] = fullPath;
+        IconCache->Add(fullPath.c_str(), image);
+    }
+    const char* GetItemCacheKeyPtr(const CFileData& file) const
+    {
+        auto found = BranchKeys.find(file.Name);
+        return found == BranchKeys.end() ? file.Name : found->second.c_str();
+    }
     int Deliver(WPARAM wParam, UINT uMsg = WM_USER_REFRESHINDEX)
     {
         switch (uMsg)
@@ -278,10 +315,88 @@ void TestInsertion()
     CHECK(Associations.GetPixelIconIndex(2, 16) == 1601 && Associations.GetPixelIconIndex(2, 32) == 3201, "allocation failure preserves other pixel-size maps");
 }
 
+
+void TestPreparedAssociations()
+{
+#if HAS_PREPARATION
+    SeedMappings(); ShellQueryCount = 0;
+    Associations.PrepareShellAssociation("ccc");
+    Associations.PrepareShellAssociation("ccc");
+    CHECK(ShellQueryCount == 1, "preparation queries each unknown extension once");
+    CHECK(Associations.Count == 3, "preparation never inserts into the live sorted association array");
+    CheckKnownMappings();
+    BOOL load = FALSE; char extension[8] = "ccc";
+    CHECK(Associations.IsAssociated(extension, load, ICONSIZE_16, 16) && load,
+          "publication consumes the prepared association through normal loading");
+    CHECK(ShellQueryCount == 1, "publication must reuse the prepared shell result");
+    CheckKnownMappings();
+    int inserted; Associations.GetIndex("ccc", inserted);
+    CHECK(Associations.GetPixelIconIndex(inserted, 16) == -3,
+          "only publication claims the static association source");
+
+    Associations.Clear(); ShellQueryCount = 0;
+    int pdf = AddAssociation("pdf");
+    Associations.PrepareShellAssociation("pdf");
+    CHECK(ShellQueryCount == 0 && Associations[pdf].GetIndex(ICONSIZE_16) == -1,
+          "preparing a known static association must not claim its source icon");
+    CHECK(Associations.GetPixelIconIndex(pdf, 16) == -1,
+          "preparing a known static association must not create a pending pixel slot");
+    int exe = AddAssociation("exe", -2);
+    Associations.PrepareShellAssociation("exe");
+    CHECK(ShellQueryCount == 0 && Associations[exe].GetIndex(ICONSIZE_16) == -2,
+          "preparation preserves known per-file association semantics");
+
+    Associations.Clear(); ShellQueryCount = 0;
+    DuringShellQuery = [] { ++Associations.ShellAssociationEpoch; Associations.PreparedShellAssociations.clear(); };
+    Associations.PrepareShellAssociation("stale");
+    DuringShellQuery = {};
+    CHECK(Associations.PreparedShellAssociations.empty(),
+          "association invalidation during a shell callback must discard the stale result");
+    Associations.PrepareShellAssociation("stale");
+    CHECK(ShellQueryCount == 2 && Associations.PreparedShellAssociations.size() == 1,
+          "invalidated preparation can query and cache a fresh result");
+#endif
+}
+
+void TestBranchIdentityDelivery()
+{
+    const std::vector<std::string> parents = {
+        "C:\\alpha", u8"C:\\žluťoučký\\東京", "C:\\" + std::string(280, 'x') + u8"\\長い"
+    };
+    for (int chosen = 0; chosen < 3; ++chosen)
+    {
+        Associations.Clear();
+        int pdf = AddAssociation("pdf");
+        CFilesWindow panel;
+        for (int i = 0; i < 3; ++i)
+            panel.AddBranch("same.pdf", parents[i] + "\\same.pdf", 401 + i);
+        // A basename-only lookup must not accidentally return unrelated artwork.
+        panel.IconCache->Add("same.pdf", 999);
+        panel.Deliver(chosen);
+        CHECK(CachedImage(pdf, 16) == 401 + chosen,
+              "static icon source resolves the exact Branch row despite duplicate basenames");
+        CHECK(panel.IconCache->LastLookup == parents[chosen] + "\\same.pdf",
+              "Branch icon lookup retains the complete Unicode/long path");
+        CHECK(panel.IconCache->KeysPadded, "dynamic cache keys include a zero DWORD after the full name");
+        for (int i = 0; i < 3; ++i) panel.Deliver(i);
+        CHECK(CachedImage(pdf, 16) == 401 + chosen,
+              "later duplicate rows cannot overwrite the first shared static icon");
+    }
+    Associations.Clear();
+    int exe = AddAssociation("exe", -2);
+    CFilesWindow dynamic;
+    dynamic.AddBranch("same.exe", parents[0] + "\\same.exe", 701);
+    dynamic.AddBranch("same.exe", parents[1] + "\\same.exe", 702);
+    dynamic.Deliver(0); dynamic.Deliver(1);
+    CHECK(Associations[exe].GetIndex(ICONSIZE_16) == -2 &&
+          Associations.GetPixelIconIndex(exe, 16) == -1,
+          "full Branch identities still cannot seed a shared per-file icon");
+}
+
 int main()
 {
     for (int i = 0; i < 256; ++i) LowerCase[i] = static_cast<unsigned char>(i >= 'A' && i <= 'Z' ? i + 'a' - 'A' : i);
-    TestDynamicAndStatic(); TestInsertion();
+    TestDynamicAndStatic(); TestInsertion(); TestPreparedAssociations(); TestBranchIdentityDelivery();
     std::cout << "association_icon_cache_tests: " << Checks << " checks, " << Failures << " failures\n";
     return Failures == 0 ? 0 : 1;
 }

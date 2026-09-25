@@ -838,10 +838,13 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int icon;
                     CIconList* srcIconList;
                     int srcIconListIndex;
-                    char fileName[MAX_PATH + 4];
-                    memmove(fileName, file->Name, file->NameLen);
-                    *(DWORD*)(fileName + file->NameLen) = 0;
-                    if (IconCache->GetIndex(fileName, icon, NULL, NULL) &&                            // icon-thread ji nacita
+                    // Branch rows are cached by their full identity, not by a
+                    // possibly duplicated basename. GetIndex reads padded DWORDs.
+                    const char* cacheKey = GetItemCacheKeyPtr(*file);
+                    const size_t cacheKeyLength = strlen(cacheKey);
+                    std::vector<char> fileName(cacheKeyLength + sizeof(DWORD), 0);
+                    memcpy(fileName.data(), cacheKey, cacheKeyLength);
+                    if (IconCache->GetIndex(fileName.data(), icon, NULL, NULL) &&                            // icon-thread ji nacita
                         (IconCache->At(icon).GetFlag() == 1 || IconCache->At(icon).GetFlag() == 2) && // ikona je nactena nova nebo stara
                         IconCache->GetIcon(IconCache->At(icon).GetIndex(),
                                            &srcIconList, &srcIconListIndex)) // povede se ziskat nactenou ikonku

@@ -60,10 +60,18 @@ def main() -> int:
         "BOOL CAssociations::SetPixelIconIndex(",
         "BOOL CAssociations::IsAssociated(char* ext,",
     ))
+    prepared_signatures = (
+        "BOOL CAssociations::QueryShellAssociationCached(",
+        "void CAssociations::PrepareShellAssociation(",
+    )
+    has_preparation = all(signature in cache for signature in prepared_signatures)
+    if has_preparation:
+        methods += "\n\n" + "\n\n".join(function(cache, signature) for signature in prepared_signatures)
     handler = panel[panel.index("    case WM_USER_REFRESHINDEX:"):
                     panel.index("    case WM_USER_DROPCOPYMOVE:")]
     template = (ROOT / "tests/association_icon_cache_tests.cpp.in").read_text(encoding="utf-8")
     for key, value in {
+        "HAS_PREPARATION": "1" if has_preparation else "0",
         "ASSOCIATION_DATA": header[data_start:data_end],
         "CACHE_METHODS": methods,
         "INSERT_DATA": function(cache, "void CAssociations::InsertData("),

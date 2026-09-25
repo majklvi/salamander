@@ -12,6 +12,7 @@
 #include <vector>
 #include <windows.h>
 #include "../common/unicode/ViewerBomText.h"
+#include "../viewerhex.h"
 
 static int Checks = 0;
 static int Failures = 0;
@@ -105,7 +106,9 @@ public:
     BOOL UseCodeTable = FALSE;
     char CodeTable[256] = {};
     unsigned char* Buffer = NULL;
+    unsigned char* RawBuffer = NULL;
     std::vector<unsigned char> Storage;
+    std::vector<unsigned char> RawStorage;
     int FatalErrors = 0;
     int PrepareCalls = 0;
 
@@ -113,11 +116,15 @@ public:
     {
         Storage.assign(bytes.begin(), bytes.end());
         Buffer = Storage.data();
+        RawStorage.resize(Storage.size());
+        RawBuffer = RawStorage.data();
         FileSize = (__int64)Storage.size();
         Seek = StartSelection = 0;
         EndSelection = FileSize;
         if (!Storage.empty())
             CodeCharacters(Buffer, Buffer + Storage.size());
+        Check(RawStorage == std::vector<unsigned char>(bytes.begin(), bytes.end()),
+              "clipboard preparation retains original bytes for hex mode");
     }
 
     __int64 Prepare(HANDLE*, __int64 offset, __int64 bytes, BOOL& fatalErr)
