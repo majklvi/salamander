@@ -1122,6 +1122,7 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 case IDC_CM_COPYATTRS:
                 case IDC_CM_SECURITY:
                 case IDC_CM_DIRTIME:
+                case IDC_BRANCH_KEEP_PATHS:
                 case IDC_CM_IGNADS:
                 case IDC_CM_EMPTY:
                 case IDC_CM_NAMED:
@@ -1252,7 +1253,7 @@ CCopyMoveMoreDialog::CCopyMoveMoreDialog(HWND parent, char* path, int pathBufSiz
                                          int* conflictModeInOut,
                                          int* operationSchedulingOverrideInOut,
                                          const std::vector<std::string>* targetPaths,
-                                         BOOL allowChangeTarget)
+                                         BOOL allowChangeTarget, BOOL* keepBranchPathsInOut)
     : CCommonDialog(HLanguage,
                     targetPaths == NULL ? IDD_COPYMOVEMOREDIALOG : IDD_COPYTOSELECTEDDIRSDIALOG,
                     helpID, parent)
@@ -1279,6 +1280,7 @@ CCopyMoveMoreDialog::CCopyMoveMoreDialog(HWND parent, char* path, int pathBufSiz
                  *OperationSchedulingOverrideInOut == COSO_WAIT_ALL;
     TargetPaths = targetPaths;
     AllowChangeTarget = allowChangeTarget;
+    KeepBranchPathsInOut = keepBranchPathsInOut;
     MoreButton = NULL;
 }
 
@@ -1329,6 +1331,8 @@ void CCopyMoveMoreDialog::Transfer(CTransferInfo& ti)
     {
         ti.EditLine(IDE_PATH, Path, PathBufSize);
     }
+    if (KeepBranchPathsInOut != NULL)
+        ti.CheckBox(IDC_BRANCH_KEEP_PATHS, *KeepBranchPathsInOut);
     TransferCriteriaControls(ti);
     if (TransferModeInOut != NULL)
     {
@@ -1590,7 +1594,7 @@ void CCopyMoveMoreDialog::SetOptionsButtonState(BOOL more)
 void CCopyMoveMoreDialog::DisplayMore(BOOL more, BOOL fast)
 {
     // hide the concealed controls so they are removed from the tab order
-    int controls[] = {IDC_CM_NEWER, IDC_CM_STARTONIDLE, IDC_CM_TRANSFERMODE_LABEL, IDC_CM_TRANSFERMODE, IDC_CM_CONFLICTMODE_LABEL, IDC_CM_CONFLICTMODE, IDC_CM_SPEEDLIMIT, IDE_CM_SPEEDLIMIT,
+    int controls[] = {IDC_BRANCH_KEEP_PATHS, IDC_CM_NEWER, IDC_CM_STARTONIDLE, IDC_CM_TRANSFERMODE_LABEL, IDC_CM_TRANSFERMODE, IDC_CM_CONFLICTMODE_LABEL, IDC_CM_CONFLICTMODE, IDC_CM_SPEEDLIMIT, IDE_CM_SPEEDLIMIT,
                       IDC_CM_SPEEDLIMITUNITS, IDC_CM_SECURITY, IDC_CM_COPYATTRS,
                       IDC_CM_DIRTIME, IDC_CM_IGNADS, IDC_CM_EMPTY, IDC_CM_NAMED_MASK, IDC_CM_NAMED,
                       IDC_FILEMASK_HINT, IDC_CM_ADVANCED, IDC_CM_ADVANCED_INFO,
@@ -1612,7 +1616,7 @@ void CCopyMoveMoreDialog::DisplayMore(BOOL more, BOOL fast)
             SendMessage(HWindow, DM_SETDEFID, IDOK, 0);
             SetFocus(GetDlgItem(HWindow, TargetPaths == NULL ? IDE_PATH : IDC_COPY_TARGETDIRS));
         }
-        ShowWindow(hCtrl, more ? SW_SHOW : SW_HIDE);
+        ShowWindow(hCtrl, more && (controls[i] != IDC_BRANCH_KEEP_PATHS || KeepBranchPathsInOut != NULL) ? SW_SHOW : SW_HIDE);
     }
 
     int yOffset = more ? SpacerHeight : -SpacerHeight;
@@ -1631,6 +1635,11 @@ void CCopyMoveMoreDialog::DisplayMore(BOOL more, BOOL fast)
 
     if (!more && !fast) // fast is TRUE when the controls hold default values and don't need resetting
     {
+        if (KeepBranchPathsInOut != NULL)
+        {
+            *KeepBranchPathsInOut = FALSE;
+            CheckDlgButton(HWindow, IDC_BRANCH_KEEP_PATHS, BST_UNCHECKED);
+        }
         Criteria->Reset();
         CTransferInfo ti(HWindow, ttDataToWindow);
         TransferCriteriaControls(ti);
@@ -1713,6 +1722,8 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             PostMessage(HWindow, WM_USER_ENABLEPATHAUTOCOMPLETE, 0, 0);
         }
 
+        SetDlgItemText(HWindow, IDC_BRANCH_KEEP_PATHS, LoadStr(IDS_BRANCH_KEEP_PATHS));
+        ShowWindow(GetDlgItem(HWindow, IDC_BRANCH_KEEP_PATHS), KeepBranchPathsInOut != NULL ? SW_SHOW : SW_HIDE);
         UpdateTransferModeControls();
         EnableWindow(GetDlgItem(HWindow, IDC_CM_SECURITY), HavePermissions);
         EnableWindow(GetDlgItem(HWindow, IDC_CM_IGNADS), SupportsADS);
@@ -1753,7 +1764,7 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         GetWindowRect(GetDlgItem(HWindow, IDC_CM_SPACER), &r);
         SpacerHeight = r.bottom - r.top;
 
-        if (!Criteria->IsDirty())
+        if (!Criteria->IsDirty() && KeepBranchPathsInOut == NULL)
             DisplayMore(FALSE, TRUE);
         break;
     }
@@ -1818,6 +1829,7 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 case IDC_CM_COPYATTRS:
                 case IDC_CM_SECURITY:
                 case IDC_CM_DIRTIME:
+                case IDC_BRANCH_KEEP_PATHS:
                 case IDC_CM_IGNADS:
                 case IDC_CM_EMPTY:
                 case IDC_CM_NAMED:

@@ -901,3 +901,5 @@
 #define _APS_NEXT_SYMED_VALUE           103
 #endif
 #endif
+
+#define IDC_BRANCH_KEEP_PATHS            14510

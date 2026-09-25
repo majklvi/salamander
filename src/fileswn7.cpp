@@ -22,6 +22,7 @@
 
 CPanelTmpEnumData::CPanelTmpEnumData()
 {
+    SourcePanel = NULL;
     Indexes = NULL;
     CurrentIndex = 0;
     IndexesCount = 0;
@@ -566,9 +567,9 @@ static bool DiskDirBuildEnumeration(HWND parent, int enumFiles,
         if (name.empty() || name == L"..")
             continue;
 
-        std::wstring fullPath = panelPath;
-        if (!SalPathAppendW(fullPath, name.c_str()))
-            return false;
+        std::wstring fullPath = data->Panel->GetItemFullPathW(*file);
+        if (data->Panel->IsBranchView())
+            name = data->Panel->GetItemRelativePathW(*file);
         if (DiskDirSamePath(fullPath, data->OutputPath))
             continue;
 
@@ -820,6 +821,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
     data.ZIPPath = GetZIPPath();
     data.Dirs = Dirs;
     data.Files = Files;
+    data.SourcePanel = this;
     data.ArchiveDir = GetArchiveDir();
     data.EnumLastDir = NULL;
     data.EnumLastIndex = -1;
@@ -1651,6 +1653,26 @@ const char* WINAPI PanelEnumDiskSelection(HWND parent, int enumFiles, const char
         return NULL;
     }
 
+    if (data->SourcePanel != NULL && data->SourcePanel->IsBranchView())
+    {
+        if (data->CurrentIndex >= data->IndexesCount)
+            return NULL;
+        const int index = data->Indexes[data->CurrentIndex++];
+        if (index < data->Dirs->Count || index >= data->Dirs->Count + data->Files->Count)
+        {
+            if (errorOccured != NULL) *errorOccured = SALENUM_ERROR;
+            return NULL;
+        }
+        const CFileData& file = data->Files->At(index - data->Dirs->Count);
+        data->BranchEnumName = SalWideToMultiBytePath(data->SourcePanel->GetItemRelativePathW(file).c_str(), CP_UTF8);
+        if (dosName != NULL) *dosName = NULL;
+        if (isDir != NULL) *isDir = FALSE;
+        if (size != NULL) *size = file.Size;
+        if (attr != NULL) *attr = file.Attr;
+        if (lastWrite != NULL) *lastWrite = file.LastWrite;
+        return data->BranchEnumName.c_str();
+    }
+
     if (enumFiles > 0)
     {
         if (data->DiskDirectoryTree == NULL)
@@ -2012,6 +2034,7 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     data.ZIPPath = GetZIPPath();
     data.Dirs = Dirs;
     data.Files = Files;
+    data.SourcePanel = this;
     data.ArchiveDir = GetArchiveDir();
     lstrcpyn(data.WorkPath, GetPath(), _countof(data.WorkPath));
     data.EnumLastDir = NULL;
@@ -2111,9 +2134,9 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     }
 
     // if no item is selected, choose the focused item and store its name
-    char temporarySelected[SAL_MAX_PATH];
-    temporarySelected[0] = 0;
-    SelectFocusedItemAndGetName(temporarySelected, _countof(temporarySelected));
+    CPanelTemporarySelection temporarySelected;
+    temporarySelected.Clear();
+    SelectFocusedItemAndGetName(temporarySelected);
 
     if (delFilesAfterPacking == 1)
         PackerConfig.Move = TRUE;
@@ -2657,6 +2680,30 @@ void CFilesWindow::AcceptChangeOnPathNotification(const char* path, BOOL includi
     CALL_STACK_MESSAGE3("CFilesWindow::AcceptChangeOnPathNotification(%s, %d)",
                         path, includingSubdirs);
 
+    if (IsBranchView())
+    {
+        std::wstring changed = SalMultiByteToWidePath(path, CP_UTF8);
+        if (changed.empty())
+            changed = SalMultiByteToWidePath(path, CP_ACP);
+        std::wstring root = GetPathW();
+        while (!root.empty() && root.back() == L'\\') root.pop_back();
+        while (!changed.empty() && changed.back() == L'\\') changed.pop_back();
+        const BOOL descendant = changed.size() >= root.size() &&
+            CompareStringOrdinal(changed.c_str(), (int)root.size(), root.c_str(), (int)root.size(), TRUE) == CSTR_EQUAL &&
+            (changed.size() == root.size() || changed[root.size()] == L'\\');
+        const BOOL ancestor = includingSubdirs && root.size() >= changed.size() &&
+            CompareStringOrdinal(root.c_str(), (int)changed.size(), changed.c_str(), (int)changed.size(), TRUE) == CSTR_EQUAL &&
+            (root.size() == changed.size() || root[changed.size()] == L'\\');
+        if (!changed.empty() && (descendant || ancestor))
+        {
+            HANDLES(EnterCriticalSection(&TimeCounterSection));
+            const int stamp = MyTimeCounter++;
+            HANDLES(LeaveCriticalSection(&TimeCounterSection));
+            PostMessage(HWindow, WM_USER_REFRESH_DIR, 0, stamp);
+        }
+        RefreshDiskFreeSpace(TRUE, TRUE);
+        return;
+    }
     BOOL refresh = FALSE;
     if ((Is(ptDisk) || Is(ptZIPArchive)) && (!AutomaticRefresh || GetNetworkDrive()))
     {

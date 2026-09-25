@@ -725,6 +725,19 @@ BOOL CSalamanderGeneral::QueryService(const CSalamanderServiceQuery* query, CSal
     if (query == NULL || query->ServiceId == NULL)
         return FALSE;
 
+    // Built-in, immutable service: never registered by or owned by a plug-in.
+    if (strcmp(query->ServiceId, SALAMANDER_SERVICE_VIEWER_ENUMERATION) == 0 &&
+        query->MinimumVersion <= SALAMANDER_VIEWER_ENUMERATION_VERSION_1_0)
+    {
+        if (result != NULL)
+        {
+            result->Interface = GetViewerEnumerationService();
+            result->Version = SALAMANDER_VIEWER_ENUMERATION_VERSION_1_0;
+            result->ProviderName = "Samandarin";
+        }
+        return TRUE;
+    }
+
     EnterCriticalSection(&SalamanderServiceRegistryLock);
     for (int i = 0; i < SalamanderServiceRegistryCount; ++i)
     {

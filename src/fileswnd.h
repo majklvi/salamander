@@ -9,6 +9,7 @@ struct CExplorerSortAsyncData;
 struct CExplorerPropertyCache;
 
 #include "plugins.h"
+#include "panel_temporary_selection.h"
 #include <string>
 #include <vector>
 
@@ -176,6 +177,9 @@ class CStatusWindow;
 class CFilesArray;
 struct CFileData;
 class CIconCache;
+class CBranchViewState;
+struct CBranchViewRestoreState;
+namespace Salamander { namespace BranchView { struct Progress; } }
 class CSalamanderDirectory;
 struct IContextMenu2;
 class CPathHistory;
@@ -566,7 +570,7 @@ public:
     // it returns TRUE if the path fits into the buffer completely, otherwise a truncated path is returned
     BOOL GetGeneralPath(char* buf, int bufSize, BOOL convertFSPathToExternal = FALSE);
 
-    const char* GetPath() { return Path; }
+    const char* GetPath() const { return Path; }
     const wchar_t* GetPathW() const { return PathW.c_str(); }
     BOOL Is(CPanelType type) { return type == PanelType; }
     CPanelType GetPanelType() { return PanelType; }
@@ -862,6 +866,37 @@ public:
 
     CPanelSide PanelSide;
     ULONGLONG PanelTabId;
+    CBranchViewState* BranchView; // core-owned disk collection, NULL for ordinary panels
+
+    BOOL IsBranchView() const;
+    BOOL IsBranchViewScanning() const;
+    ULONGLONG GetBranchViewGeneration() const;
+    std::wstring GetItemFullPathW(const CFileData& file) const;
+    std::wstring GetItemDirectoryW(const CFileData& file) const;
+    std::wstring GetItemIdentityW(const CFileData& file) const;
+    std::wstring GetItemRelativePathW(const CFileData& file) const;
+    std::string GetItemCacheKey(const CFileData& file) const;
+    const char* GetItemCacheKeyPtr(const CFileData& file) const;
+    const CFileData* GetBranchViewFileByCacheKey(const char* key) const;
+    CBranchViewRestoreState CaptureBranchViewState();
+    void RestoreBranchViewState(const CBranchViewRestoreState& state);
+    void ToggleBranchView();
+    void RefreshBranchView(BOOL automatic = FALSE);
+    void PollBranchView();
+    void CancelBranchViewScan();
+    void ShutdownBranchView();
+    void LeaveBranchView();
+    void BranchItemRenamed(const char* oldNameKey, const CFileData& file, const std::wstring& oldFullPath);
+    void GetBranchViewProgress(Salamander::BranchView::Progress& progress) const;
+    std::wstring GetBranchViewStatusW() const;
+    std::string GetBranchViewStatusText() const;
+    int GetBranchViewPathColumnWidth() const;
+    void SetBranchViewPathColumnWidth(int width);
+    BOOL OpenBranchItemDirectory();
+    void FocusBranchShortcutTarget(CFilesWindow* panel, const CFileData& file);
+    void PruneBranchViewMetadata();
+    void ReindexBranchViewFiles();
+
     bool CustomTabColorValid;
     COLORREF CustomTabColor;
     bool CustomTabPrefixValid;
@@ -1502,7 +1537,7 @@ public:
                          char* mask, int selCount, int* selection,
                          CFileData* oneFile, CAttrsData* attrsData,
                          CChangeCaseData* chCaseData, BOOL onlySize,
-                         CCriteriaData* filterCriteria);
+                         CCriteriaData* filterCriteria, BOOL keepBranchPaths = FALSE);
     BOOL BuildScriptDir(COperations* script, CActionType type, char* sourcePath,
                         BOOL sourcePathSupADS, char* targetPath, CTargetPathState targetPathState,
                         BOOL targetPathSupADS, BOOL targetPathIsFAT32, char* mask, char* dirName,
@@ -1725,8 +1760,8 @@ public:
 
     int GetSelCount(); // returns the number of selected items
 
-    void SelectFocusedItemAndGetName(char* name, int nameMax);
-    void UnselectItemWithName(const char* name);
+    void SelectFocusedItemAndGetName(CPanelTemporarySelection& selection);
+    void UnselectItemWithName(const CPanelTemporarySelection& selection);
 
     // returns PANEL_LEFT or PANEL_RIGHT depending on which side this panel is on
     int GetPanelCode();
@@ -1852,6 +1887,8 @@ public:
 
 struct CPanelTmpEnumData
 {
+    CFilesWindow* SourcePanel;
+    std::string BranchEnumName;
     int* Indexes;
     int CurrentIndex;
     int IndexesCount;

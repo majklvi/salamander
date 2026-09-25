@@ -4142,9 +4142,29 @@ SLGINCOMPLETE,""
 14493,1,"Mismatch tra file/directory"
 
 [STRINGTABLE 182]
-14991,1,"Lettura associazioni dall'archiviazione file, attendere..."
+14500,1,"Vista ramo"
+14501,1,"&Vista ramo\tCtrl+B"
+14502,1,"Percorso"
+14503,1,"Cartella padre effettiva"
+14504,1,"Apri &cartella contenente"
+14505,1,"Interrompi scansione del ramo"
+14506,1,"Vista ramo - scansione... %I64u file"
+14507,1,"Vista ramo - %I64u file"
+14508,1,"Vista ramo - interrotta; %I64u file (incompleta)"
+14509,1,"Vista ramo - %I64u file; impossibile leggere %I64u cartelle"
+14510,1,"Mantieni i percorsi delle sottocartelle relativi alla radice della vista ramo"
+14511,1,"Percorso: "
 
 [STRINGTABLE 183]
+14512,1,"Impossibile leggere l’albero delle cartelle. Aggiorna la vista per riprovare."
+14513,1,"Vista ramo - aggiornamento... %I64u file mantenuti"
+14514,1,"Vista ramo - aggiornamento interrotto; risultati precedenti mantenuti (%I64u file)"
+14515,1,"Vista ramo - preparazione di %I64u file; %I64u risultati precedenti mantenuti"
+
+[STRINGTABLE 184]
+14991,1,"Lettura associazioni dall'archiviazione file, attendere..."
+
+[STRINGTABLE 185]
 14992,1,"Salvataggio configurazione nell'archiviazione file, attendere..."
 14993,1,"Eliminazione vecchia configurazione dall'archiviazione file, attendere..."
 14994,1,"Lettura associazioni dall'archiviazione file..."

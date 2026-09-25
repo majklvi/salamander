@@ -4142,9 +4142,29 @@ SLGINCOMPLETE,""
 14493,1,"Neshoda typu soubor/adresář"
 
 [STRINGTABLE 182]
-14991,1,"Čtení přidružení souborů ze souborového úložiště, čekejte prosím..."
+14500,1,"Pohled na větev"
+14501,1,"&Pohled na větev\tCtrl+B"
+14502,1,"Cesta"
+14503,1,"Skutečná nadřazená složka"
+14504,1,"Otevřít obsahující &složku"
+14505,1,"Zastavit prohledávání větve"
+14506,1,"Pohled na větev - prohledávání... %I64u souborů"
+14507,1,"Pohled na větev - %I64u souborů"
+14508,1,"Pohled na větev - zastaveno; %I64u souborů (neúplné)"
+14509,1,"Pohled na větev - %I64u souborů; %I64u složek nebylo možné přečíst"
+14510,1,"Zachovat cesty podsložek relativní ke kořeni pohledu na větev"
+14511,1,"Cesta: "
 
 [STRINGTABLE 183]
+14512,1,"Strom složek nebylo možné přečíst. Obnovte zobrazení a zkuste to znovu."
+14513,1,"Pohled na větev - obnovování... ponecháno %I64u souborů"
+14514,1,"Pohled na větev - obnova zastavena; předchozí výsledky ponechány (%I64u souborů)"
+14515,1,"Pohled na větev - příprava %I64u souborů; ponecháno %I64u předchozích výsledků"
+
+[STRINGTABLE 184]
+14991,1,"Čtení přidružení souborů ze souborového úložiště, čekejte prosím..."
+
+[STRINGTABLE 185]
 14992,1,"Ukládání konfigurace do souborového úložiště, čekejte prosím..."
 14993,1,"Odstraňování staré konfigurace ze souborového úložiště, čekejte prosím..."
 14994,1,"Probíhá čtení přidružení souborů ze souborového úložiště..."

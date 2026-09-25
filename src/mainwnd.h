@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "fileswnd.h"
+#include "branch_view.h"
 #include "cfgdlg.h"
 
 #define HOT_PATHS_COUNT 30
@@ -273,8 +274,8 @@ public:
 // UM_GetNextFileName - function type that gradually returns file names for U.M.
 //
 // index - order of the next name (starting from zero and increasing by one)
-// path  - buffer for the path [MAX_PATH]
-// name  - buffer for the file name [MAX_PATH]
+// path  - UTF-8 buffer for the path [3 * SAL_MAX_PATH]
+// name  - UTF-8 buffer for the file name [3 * SAL_MAX_PATH]
 // param - helper pointer for user data
 //
 // returns success - continue retrieving more names? (returns FALSE - ends the enumeration)
@@ -419,6 +420,8 @@ public:
         int InsertIndex;
         std::string GeneralPath;
         std::string FallbackPath;
+        std::wstring DiskPathW;
+        CBranchViewRestoreState BranchState;
         int ViewTemplateIndex;
         CSortType SortType;
         DWORD SortCustomData;

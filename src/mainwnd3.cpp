@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/widepath.h"
 
 #include <algorithm>
 #include <new>
@@ -737,6 +738,8 @@ void CMainWindow::RememberClosedTab(CPanelSide side, CFilesWindow* panel, int in
     if (basicPath != NULL)
         info.FallbackPath.assign(basicPath);
 
+    info.BranchState = panel->CaptureBranchViewState();
+    info.DiskPathW = panel->Is(ptDisk) ? panel->GetPathW() : L"";
     info.ViewTemplateIndex = panel->GetViewTemplateIndex();
     info.SortType = panel->SortType;
     info.SortCustomData = panel->SortCustomData;
@@ -930,7 +933,10 @@ std::wstring CMainWindow::GetPanelTabDisplayText(CFilesWindow* panel) const
         if (info != NULL)
             index = info->OriginalIndex;
     }
-    return BuildTabDisplayText(panel, index);
+    std::wstring text = BuildTabDisplayText(panel, index);
+    if (panel->IsBranchView())
+        text += L" [" + SalMultiByteToWidePath(LoadStr(IDS_BRANCH_VIEW), CP_UTF8) + L"]";
+    return text;
 }
 
 void CMainWindow::UpdatePanelTabTitle(CFilesWindow* panel)
@@ -2298,13 +2304,16 @@ CFilesWindow* CMainWindow::CreateDuplicatePanelTab(CPanelSide targetSide, CFiles
     // Capture this before creating the target HWND or copying view state.
     // Both can synchronously dispatch UI messages, while sourcePanel can be a
     // hidden tab which must retain its own location throughout the operation.
-    char sourcePath[2 * MAX_PATH];
+    CPathBuffer sourcePathBuffer(4 * SAL_MAX_PATH);
+    char* sourcePath = sourcePathBuffer.Data();
     sourcePath[0] = 0;
-    if (!sourcePanel->GetGeneralPath(sourcePath, _countof(sourcePath), TRUE))
+    const std::wstring sourceDiskPath = sourcePanel->Is(ptDisk) ? sourcePanel->GetPathW() : L"";
+    const CBranchViewRestoreState sourceBranchView = sourcePanel->CaptureBranchViewState();
+    if (!sourcePanel->GetGeneralPath(sourcePath, sourcePathBuffer.Capacity(), TRUE))
     {
         const char* currentSourcePath = sourcePanel->GetPath();
         if (currentSourcePath != NULL)
-            lstrcpyn(sourcePath, currentSourcePath, _countof(sourcePath));
+            lstrcpyn(sourcePath, currentSourcePath, sourcePathBuffer.Capacity());
     }
 
     CFilesWindow* newPanel = AddPanelTab(targetSide, insertIndex);
@@ -2385,8 +2394,16 @@ CFilesWindow* CMainWindow::CreateDuplicatePanelTab(CPanelSide targetSide, CFiles
 
     newPanel->UserWorkedOnThisPath = sourcePanel->UserWorkedOnThisPath;
 
-    if (sourcePath[0] != 0)
+    if (!sourceDiskPath.empty())
+        newPanel->ChangePathToDiskW(HWindow, sourceDiskPath.c_str());
+    else if (sourcePath[0] != 0)
         newPanel->ChangeDir(sourcePath);
+    if (sourceBranchView.Enabled && newPanel->Is(ptDisk) && sourceDiskPath == newPanel->GetPathW())
+    {
+        newPanel->RestoreBranchViewState(sourceBranchView);
+        if (sourcePanel->SortType == stCustom)
+            newPanel->ChangeCustomSortType(sourcePanel->SortCustomData, sourcePanel->ReverseSort, TRUE);
+    }
 
     UpdatePanelTabColor(newPanel);
     UpdatePanelTabTitle(newPanel);
@@ -2549,10 +2566,18 @@ bool CMainWindow::CommandReopenClosedTab(CPanelSide side)
 
     panel->UserWorkedOnThisPath = entry.UserWorkedOnPath;
 
-    if (!entry.GeneralPath.empty())
+    if (!entry.DiskPathW.empty())
+        panel->ChangePathToDiskW(HWindow, entry.DiskPathW.c_str());
+    else if (!entry.GeneralPath.empty())
         panel->ChangeDir(entry.GeneralPath.c_str());
     else if (!entry.FallbackPath.empty())
         panel->ChangeDir(entry.FallbackPath.c_str());
+    if (entry.BranchState.Enabled && panel->Is(ptDisk) && entry.DiskPathW == panel->GetPathW())
+    {
+        panel->RestoreBranchViewState(entry.BranchState);
+        if (entry.SortType == stCustom)
+            panel->ChangeCustomSortType(entry.SortCustomData, entry.ReverseSort, TRUE);
+    }
 
     UpdatePanelTabColor(panel);
     UpdatePanelTabTitle(panel);
@@ -5928,7 +5953,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 char* listFull = userMenuAdvancedData.ListOfSelFullNames;
                 char* listFullEnd = listFull + USRMNUARGS_MAXLEN - 1;
                 smallBuf = FALSE;
-                char fullName[MAX_PATH];
+                std::string fullName;
                 if (activePanel->SelectedCount > 0)
                 {
                     int count = activePanel->Files->Count + activePanel->Dirs->Count;
@@ -5945,9 +5970,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                                 else
                                     break;
                             }
-                            lstrcpyn(fullName, activePanel->GetPath(), MAX_PATH);
-                            if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
-                                !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
+                            fullName = SalWideToMultiBytePath(activePanel->GetItemFullPathW(*file).c_str(), CP_UTF8);
+                            if (!AddToListOfNames(&listFull, listFullEnd, fullName.c_str(), (int)fullName.size()))
                                 break;
                         }
                     }
@@ -5966,9 +5990,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         (index != 0 || !subDir))
                     {
                         CFileData* file = (index < activePanel->Dirs->Count) ? &activePanel->Dirs->At(index) : &activePanel->Files->At(index - activePanel->Dirs->Count);
-                        lstrcpyn(fullName, activePanel->GetPath(), MAX_PATH);
-                        if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
-                            !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
+                        fullName = SalWideToMultiBytePath(activePanel->GetItemFullPathW(*file).c_str(), CP_UTF8);
+                        if (!AddToListOfNames(&listFull, listFullEnd, fullName.c_str(), (int)fullName.size()))
                         {
                             smallBuf = TRUE;
                         }
@@ -5987,16 +6010,18 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
                 if (LeftPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathLeft, LeftPanel->GetPath(), MAX_PATH);
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, MAX_PATH))
+                    std::string panelPath = SalWideToMultiBytePath(LeftPanel->GetPathW(), CP_UTF8);
+                    strcpy(userMenuAdvancedData.FullPathLeft, panelPath.c_str());
+                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, CUserMenuAdvancedData::PathCapacity))
                         userMenuAdvancedData.FullPathLeft[0] = 0;
                 }
                 else
                     userMenuAdvancedData.FullPathLeft[0] = 0;
                 if (RightPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathRight, RightPanel->GetPath(), MAX_PATH);
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathRight, MAX_PATH))
+                    std::string panelPath = SalWideToMultiBytePath(RightPanel->GetPathW(), CP_UTF8);
+                    strcpy(userMenuAdvancedData.FullPathRight, panelPath.c_str());
+                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathRight, CUserMenuAdvancedData::PathCapacity))
                         userMenuAdvancedData.FullPathRight[0] = 0;
                 }
                 else
@@ -6089,21 +6114,16 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
                 if (f1 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName1, activePanel->GetPath(), MAX_PATH);
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName1, f1->Name, MAX_PATH))
-                        userMenuAdvancedData.CompareName1[0] = 0;
+                    std::string comparedName = SalWideToMultiBytePath(activePanel->GetItemFullPathW(*f1).c_str(), CP_UTF8);
+                    strcpy(userMenuAdvancedData.CompareName1, comparedName.c_str());
                 }
                 if (f2 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName2,
-                             (f2FromInactPanel ? inactivePanel : activePanel)->GetPath(), MAX_PATH);
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName2, f2->Name, MAX_PATH))
-                        userMenuAdvancedData.CompareName2[0] = 0;
-                    else
-                    {
-                        if (f2FromInactPanel && inactivePanel == LeftPanel)
-                            userMenuAdvancedData.CompareNamesReversed = TRUE;
-                    }
+                    std::string comparedName = SalWideToMultiBytePath(
+                        (f2FromInactPanel ? inactivePanel : activePanel)->GetItemFullPathW(*f2).c_str(), CP_UTF8);
+                    strcpy(userMenuAdvancedData.CompareName2, comparedName.c_str());
+                    if (f2FromInactPanel && inactivePanel == LeftPanel)
+                        userMenuAdvancedData.CompareNamesReversed = TRUE;
                 }
                 if (userMenuAdvancedData.CompareName1[0] != 0 &&
                     userMenuAdvancedData.CompareName2[0] == 0 && activePanel == RightPanel)
@@ -6112,7 +6132,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
 
                 CUMDataFromPanel data(activePanel);
-                SetCurrentDirectory(activePanel->GetPath());
+                SetCurrentDirectoryW(activePanel->GetPathW());
                 UserMenu(HWindow, LOWORD(wParam) - CM_USERMENU_MIN, GetNextFileFromPanel,
                          &data, &userMenuAdvancedData);
                 SetCurrentDirectoryToSystem();
@@ -7102,6 +7122,27 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             return 0;
         }
 
+        case CM_BRANCHVIEW:
+        case CM_LEFT_BRANCHVIEW:
+        case CM_RIGHT_BRANCHVIEW:
+        {
+            CFilesWindow* panel = LOWORD(wParam) == CM_LEFT_BRANCHVIEW ? LeftPanel :
+                                  LOWORD(wParam) == CM_RIGHT_BRANCHVIEW ? RightPanel : activePanel;
+            if (panel != NULL && panel->Is(ptDisk))
+                panel->ToggleBranchView();
+            return 0;
+        }
+
+        case CM_BRANCH_STOP:
+            if (activePanel != NULL)
+                activePanel->CancelBranchViewScan();
+            return 0;
+
+        case CM_BRANCH_OPENPARENT:
+            if (activePanel != NULL)
+                activePanel->OpenBranchItemDirectory();
+            return 0;
+
         case CM_CHANGEFILTER:
             activePanel->ChangeFilter();
             return 0;
@@ -7444,8 +7485,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            char temporarySelected[MAX_PATH];
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
             activePanel->EmailFiles();
 
@@ -7493,8 +7534,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            char temporarySelected[MAX_PATH];
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
             BOOL changeTargetRequested;
             do
@@ -7659,8 +7700,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 activePanel->StoreSelection(); // save selection for Restore Selection command
 
                 // if no item is selected, choose the one under the focus and store its name
-                char temporarySelected[MAX_PATH];
-                activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+                CPanelTemporarySelection temporarySelected;
+                activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
                 activePanel->Convert();
 
@@ -9332,6 +9373,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             BOOL left = popupID == CML_LEFT;
 
+            CFilesWindow* branchPanel = left ? LeftPanel : RightPanel;
+            popup->CheckItem(left ? CM_LEFT_BRANCHVIEW : CM_RIGHT_BRANCHVIEW, FALSE, branchPanel->IsBranchView());
+            popup->EnableItem(left ? CM_LEFT_BRANCHVIEW : CM_RIGHT_BRANCHVIEW, FALSE, branchPanel->Is(ptDisk));
+
             popup->CheckItem(left ? CM_LCHANGEFILTER : CM_RCHANGEFILTER, FALSE,
                              (left ? LeftPanel : RightPanel)->FilterEnabled);
 
@@ -9428,6 +9473,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CML_FILES:
         {
+            CFilesWindow* branchPanel = GetActivePanel();
+            popup->EnableItem(CM_BRANCH_OPENPARENT, FALSE, branchPanel != NULL && branchPanel->IsBranchView() && branchPanel->Files->Count > 0);
+            popup->EnableItem(CM_BRANCH_STOP, FALSE, branchPanel != NULL && branchPanel->IsBranchViewScanning());
             break;
         }
 

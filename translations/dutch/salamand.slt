@@ -4142,9 +4142,29 @@ SLGINCOMPLETE,""
 14493,1,"Type komt niet overeen (bestand/map)"
 
 [STRINGTABLE 182]
-14991,1,"Associaties worden uit de bestandopslag gelezen, even geduld..."
+14500,1,"Vertakkingsweergave"
+14501,1,"&Vertakkingsweergave\tCtrl+B"
+14502,1,"Pad"
+14503,1,"Werkelijke bovenliggende map"
+14504,1,"Bevattende &map openen"
+14505,1,"Scannen van vertakking stoppen"
+14506,1,"Vertakkingsweergave - scannen... %I64u bestanden"
+14507,1,"Vertakkingsweergave - %I64u bestanden"
+14508,1,"Vertakkingsweergave - gestopt; %I64u bestanden (onvolledig)"
+14509,1,"Vertakkingsweergave - %I64u bestanden; %I64u mappen konden niet worden gelezen"
+14510,1,"Submappaden ten opzichte van de hoofdmap van de vertakkingsweergave behouden"
+14511,1,"Pad: "
 
 [STRINGTABLE 183]
+14512,1,"De mappenstructuur kon niet worden gelezen. Vernieuw de weergave om het opnieuw te proberen."
+14513,1,"Vertakkingsweergave - vernieuwen... %I64u bestanden behouden"
+14514,1,"Vertakkingsweergave - vernieuwen gestopt; vorige resultaten behouden (%I64u bestanden)"
+14515,1,"Vertakkingsweergave - %I64u bestanden voorbereiden; %I64u vorige resultaten behouden"
+
+[STRINGTABLE 184]
+14991,1,"Associaties worden uit de bestandopslag gelezen, even geduld..."
+
+[STRINGTABLE 185]
 14992,1,"Configuratie wordt in de bestandopslag opgeslagen, even geduld..."
 14993,1,"Oude configuratie wordt uit de bestandopslag verwijderd, even geduld..."
 14994,1,"Associaties worden uit de bestandopslag gelezen..."

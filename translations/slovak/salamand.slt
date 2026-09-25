@@ -4142,9 +4142,29 @@ SLGINCOMPLETE,""
 14493,1,"Nesúlad typu súbor/adresár"
 
 [STRINGTABLE 182]
-14991,1,"Čítanie priradení súborov zo súborového úložiska, čakajte prosím..."
+14500,1,"Zobrazenie vetvy"
+14501,1,"&Zobrazenie vetvy\tCtrl+B"
+14502,1,"Cesta"
+14503,1,"Skutočný nadradený priečinok"
+14504,1,"Otvoriť obsahujúci &priečinok"
+14505,1,"Zastaviť prehľadávanie vetvy"
+14506,1,"Zobrazenie vetvy - prehľadávanie... %I64u súborov"
+14507,1,"Zobrazenie vetvy - %I64u súborov"
+14508,1,"Zobrazenie vetvy - zastavené; %I64u súborov (neúplné)"
+14509,1,"Zobrazenie vetvy - %I64u súborov; %I64u priečinkov sa nepodarilo prečítať"
+14510,1,"Zachovať cesty podpriečinkov relatívne ku koreňu zobrazenia vetvy"
+14511,1,"Cesta: "
 
 [STRINGTABLE 183]
+14512,1,"Strom priečinkov sa nepodarilo prečítať. Obnovte zobrazenie a skúste to znova."
+14513,1,"Zobrazenie vetvy - obnovovanie... ponechaných %I64u súborov"
+14514,1,"Zobrazenie vetvy - obnova zastavená; predchádzajúce výsledky ponechané (%I64u súborov)"
+14515,1,"Zobrazenie vetvy - príprava %I64u súborov; ponechaných %I64u predchádzajúcich výsledkov"
+
+[STRINGTABLE 184]
+14991,1,"Čítanie priradení súborov zo súborového úložiska, čakajte prosím..."
+
+[STRINGTABLE 185]
 14992,1,"Ukladanie konfigurácie do súborového úložiska, čakajte prosím..."
 14993,1,"Odstraňovanie starej konfigurácie zo súborového úložiska, čakajte prosím..."
 14994,1,"Prebieha čítanie priradení súborov zo súborového úložiska..."

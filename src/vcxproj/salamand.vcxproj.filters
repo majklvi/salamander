@@ -612,6 +612,12 @@
     <ClInclude Include="..\filesbox.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\explorerpropertywork.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\panel_temporary_selection.h">
+      <Filter>h</Filter>
+    </ClInclude>
     <ClInclude Include="..\fileswnd.h">
       <Filter>h</Filter>
     </ClInclude>
