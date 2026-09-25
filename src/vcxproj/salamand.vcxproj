@@ -515,6 +515,9 @@
     </ClCompile>
     <ClCompile Include="..\fileswn0.cpp">
     </ClCompile>
+    <ClCompile Include="..\branch_view.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\fileswn1.cpp">
     </ClCompile>
     <ClCompile Include="..\fileswn2.cpp">
@@ -1008,6 +1011,15 @@
     </ClInclude>
     <ClInclude Include="..\filesbox.h">
     </ClInclude>
+    <ClInclude Include="..\branch_view.h" />
+    <ClInclude Include="..\panel_temporary_selection.h" />
+    <ClInclude Include="..\branchshell.h" />
+    <ClInclude Include="..\branchclipboard.h" />
+    <ClInclude Include="..\viewerpath.h" />
+    <ClInclude Include="..\workerpath.h" />
+    <ClInclude Include="..\fileactionpath.h" />
+    <ClInclude Include="..\operationrecycle.h" />
+    <ClInclude Include="..\explorerpropertywork.h" />
     <ClInclude Include="..\fileswnd.h">
     </ClInclude>
     <ClInclude Include="..\filenamecase.h">

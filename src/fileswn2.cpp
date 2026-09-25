@@ -1,8 +1,9 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "branch_view.h"
 
 #include <uxtheme.h>
 
@@ -874,6 +875,30 @@ void CFilesWindow::Execute(int index)
             }
 
             CFileData* file = &Files->At(index - Dirs->Count);
+            if (IsBranchView())
+            {
+                const std::wstring source = GetItemFullPathW(*file);
+                const std::wstring directory = GetItemDirectoryW(*file);
+                const std::string sourceUtf8 = SalWideToMultiBytePath(source.c_str(), CP_UTF8);
+                if (PackerFormatConfig.PackIsArchive(file->Name))
+                {
+                    BOOL noChange;
+                    ChangePathToArchive(sourceUtf8.c_str(), "", -1, NULL, FALSE, &noChange);
+                }
+                else
+                {
+                    SHELLEXECUTEINFOW execute = {sizeof(execute)};
+                    execute.fMask = SEE_MASK_NOASYNC;
+                    execute.hwnd = GetListBoxHWND();
+                    execute.lpFile = source.c_str();
+                    execute.lpDirectory = directory.c_str();
+                    execute.nShow = SW_SHOWNORMAL;
+                    if (ShellExecuteExW(&execute))
+                        MainWindow->FileHistory->AddFile(fhitOpen, 0, sourceUtf8.c_str());
+                }
+                EndStopRefresh();
+                return;
+            }
             char* fileName = file->Name;
             char fullPath[SAL_MAX_PATH];
             char netFSName[SAL_MAX_PATH];
@@ -1334,8 +1359,28 @@ void CFilesWindow::ChangeCustomSortType(DWORD customData, BOOL reverse, BOOL for
     if (focusIndex >= 0 && focusIndex < Dirs->Count + Files->Count)
         d1 = (focusIndex < Dirs->Count) ? Dirs->At(focusIndex) : Files->At(focusIndex - Dirs->Count);
 
-    SortDirectory();
-    RefreshListBox(-1, -1, FocusedIndex, FALSE, FALSE);
+    const BOOL branchListing = IsBranchView();
+    const BOOL suspendIcons = branchListing && (UseSystemIcons || UseThumbnails);
+    if (suspendIcons)
+        SleepIconCacheThread();
+    SortDirectory(); // also rebuilds the Branch cache-key -> row index
+    if (branchListing && d1.Name != NULL)
+    {
+        // Name allocations survive sorting and distinguish identical basenames.
+        // Do not leave the focus on the former row number after Path sorting.
+        for (int i = 0; i < Dirs->Count + Files->Count; ++i)
+        {
+            const CFileData& file = i < Dirs->Count ? Dirs->At(i) : Files->At(i - Dirs->Count);
+            if (file.Name == d1.Name)
+            {
+                focusIndex = i;
+                break;
+            }
+        }
+    }
+    if (suspendIcons)
+        WakeupIconCacheThread();
+    RefreshListBox(-1, -1, branchListing ? focusIndex : FocusedIndex, FALSE, FALSE);
 }
 
 void CFilesWindow::ChangeSortType(CSortType newType, BOOL reverse, BOOL force)
@@ -2494,6 +2539,7 @@ void CFilesWindow::UpdateTreeView(BOOL active)
 void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOOL newPathIsTheSame,
                                     BOOL isRefresh, BOOL canChangeSourceUID)
 {
+    if (!cancel && (!newPathIsTheSame || !isRefresh)) LeaveBranchView();
     CALL_STACK_MESSAGE6("CFilesWindow::CloseCurrentPath(, %d, %d, %d, %d, %d)",
                         cancel, detachFS, newPathIsTheSame, isRefresh, canChangeSourceUID);
 
@@ -2669,6 +2715,11 @@ void CFilesWindow::RefreshPathHistoryData()
     CALL_STACK_MESSAGE1("CFilesWindow::RefreshPathHistoryData()");
 
     int index = GetCaretIndex();
+    if (Is(ptDisk) && Files->Count + Dirs->Count == 0)
+    {
+        const CBranchViewRestoreState branch = CaptureBranchViewState();
+        PathHistory->ChangeActualPathData(0, GetPath(), NULL, NULL, NULL, ListBox->GetTopIndex(), NULL, &branch);
+    }
     if (index >= 0 && index < Files->Count + Dirs->Count) // bounds check to prevent data inconsistency
     {
         int topIndex = ListBox->GetTopIndex();
@@ -2683,7 +2734,8 @@ void CFilesWindow::RefreshPathHistoryData()
         {
             if (Is(ptDisk))
             {
-                PathHistory->ChangeActualPathData(0, GetPath(), NULL, NULL, NULL, topIndex, file->Name);
+                const CBranchViewRestoreState branch = CaptureBranchViewState();
+                PathHistory->ChangeActualPathData(0, GetPath(), NULL, NULL, NULL, topIndex, file->Name, &branch);
             }
             else
             {

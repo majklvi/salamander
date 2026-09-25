@@ -359,6 +359,30 @@ try {
             )
         },
         @{
+            Name = 'branch_view_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_view_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_activation_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_activation_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_properties_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_properties_contract_tests.py'))
+        },
+        @{
+            Name = 'worker_copy_path_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\worker_copy_path_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_view_file_action_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_view_file_action_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_operations_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_operations_contract_tests.py'))
+        },
+        @{
             Name = 'copy_move_scheduling_contract_tests'
             Arguments = @(
                 '-B',

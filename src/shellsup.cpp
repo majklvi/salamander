@@ -1054,6 +1054,48 @@ const char* EnumFileNames(int index, void* param)
         return NULL;
 }
 
+static std::vector<std::wstring> GetPanelShellPaths(int count, CTmpEnumData* data)
+{
+    std::vector<std::wstring> paths;
+    for (int i = 0; i < count; ++i)
+    {
+        const int index = data->Indexes[i];
+        if (index < 0 || index >= data->Panel->Dirs->Count + data->Panel->Files->Count)
+        {
+            paths.clear();
+            return paths;
+        }
+        const CFileData& file = index < data->Panel->Dirs->Count ? data->Panel->Dirs->At(index) :
+                               data->Panel->Files->At(index - data->Panel->Dirs->Count);
+        paths.push_back(data->Panel->GetItemFullPathW(file));
+    }
+    return paths;
+}
+
+static IContextMenu2* CreatePanelShellMenu(HWND owner, const char* root, int count,
+                                          CEnumFileNamesFunction next, void* param)
+{
+    CTmpEnumData* data = (CTmpEnumData*)param;
+    if (!data->Panel->IsBranchView())
+        return CreateIContextMenu2(owner, root, count, next, param);
+    IContextMenu2* menu = CreateIContextMenu2ForPaths(owner, GetPanelShellPaths(count, data));
+    if (menu == NULL)
+        SalMessageBox(owner, GetErrorText(GetLastError()), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+    return menu;
+}
+
+static IDataObject* CreatePanelShellData(HWND owner, const char* root, int count,
+                                        CEnumFileNamesFunction next, void* param)
+{
+    CTmpEnumData* data = (CTmpEnumData*)param;
+    if (!data->Panel->IsBranchView())
+        return CreateIDataObject(owner, root, count, next, param);
+    IDataObject* object = CreateIDataObjectForPaths(owner, GetPanelShellPaths(count, data));
+    if (object == NULL)
+        SalMessageBox(owner, GetErrorText(GetLastError()), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+    return object;
+}
+
 const char* EnumOneFileName(int index, void* param)
 {
     return index == 0 ? (char*)param : NULL;
@@ -1977,7 +2019,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 CTmpEnumData data;
                 data.Indexes = (count == 0) ? &index : indexes;
                 data.Panel = panel;
-                IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(),
+                IContextMenu2* menu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
                                                           (count == 0) ? 1 : count,
                                                           EnumFileNames, &data);
                 if (menu != NULL)
@@ -2029,7 +2071,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 CTmpEnumData data;
                 data.Indexes = (count == 0) ? &index : indexes;
                 data.Panel = panel;
-                IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
+                IContextMenu2* menu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
                                                           EnumFileNames, &data);
                 if (menu != NULL)
                 {
@@ -2090,7 +2132,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                     for (k = 0; k < total; k++)
                                     {
                                         CFileData* f2 = &anotherPanel->Dirs->At(k);
-                                        if (StrICmp(f->Name, f2->Name) == 0)
+                                        if (panel->GetItemIdentityW(*f) == anotherPanel->GetItemIdentityW(*f2))
                                         {
                                             f2->CutToClip = 1;
                                             f2->Dirty = 1;
@@ -2105,7 +2147,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                     for (k = 0; k < total; k++)
                                     {
                                         CFileData* f2 = &anotherPanel->Files->At(k);
-                                        if (StrICmp(f->Name, f2->Name) == 0)
+                                        if (panel->GetItemIdentityW(*f) == anotherPanel->GetItemIdentityW(*f2))
                                         {
                                             f2->CutToClip = 1;
                                             f2->Dirty = 1;
@@ -2145,7 +2187,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             CTmpEnumData data;
             data.Indexes = (count == 0) ? &index : indexes;
             data.Panel = panel;
-            IDataObject* dataObject = CreateIDataObject(MainWindow->HWindow, panel->GetPath(),
+            IDataObject* dataObject = CreatePanelShellData(MainWindow->HWindow, panel->GetPath(),
                                                         (count == 0) ? 1 : count,
                                                         EnumFileNames, &data);
             CImpIDropSource* dropSource = new CImpIDropSource(FALSE);
@@ -2307,7 +2349,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         else
                         {
 #endif // _WIN64
-                            panel->ContextMenu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
+                            panel->ContextMenu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
                                                                      EnumFileNames, &selectionEnumData);
 #ifndef _WIN64
                         }
@@ -2357,7 +2399,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                             h = CreatePopupMenu();
                             if (h != NULL)
                             {
-                                panel->ContextMenu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(),
+                                panel->ContextMenu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
                                                                          (count == 0) ? 1 : count, EnumFileNames,
                                                                          &selectionEnumData);
                                 if (panel->ContextMenu != NULL)

@@ -882,6 +882,35 @@ struct CSalamanderServiceResult
     const char* ProviderName;
 };
 
+// Optional host-owned viewer navigation service. QueryService returns this
+// interface only on hosts supporting complete UTF-16 paths; older hosts return
+// FALSE and viewers may keep using the original MAX_PATH methods. This service
+// remains valid for the host lifetime and does not require a provider lease.
+#define SALAMANDER_SERVICE_VIEWER_ENUMERATION "Salamander.ViewerEnumeration"
+#define SALAMANDER_VIEWER_ENUMERATION_VERSION_1_0 0x00010000
+
+class CSalamanderViewerEnumerationAbstract
+{
+public:
+    // Same source/index/filter semantics as the legacy viewer methods. Capacities
+    // are in wchar_t units, including the terminator. A short output buffer returns
+    // FALSE and ERROR_INSUFFICIENT_BUFFER without advancing lastFileIndex or
+    // returning a partial path. Calls must be made outside the host UI thread.
+    // viewerPlugin is the caller's CPluginInterfaceAbstract (NULL for host viewers).
+    virtual BOOL WINAPI GetNextFileName(int srcUID, int* lastFileIndex,
+        const wchar_t* lastFileName, BOOL preferSelected, BOOL onlyAssociatedExtensions,
+        CPluginInterfaceAbstract* viewerPlugin, wchar_t* fileName, int fileNameCapacity,
+        BOOL* noMoreFiles, BOOL* srcBusy) = 0;
+    virtual BOOL WINAPI GetPreviousFileName(int srcUID, int* lastFileIndex,
+        const wchar_t* lastFileName, BOOL preferSelected, BOOL onlyAssociatedExtensions,
+        CPluginInterfaceAbstract* viewerPlugin, wchar_t* fileName, int fileNameCapacity,
+        BOOL* noMoreFiles, BOOL* srcBusy) = 0;
+    virtual BOOL WINAPI IsFileSelected(int srcUID, int lastFileIndex,
+        const wchar_t* lastFileName, BOOL* isFileSelected, BOOL* srcBusy) = 0;
+    virtual BOOL WINAPI SetFileSelection(int srcUID, int lastFileIndex,
+        const wchar_t* lastFileName, BOOL select, BOOL* srcBusy) = 0;
+};
+
 // Temporary host-owned service available while load-on-start plug-ins and
 // manifest extensions are initialized.  Consumers must query it for each
 // synchronous report and must not retain the returned pointer.
