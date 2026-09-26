@@ -389,6 +389,10 @@ try {
             Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_operations_contract_tests.py'))
         },
         @{
+            Name = 'filecomp_panel_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\filecomp_panel_paths_tests.py'))
+        },
+        @{
             Name = 'copy_move_scheduling_contract_tests'
             Arguments = @(
                 '-B',

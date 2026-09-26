@@ -36,6 +36,9 @@ folder or move any files.
 - F3, editing, Enter, rename, copy/move, deletion, clipboard and shell actions
   resolve the chosen row's actual path. Viewer next/previous navigation uses
   the panel's ordering, subject to the viewer's normal masks/association rules.
+- File Comparator (**Ctrl+Shift+C**) receives the actual paths of both files,
+  including duplicate names in different subfolders, selected-plus-focused
+  pairs, and comparisons between panels.
 - F5/F6 initially copy or move selected files into the destination as a flat
   selection. The optional **Keep subfolder paths relative to the Branch View
   root** checkbox preserves their relative directory structure. Ordinary
@@ -108,6 +111,16 @@ Viewer enumeration passes complete paths and validates the source tab and
 current item, including after reorder. PictView consumes the new wide viewer
 enumeration service; existing plug-in interface slots remain in place.
 
+File Comparator queries the optional `Salamander.PanelItemPaths` service for
+complete UTF-16 paths of current disk-panel items on the host UI thread. The
+resolver validates panel membership before reading the item, rejects stale or
+cross-panel pointers, and never returns a truncated path. It is a separate
+interface obtained through the existing `QueryService`; published vtables and
+`CFileData` are unchanged. Older hosts without this service keep the ordinary
+folder-path fallback. A failed service call never synthesizes a Branch root/name
+path. Same-name matching uses the full Unicode name rather than its bounded
+narrow display mirror.
+
 The worker uses wide `FindFirstFileExW`/`FindNextFileW` and an explicit stack of
 directories. It publishes groups of up to 256 files and also publishes at
 folder boundaries. It owns a reference-counted scan state and no window or
@@ -177,6 +190,7 @@ exercise the built application. Passing one does not imply the others passed.
 
 | Layer | Verified scope |
 | --- | --- |
+| `filecomp_panel_paths_tests.py` | PASS: 30 checks over the actual Compare command, helpers and host resolver; duplicate basenames, selected/focused and cross-panel choices from either side, Unicode/UNC/long paths, display-mirror collisions, old-host fallback, failed resolution and output capacities. The previous command fails 23 of 26 applicable checks. |
 | Native `branch_view_tests` | PASS: 605 files, zero failures; nested trees, duplicate basenames, Czech/CJK/emoji components, a 254-UTF-16-unit filename, UTF-8 paths over 260 bytes, full paths over 260 UTF-16 units, hidden-folder filtering, batching, replacement scan, cancellation, immediate scanner-owner destruction, UNC prefix construction, component-aware root checks, and a real directory-link cycle skipped. |
 | `branch_view_contract_tests.py` | Lifecycle ordering, operation-suspend guards, coalesced asynchronous refresh, exact selection identity, recursive watcher registration, mode restoration, history ownership, duplicate/closed tabs, Path column layout, saved selection, and stale Explorer-property results. |
 | Native action tests | PASS: viewer enumeration 11 checks, operation/shell/recycle 33, worker paths 9, file launching 12, copy/ADS paths 11. Launch tests use real processes; recycle tests use only disposable fixtures. |

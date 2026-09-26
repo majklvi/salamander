@@ -911,6 +911,30 @@ public:
         const wchar_t* lastFileName, BOOL select, BOOL* srcBusy) = 0;
 };
 
+// Optional host-owned resolver for complete disk-panel item paths, including
+// recursive listings whose rows have different parent directories. QueryService
+// returns FALSE on older hosts. The interface is valid for the host lifetime and
+// requires no provider lease. Existing general/item interfaces remain unchanged.
+#define SALAMANDER_SERVICE_PANEL_ITEM_PATHS "Salamander.PanelItemPaths"
+#define SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0 0x00010000
+
+class CSalamanderPanelItemPathsAbstract
+{
+public:
+    // Main UI thread only. item must be the current read-only pointer returned by
+    // GetPanelFocusedItem/GetPanelItem/GetPanelSelectedItem for the same PANEL_XXX.
+    // Call before returning to the host or pumping messages; never retain item
+    // across a panel refresh. Only disk panels are supported (local/UNC/Branch).
+    // capacity is in wchar_t units including the terminator. FALSE leaves valid
+    // output empty and sets LastError: INVALID_THREAD_ID, INVALID_PARAMETER,
+    // NOT_SUPPORTED, INSUFFICIENT_BUFFER, INVALID_DATA, or NOT_ENOUGH_MEMORY.
+    // Short buffers never return a partial path. TRUE returns a complete UTF-16
+    // path and ERROR_SUCCESS. Paths can exceed MAX_PATH; callers must use wide
+    // path APIs and add an extended-length prefix where their file API needs it.
+    virtual BOOL WINAPI GetItemFullPath(int panel, const CFileData* item,
+        wchar_t* path, int capacity) = 0;
+};
+
 // Temporary host-owned service available while load-on-start plug-ins and
 // manifest extensions are initialized.  Consumers must query it for each
 // synchronous report and must not retain the returned pointer.
