@@ -3078,7 +3078,7 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
 
     if (DynNtQueryInformationFile != NULL) // "always true"
     {
-        HANDLE file = HANDLES_Q(WorkerOpenFile(fileName, NULL, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        HANDLE file = HANDLES_Q(CreateFileW(WorkerOperationPathW(fileName, NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                               NULL, OPEN_EXISTING,
                                               isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL));
         if (file == INVALID_HANDLE_VALUE)
@@ -4250,11 +4250,11 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
             if (err != NO_ERROR)
                 TRACE_I("SetCompressAndEncryptedAttrs(): Unable to set Encrypted attribute for " << name << "! error=" << GetErrorText(err));
             // reopen the existing file to continue writing
-            *out = HANDLES_Q(WorkerOpenFile(name, nameW.c_str(), GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
+            *out = HANDLES_Q(CreateFileW(WorkerOperationPathW(name, nameW.c_str()).c_str(), GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
                                         asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
             if (openAlsoForRead && *out == INVALID_HANDLE_VALUE) // problem: reopening failed, try write-only
             {
-                *out = HANDLES_Q(WorkerOpenFile(name, nameW.c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                *out = HANDLES_Q(CreateFileW(WorkerOperationPathW(name, nameW.c_str()).c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
                                             asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
             }
             if (*out == INVALID_HANDLE_VALUE) // still a problem: cannot reopen; delete it + report an error
@@ -4380,7 +4380,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                             SetEndOfFile(out);     // otherwise on a floppy the remaining bytes would be written
                         HANDLES(CloseHandle(out)); // close the invalid handle
                     }
-                    out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, GENERIC_WRITE | GENERIC_READ, 0, NULL,
+                    out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), GENERIC_WRITE | GENERIC_READ, 0, NULL,
                                                OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                     if (out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                     {
@@ -4485,7 +4485,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
                 if (in != NULL)
                     HANDLES(CloseHandle(in)); // close the invalid handle
-                in = HANDLES_Q(WorkerOpenFile(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL, GENERIC_READ,
+                in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                           OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                 if (in != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
@@ -4973,7 +4973,7 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
 {
     if (*In != NULL)
         HANDLES(CloseHandle(*In)); // close the invalid handle
-    *In = HANDLES_Q(WorkerOpenFile(Op->SourceName, Op->SourceNameWValid ? Op->SourceNameW.c_str() : NULL, GENERIC_READ,
+    *In = HANDLES_Q(CreateFileW(WorkerOperationPathW(Op->SourceName, Op->SourceNameWValid ? Op->SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                OPEN_EXISTING, AsyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (*In != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
@@ -5104,7 +5104,7 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
             SetEndOfFile(*Out);     // otherwise on a floppy the remaining bytes would be written
         HANDLES(CloseHandle(*Out)); // close the invalid handle
     }
-    *Out = HANDLES_Q(WorkerOpenFile(Op->TargetName, Op->TargetNameWValid ? Op->TargetNameW.c_str() : NULL, GENERIC_WRITE | GENERIC_READ, 0, NULL,
+    *Out = HANDLES_Q(CreateFileW(WorkerOperationPathW(Op->TargetName, Op->TargetNameWValid ? Op->TargetNameW.c_str() : NULL).c_str(), GENERIC_WRITE | GENERIC_READ, 0, NULL,
                                 OPEN_ALWAYS, AsyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (*Out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
     {
@@ -5697,7 +5697,7 @@ COPY_AGAIN:
     {
         if (!invalidSrcName && !asyncPar->Failed())
         {
-            in = HANDLES_Q(WorkerOpenFile(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL,
+            in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(),
                                           GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                           OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         }
@@ -6303,7 +6303,7 @@ COPY_AGAIN:
                                 GetFileOverwriteInfo(sAttr, _countof(sAttr), in, op->SourceName, &sFileTime, &getTimeFailed);
                                 HANDLES(CloseHandle(in));
                                 in = NULL;
-                                out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                            OPEN_EXISTING, 0, NULL));
                                 if (out != INVALID_HANDLE_VALUE)
                                 {
@@ -6356,7 +6356,7 @@ COPY_AGAIN:
                                 case IDYES:
                                 default: // for safety (to prevent exiting this block with the 'in' handle closed)
                                 {
-                                    in = HANDLES_Q(WorkerOpenFile(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL, GENERIC_READ,
+                                    in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                                               FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                               OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                     if (in == INVALID_HANDLE_VALUE)
@@ -6433,7 +6433,7 @@ COPY_AGAIN:
                                     case IDYES:
                                     default: // for safety (to prevent exiting this block with the 'in' handle closed)
                                     {
-                                        in = HANDLES_Q(WorkerOpenFile(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL, GENERIC_READ,
+                                        in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                                                   FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                                   OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                         if (in == INVALID_HANDLE_VALUE)
@@ -6488,7 +6488,7 @@ COPY_AGAIN:
                                     CQuadWord origFileSize(0, 0); // file size before truncation
                                     if (mustDeleteFileBeforeOverwrite == 0 /* need test */)
                                     {
-                                        out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                        out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                                    OPEN_EXISTING, 0, NULL));
                                         if (out != INVALID_HANDLE_VALUE)
                                         {
@@ -6522,7 +6522,7 @@ COPY_AGAIN:
                                         dlgData.ConflictTargetChanged = TRUE;
                                         return TRUE;
                                     }
-                                    out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL));
+                                    out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL));
                                     if (out == INVALID_HANDLE_VALUE && fileAttrs != (asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN))
                                     {
                                         if (!ValidateInjectedTargetIdentity(op, dlgData))
@@ -6531,7 +6531,7 @@ COPY_AGAIN:
                                             return TRUE;
                                         }
                                         // The target disk may reject creation with the requested encryption attributes.
-                                        out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                        out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                     }
                                     if (script->CopyAttrs && out == INVALID_HANDLE_VALUE)
                                     { // if read access to the directory is denied (we added it only for setting the Compressed attribute), try opening the file for write only
@@ -6541,7 +6541,7 @@ COPY_AGAIN:
                                             dlgData.ConflictTargetChanged = TRUE;
                                             return TRUE;
                                         }
-                                        out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL));
+                                        out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL));
                                         if (out == INVALID_HANDLE_VALUE && fileAttrs != (asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN))
                                         {
                                             if (!ValidateInjectedTargetIdentity(op, dlgData))
@@ -6550,7 +6550,7 @@ COPY_AGAIN:
                                                 return TRUE;
                                             }
                                             // Retry without optional creation attributes, still against the authorized identity.
-                                            out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                            out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                         }
                                     }
                                     if (out == INVALID_HANDLE_VALUE) // target file cannot be opened for writing, so delete it and create it again
@@ -6597,7 +6597,7 @@ COPY_AGAIN:
                                     if (mustDeleteFileBeforeOverwrite == 0 /* need test */)
                                     {
                                         HANDLES(CloseHandle(out));
-                                        out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, access, 0, NULL, OPEN_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                        out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, OPEN_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                         if (out == INVALID_HANDLE_VALUE) // cannot reopen the target file we just opened, unlikely, try deleting and recreating it
                                         {
                                             targetCannotOpenForWrite = TRUE;
@@ -7080,14 +7080,14 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     sourceNameMvDir == op->SourceName && targetNameMvDir == op->TargetName) // no invalid names allowed here (files only, and their names are validated)
                 {
                     HANDLE in, out;
-                    in = HANDLES_Q(WorkerOpenFile(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                    in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                     if (in == INVALID_HANDLE_VALUE)
                     {
                         err = GetLastError();
                         goto NORMAL_ERROR;
                     }
-                    out = HANDLES_Q(WorkerOpenFile(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                    out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                     if (out == INVALID_HANDLE_VALUE)
                     {

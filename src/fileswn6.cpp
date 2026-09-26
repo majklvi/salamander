@@ -3037,7 +3037,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         HANDLE in;
                         if (!invalidSrcName)
                         {
-                            in = HANDLES_Q(WorkerOpenFile(op.SourceName, op.SourceNameWValid ? op.SourceNameW.c_str() : NULL, GENERIC_READ,
+                            in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op.SourceName, op.SourceNameWValid ? op.SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                                       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                         }

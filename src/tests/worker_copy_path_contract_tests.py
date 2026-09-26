@@ -10,19 +10,19 @@ def section(source, first, last):
 class WorkerCopyPathContracts(unittest.TestCase):
     def test_ads_preflight_opens_wide(self):
         code = section(text("worker.cpp"), "BOOL CheckFileOrDirADS(", "BOOL DeleteAllADS(")
-        self.assertIn("WorkerOpenFile(fileName, NULL", code)
+        self.assertIn("HANDLES_Q(CreateFileW(WorkerOperationPathW(fileName, NULL).c_str(),", code)
         self.assertNotIn("CreateFile(", code)
         self.assertNotIn("fileNameCrFileCopy", code)
     def test_copy_planning_error_probe_retains_owned_path(self):
         code = section(text("fileswn6.cpp"), "BOOL CFilesWindow::BuildScriptFile(", "case atDelete:")
-        self.assertIn("WorkerOpenFile(op.SourceName, op.SourceNameWValid ? op.SourceNameW.c_str() : NULL", code)
+        self.assertIn("HANDLES_Q(CreateFileW(WorkerOperationPathW(op.SourceName, op.SourceNameWValid ? op.SourceNameW.c_str() : NULL).c_str(),", code)
         self.assertNotIn("CreateFile(op.SourceName", code)
     def test_every_copy_retry_uses_wide_boundary(self):
         code = text("worker.cpp")
         self.assertNotIn("CreateFile(op->", code)
         self.assertNotIn("CreateFile(Op->", code)
         for item in ("op->SourceName", "op->TargetName", "Op->SourceName", "Op->TargetName"):
-            self.assertIn("WorkerOpenFile(" + item, code)
+            self.assertIn("HANDLES_Q(CreateFileW(WorkerOperationPathW(" + item + ", " + item + "WValid ? " + item + "W.c_str() : NULL).c_str(),", code)
     def test_stream_copy_and_delete_keep_dynamic_wide_names(self):
         code = text("worker.cpp")
         copy = section(code, "BOOL DoCopyADS(", "HANDLE SalCreateFileEx(")
@@ -36,7 +36,7 @@ class WorkerCopyPathContracts(unittest.TestCase):
     def test_attribute_reopen_stays_wide(self):
         code = section(text("worker.cpp"), "void SetCompressAndEncryptedAttrs(", "void CorrectCaseOfTgtName(")
         self.assertIn("GetFileAttributesW(nameW.c_str())", code)
-        self.assertIn("WorkerOpenFile(name, nameW.c_str()", code)
+        self.assertIn("HANDLES_Q(CreateFileW(WorkerOperationPathW(name, nameW.c_str()).c_str(),", code)
         self.assertIn("EncryptFileW(nameW.c_str())", code)
         self.assertIn("DecryptFileW(nameW.c_str(), 0)", code)
         self.assertNotIn("CreateFile(", code)
