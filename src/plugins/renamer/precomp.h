@@ -30,6 +30,7 @@
 #include "spl_base.h"
 #include "spl_file.h"
 #include "spl_gen.h"
+#include "spl_diskselection.h"
 #include "spl_gui.h"
 #include "spl_menu.h"
 #include "spl_vers.h"

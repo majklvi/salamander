@@ -997,14 +997,43 @@ void C__Handles::CheckClose(BOOL success, const HANDLE handle, C__HandlesType ex
 // Monitored functions:
 //
 
+// Diagnostic path conversion is best effort; allocation failure must never
+// change the real Win32 operation or the handle tracker's success result.
+static char* HandlesWidePathDiagnostic(const wchar_t* path)
+{
+    if (path == NULL) return NULL;
+    const int length = WideCharToMultiByte(CP_UTF8, 0, path, -1, NULL, 0, NULL, NULL);
+    if (length <= 0) return NULL;
+    char* result = static_cast<char*>(malloc(length));
+    if (result != NULL && !WideCharToMultiByte(CP_UTF8, 0, path, -1, result, length, NULL, NULL))
+    { free(result); return NULL; }
+    return result;
+}
+
 HANDLE
-C__Handles::CreateFile(LPCTSTR lpFileName, DWORD dwDesiredAccess,
+C__Handles::CreateFileW(LPCWSTR lpFileName, DWORD dwDesiredAccess,
+                       DWORD dwShareMode, LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                       DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes,
+                       HANDLE hTemplateFile)
+{
+    HANDLE ret = ::CreateFileW(lpFileName, dwDesiredAccess, dwShareMode,
+        lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+    const DWORD error = GetLastError();
+    char* diagnostic = ret == INVALID_HANDLE_VALUE ? HandlesWidePathDiagnostic(lpFileName) : NULL;
+    CheckCreate(ret != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, ret, error, TRUE, diagnostic);
+    free(diagnostic);
+    SetLastError(error);
+    return ret;
+}
+
+HANDLE
+C__Handles::CreateFileA(LPCSTR lpFileName, DWORD dwDesiredAccess,
                        DWORD dwShareMode,
                        LPSECURITY_ATTRIBUTES lpSecurityAttributes,
                        DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes,
                        HANDLE hTemplateFile)
 {
-    HANDLE ret = ::CreateFile(lpFileName, dwDesiredAccess, dwShareMode,
+    HANDLE ret = ::CreateFileA(lpFileName, dwDesiredAccess, dwShareMode,
                               lpSecurityAttributes, dwCreationDisposition,
                               dwFlagsAndAttributes, hTemplateFile);
     char paramsBuf[MAX_PATH + 200];
@@ -2065,11 +2094,24 @@ VOID C__Handles::DeleteCriticalSection(LPCRITICAL_SECTION lpCriticalSection)
 }
 
 HANDLE
-C__Handles::FindFirstFile(LPCTSTR lpFileName, LPWIN32_FIND_DATA lpFindFileData)
+C__Handles::FindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData)
 {
-    HANDLE ret = ::FindFirstFile(lpFileName, lpFindFileData);
+    HANDLE ret = ::FindFirstFileA(lpFileName, lpFindFileData);
     CheckCreate(ret != INVALID_HANDLE_VALUE, __htFindFile, __hoFindFirstFile,
                 ret, GetLastError(), TRUE, lpFileName);
+    return ret;
+}
+
+HANDLE
+C__Handles::FindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData)
+{
+    HANDLE ret = ::FindFirstFileW(lpFileName, lpFindFileData);
+    const DWORD error = GetLastError();
+    char* diagnostic = HandlesWidePathDiagnostic(lpFileName);
+    CheckCreate(ret != INVALID_HANDLE_VALUE, __htFindFile, __hoFindFirstFile,
+                ret, error, TRUE, diagnostic);
+    free(diagnostic);
+    SetLastError(error);
     return ret;
 }
 

@@ -749,66 +749,35 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
 
     case MENUCMD_DOPFILES:
     {
-        // determine whether we work on the selection or the focused item
-        BOOL focus = FALSE;
-        if ((eventMask & MENU_EVENT_FILES_SELECTED) == 0)
+        // Same disk-selection code for ordinary, UNC and recursive panels.
+        // Capture on the UI thread before starting progress/modeless work.
+        // The owned snapshot remains valid when the panel is refreshed.
+        CSalamanderDiskSelection selection;
+        if (!selection.Capture(SalamanderGeneral, PANEL_SOURCE)) return FALSE;
+        try
         {
-            if ((eventMask & MENU_EVENT_FILE_FOCUSED) == 0)
-                return FALSE;
-            focus = TRUE;
-        }
-
-        // perform the action in two phases - preparation + execution
-        int count = 0;
-        BOOL ret = TRUE;
-        int stage;
-        for (stage = 0; stage < 2; stage++)
-        {
-            if (stage == 1) // execution phase
+            std::vector<std::string> paths;
+            for (int i = 0; i < selection.GetCount(); ++i)
+                paths.push_back(SalamanderDiskSelection::Utf8FromWide(selection.GetItem(i)->FullPathW));
+            salamander->OpenProgressDialog("Command \"*.D&OP File(s)\"", FALSE, NULL, FALSE);
+            salamander->ProgressSetTotalSize(CQuadWord(static_cast<DWORD>(paths.size()), 0), CQuadWord(-1, -1));
+            BOOL ret = TRUE;
+            for (const auto& path : paths)
             {
-                salamander->OpenProgressDialog("Command \"*.D&OP File(s)\"", FALSE, NULL, FALSE);
-                salamander->ProgressSetTotalSize(CQuadWord(count, 0), CQuadWord(-1, -1));
-            }
-
-            int index = 0;
-            const CFileData* file;
-            BOOL isDir;
-            if (!focus)
-                file = SalamanderGeneral->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
-            else
-                file = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, &isDir);
-            while (file != NULL)
-            {
-                // action on the 'file' entry
-                if (stage == 0)
-                    count++; // preparation - count the files
-                else         // execution - advance the progress
-                {
-                    salamander->ProgressDialogAddText(file->Name, FALSE);
-                    Sleep(500); // simulate some work
-                    if (!salamander->ProgressAddSize(1, FALSE))
-                    {
-                        salamander->ProgressDialogAddText("canceling operation, please wait...", FALSE);
-                        salamander->ProgressEnableCancel(FALSE);
-                        Sleep(1000); // simulate the cleanup work
-                        ret = FALSE; // Cancel -> keep the items selected
-                        break;       // abort the action
-                    }
-                }
-                if (!focus)
-                    file = SalamanderGeneral->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
-                else
-                    break;
-            }
-
-            if (stage == 1) // execution phase
-            {
+                // Actual I/O should use item->FullPathW with a wide file API.
+                salamander->ProgressDialogAddText(path.c_str(), FALSE);
                 Sleep(500); // simulate some work
-                salamander->CloseProgressDialog();
+                if (!salamander->ProgressAddSize(1, FALSE)) { ret = FALSE; break; }
             }
+            salamander->CloseProgressDialog();
+            SalamanderGeneral->SetUserWorkedOnPanelPath(PANEL_SOURCE);
+            return ret;
         }
-        SalamanderGeneral->SetUserWorkedOnPanelPath(PANEL_SOURCE); // treat this command as working with the path (it appears in Alt+F12)
-        return ret;
+        catch (const std::bad_alloc&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return FALSE;
+        }
     }
 
     case MENUCMD_FILESDIRSINARC:

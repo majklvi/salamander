@@ -67,7 +67,7 @@ def main():
     engine_header = read("src/plugins/renamer/crenamer.h", args.source_ref)
     sdk = read("src/plugins/shared/spl_gen.h")
     host = read("src/zip.cpp")
-    new_api = "RenamerPaths::ResolvePanelItemPath" in dialog
+    new_api = "SelectionValid" in dialog
     ctor_start = engine.index("CSourceFile::CSourceFile(")
     ctor_end = engine.index("// CRenamerOptions", ctor_start)
     rename = block(engine, "int CRenamer::Rename(")
@@ -77,10 +77,13 @@ def main():
     pieces = {
         "SDK": block(sdk, "struct CSalamanderServiceQuery", ";") + "\n" +
                block(sdk, "struct CSalamanderServiceResult", ";") + "\n" +
-               block(sdk, "class CSalamanderPanelItemPathsAbstract", ";"),
+               block(sdk, "class CSalamanderPanelItemPathsAbstract", ";") + "\n" +
+               sdk[sdk.index("#define SALAMANDER_SERVICE_DISK_SELECTION"):sdk.index("class CSalamanderDiskSelectionAbstract")] + block(sdk, "class CSalamanderDiskSelectionAbstract", ";"),
         "CONVERSIONS": "\n".join(block(read("src/plugins/filecomp/precomp.h"), marker) for marker in
             ("static std::wstring PluginMultiByteToWidePath(", "static std::string PluginWideToMultiBytePath(")),
         "SERVICE": block(host, "class CPanelItemPathsService", ";"),
+        "FACADE": '#include "' + str(ROOT / "src/plugins/shared/spl_diskselection.h").replace("\\", "/") + '"',
+        "DISK_SERVICE": block(host, "class CDiskSelectionService", ";"),
         "PATH_HELPERS": ('#include "' + str(ROOT / "src/plugins/renamer/renamer_paths.h").replace('\\', '/') + '"') if new_api else '',
         "SOURCE_DECL": engine_header[engine_header.index("struct CSourceFile"):engine_header.index("enum CChangeCase")],
         "SOURCE_IMPL": engine[ctor_start:ctor_end],

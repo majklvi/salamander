@@ -69,14 +69,18 @@ def main():
     pieces = {
         "SDK": block(sdk, "struct CSalamanderServiceQuery", ";") + "\n" +
                block(sdk, "struct CSalamanderServiceResult", ";") + "\n" +
-               block(sdk, "class CSalamanderPanelItemPathsAbstract", ";"),
+               block(sdk, "class CSalamanderPanelItemPathsAbstract", ";") + "\n" +
+               sdk[sdk.index("#define SALAMANDER_SERVICE_DISK_SELECTION"):sdk.index("class CSalamanderDiskSelectionAbstract")] + block(sdk, "class CSalamanderDiskSelectionAbstract", ";"),
         "CONVERSIONS": block(precomp, "static std::wstring PluginMultiByteToWidePath(") + "\n" +
                        block(precomp, "static std::string PluginWideToMultiBytePath("),
         "SERVICE": block(host, "class CPanelItemPathsService", ";"),
+        "FACADE": '#include "' + str(ROOT / "src/plugins/shared/spl_diskselection.h").replace("\\", "/") + '"',
+        "DISK_SERVICE": block(host, "class CDiskSelectionService", ";"),
         "HELPERS": "\n".join(block(consumer, marker) for marker in
                      ("static BOOL GetFileCompPanelItemPath(", "static BOOL FileCompPanelItemNamesEqual(")
                      if marker in consumer),
         "COMMAND": block(consumer, "BOOL CPluginInterfaceForMenu::ExecuteMenuItem("),
+        "SNAPSHOT": "1" if "CSalamanderDiskSelection source" in consumer else "0",
         "HAS_HELPER": "1" if "static BOOL GetFileCompPanelItemPath(" in consumer else "0",
     }
     generated = read("src/tests/filecomp_panel_paths_tests.cpp.in")

@@ -1,0 +1,224 @@
+// SPDX-FileCopyrightText: 2026 Samandarin Contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Compile the complete production SafeFile implementation. Dialog decisions and
+// one-shot device failures are controlled; all path I/O uses actual Win32 files.
+#define NOMINMAX
+#ifdef UNICODE
+#undef UNICODE
+#endif
+#include <windows.h>
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <new>
+#include <string>
+#include <vector>
+#define SAL_MAX_PATH 32768
+#define CALL_STACK_MESSAGE7(...) ((void)0)
+#define CALL_STACK_MESSAGE1(...) ((void)0)
+#define TRACE_E(...) ((void)0)
+#define TRACE_I(...) ((void)0)
+#define LOW_MEMORY "out of memory"
+#define HANDLES_Q(expression) (expression)
+#define HANDLES(expression) (expression)
+#define NOHANDLES(expression) (expression)
+#define HANDLES_ADD(...) ((void)0)
+#pragma warning(push)
+#pragma warning(disable: 4201) // existing SDK anonymous union
+@@SDK@@
+#pragma warning(pop)
+@@DECLARATIONS@@
+@@IDS@@
+@@WIDE_HELPERS@@
+@@GET_SIZE@@
+@@CREATE_DIRECTORY@@
+static struct { BOOL CnfrmFileOver = TRUE, CnfrmSHFileOver = TRUE; } Configuration;
+static DWORD Answer = DIALOG_CANCEL;
+static int Dialogs = 0;
+static bool FailDuplicate = false, FailRead = false, FailWrite = false;
+static const char* LoadStr(int) { return "resource"; }
+static const char* GetErrorText(DWORD) { return "error"; }
+static char* DupStr(const char* text) { return FailDuplicate ? nullptr : _strdup(text); }
+static void GetFileOverwriteInfo(char* out, int, HANDLE, const char*) { strcpy(out, "file"); }
+static DWORD DialogError(HWND, DWORD, const char*, const char*, const char*) { ++Dialogs; return Answer; }
+static DWORD DialogQuestion(HWND, DWORD, const char*, const char*, const char*) { ++Dialogs; return Answer; }
+static DWORD DialogOverwrite(HWND, DWORD, const char*, const char*, const char*, const char*) { ++Dialogs; return Answer; }
+static BOOL InjectRead(HANDLE handle, LPVOID buffer, DWORD length, LPDWORD done, LPOVERLAPPED overlapped)
+{
+    if (FailRead) { FailRead = false; *done = 0; SetLastError(ERROR_READ_FAULT); return FALSE; }
+    return ReadFile(handle, buffer, length, done, overlapped);
+}
+static BOOL InjectWrite(HANDLE handle, LPCVOID buffer, DWORD length, LPDWORD done, LPOVERLAPPED overlapped)
+{
+    if (FailWrite) { FailWrite = false; *done = 0; SetLastError(ERROR_WRITE_FAULT); return FALSE; }
+    return WriteFile(handle, buffer, length, done, overlapped);
+}
+#define ReadFile InjectRead
+#define WriteFile InjectWrite
+#pragma warning(push)
+#pragma warning(disable: 4245 4189) // legacy sentinel and trace-only local
+@@SAFE_FILE@@
+#pragma warning(pop)
+#undef ReadFile
+#undef WriteFile
+static int Checks = 0, Failures = 0;
+static void Check(bool success, const char* description)
+{
+    ++Checks;
+    if (!success) { ++Failures; std::printf("FAIL: %s (Win32 %lu)\n", description, GetLastError()); }
+}
+static std::string Utf8(const std::wstring& value)
+{
+    const int count = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
+    if (count <= 0) std::abort();
+    std::string result(count, '\0');
+    WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.c_str(), -1, &result[0], count, nullptr, nullptr);
+    result.resize(count - 1);
+    return result;
+}
+static std::wstring Extended(const std::wstring& value)
+{
+    return value.compare(0, 4, L"\\\\?\\") == 0 ? value : L"\\\\?\\" + value;
+}
+struct Fixtures
+{
+    std::wstring Root, OldDirectory;
+    std::vector<std::wstring> Files, Directories;
+    Fixtures()
+    {
+        std::vector<wchar_t> buffer(SAL_MAX_PATH);
+        DWORD count = GetCurrentDirectoryW(static_cast<DWORD>(buffer.size()), buffer.data());
+        if (!count || count >= buffer.size()) std::abort();
+        OldDirectory.assign(buffer.data(), count);
+        count = GetTempPathW(static_cast<DWORD>(buffer.size()), buffer.data());
+        if (!count || count >= buffer.size()) std::abort();
+        Root.assign(buffer.data(), count);
+        Root += L"Samandarin-size-" + std::to_wstring(GetCurrentProcessId()) + L"-" + std::to_wstring(GetTickCount64());
+        if (!CreateDirectoryW(Root.c_str(), nullptr)) std::abort();
+        Directories.push_back(Root);
+    }
+    bool Owned(const std::wstring& path) const
+    {
+        return path == Root || (path.size() > Root.size() &&
+               path.compare(0, Root.size(), Root) == 0 && path[Root.size()] == L'\\');
+    }
+    ~Fixtures()
+    {
+        Check(SetCurrentDirectoryW(OldDirectory.c_str()) != FALSE, "restore working directory");
+        for (auto i = Files.rbegin(); i != Files.rend(); ++i)
+            Check(Owned(*i) && DeleteFileW(Extended(*i).c_str()) != FALSE, "remove own fixture file");
+        for (auto i = Directories.rbegin(); i != Directories.rend(); ++i)
+            Check(Owned(*i) && RemoveDirectoryW(Extended(*i).c_str()) != FALSE, "remove own fixture directory");
+    }
+    std::wstring Directory(const std::wstring& parent, const std::wstring& name)
+    {
+        const std::wstring path = parent + L"\\" + name;
+        if (!Owned(path) || !CreateDirectoryW(Extended(path).c_str(), nullptr)) std::abort();
+        Directories.push_back(path);
+        return path;
+    }
+    std::wstring File(const std::wstring& parent, const std::wstring& name, DWORD size)
+    {
+        const std::wstring path = parent + L"\\" + name;
+        if (!Owned(path)) std::abort();
+        HANDLE handle = CreateFileW(Extended(path).c_str(), GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
+        if (handle == INVALID_HANDLE_VALUE) std::abort();
+        Files.push_back(path);
+        std::string payload(size, 'x');
+        DWORD written = 0;
+        const BOOL ok = WriteFile(handle, payload.data(), size, &written, nullptr);
+        CloseHandle(handle);
+        if (!ok || written != size) std::abort();
+        return path;
+    }
+};
+
+static void RoundTrip(Fixtures& fixtures, const std::wstring& directory, const std::wstring& name)
+{
+    const std::wstring path = directory + L"\\" + name;
+    const std::string text = Utf8(path);
+    SAFE_FILE file = {};
+    DWORD silent = 0, button = 0, count = 0;
+    Check(SalSafeFile.SafeFileCreate(text.c_str(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ,
+        FILE_ATTRIBUTE_NORMAL, FALSE, nullptr, nullptr, nullptr, &silent, TRUE, nullptr,
+        nullptr, 0, nullptr, &file) != INVALID_HANDLE_VALUE, "create exact Unicode path");
+    if (!file.HFile || file.HFile == INVALID_HANDLE_VALUE) return;
+    fixtures.Files.push_back(path);
+    char prefix[] = "first-", suffix[] = "second";
+    Check(SalSafeFile.SafeFileWrite(&file, prefix, 6, &count, nullptr, BUTTONS_RETRYSKIPCANCEL, &button, &silent) && count == 6, "first write");
+    FailWrite = true; Answer = DIALOG_RETRY;
+    Check(SalSafeFile.SafeFileWrite(&file, suffix, 6, &count, nullptr, BUTTONS_RETRYSKIPCANCEL, &button, &silent) && count == 6, "retry write reopens exact path");
+    CQuadWord size(0, 0);
+    Check(SalSafeFile.SafeFileGetSize(&file, &size, nullptr) && size == CQuadWord(12, 0), "retry preserves previous bytes");
+    CQuadWord offset(6, 0);
+    Check(SalSafeFile.SafeFileSeek(&file, &offset, FILE_BEGIN, nullptr), "seek middle");
+    char bytes[16] = {};
+    FailRead = true;
+    Check(SalSafeFile.SafeFileRead(&file, bytes, 6, &count, nullptr, BUTTONS_RETRYSKIPCANCEL, &button, &silent) &&
+          count == 6 && memcmp(bytes, "second", 6) == 0, "retry read preserves offset and data");
+    offset.Set(0, 0);
+    SalSafeFile.SafeFileSeek(&file, &offset, FILE_BEGIN, nullptr);
+    Check(SalSafeFile.SafeFileRead(&file, bytes, 12, &count, nullptr, BUTTONS_RETRYSKIPCANCEL, &button, &silent) &&
+          count == 12 && memcmp(bytes, "first-second", 12) == 0, "complete retry content");
+    SalSafeFile.SafeFileClose(&file);
+    Check(SalSafeFile.SafeFileOpen(&file, text.c_str(), GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL, nullptr, BUTTONS_RETRYSKIPCANCEL, &button, &silent), "SafeFileOpen exact path");
+    const int before = Dialogs;
+    silent = SILENT_SKIP_FILE_READ; FailRead = true;
+    Check(!SalSafeFile.SafeFileRead(&file, bytes, 1, &count, nullptr, BUTTONS_RETRYSKIPCANCEL, &button, &silent)
+          && button == DIALOG_SKIP && Dialogs == before, "silent read skip");
+    SalSafeFile.SafeFileClose(&file);
+    Answer = DIALOG_CANCEL; silent = 0;
+    Check(SalSafeFile.SafeFileCreate(text.c_str(), GENERIC_WRITE, 0, FILE_ATTRIBUTE_NORMAL, FALSE,
+        nullptr, nullptr, nullptr, &silent, TRUE, nullptr, nullptr, 0, nullptr, nullptr) == INVALID_HANDLE_VALUE, "overwrite cancel");
+    HANDLE verify = CreateFileW(Extended(path).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+    Check(verify != INVALID_HANDLE_VALUE && ReadFile(verify, bytes, 12, &count, nullptr) &&
+          count == 12 && memcmp(bytes, "first-second", 12) == 0, "cancel preserves complete file");
+    if (verify != INVALID_HANDLE_VALUE) CloseHandle(verify);
+}
+int main()
+{
+    {
+        Fixtures fixtures;
+        RoundTrip(fixtures, fixtures.Root, L"ascii.bin");
+        RoundTrip(fixtures, fixtures.Root, L"žluťoučký-東京-\U0001F642.bin");
+        auto folder = fixtures.Directory(fixtures.Root, L"žluťoučký");
+        folder = fixtures.Directory(folder, L"東京-\U0001F642");
+        RoundTrip(fixtures, folder, L"same.bin");
+        RoundTrip(fixtures, fixtures.Root, std::wstring(90, L'東') + L".bin");
+        for (int i = 0; i < 12; ++i)
+            folder = fixtures.Directory(folder, L"component-東京-" + std::to_wstring(i));
+        Check(folder.size() > MAX_PATH, "real UTF16 long fixture");
+        RoundTrip(fixtures, folder, L"long.bin");
+        // Parent creation must be real, recursive, Unicode-aware and heap sized.
+        const auto child = folder + L"\\new-žluťoučký\\東京";
+        SAFE_FILE created = {};
+        auto full = child + L"\\created.bin";
+        auto bytes = Utf8(full);
+        Check(SalSafeFile.SafeFileCreate(bytes.c_str(), GENERIC_WRITE, 0, FILE_ATTRIBUTE_NORMAL,
+            FALSE, nullptr, nullptr, nullptr, nullptr, TRUE, nullptr, nullptr, 0, nullptr, &created) != INVALID_HANDLE_VALUE, "recursive Unicode long parent creation");
+        if (created.HFile && created.HFile != INVALID_HANDLE_VALUE) {
+            fixtures.Directories.push_back(folder + L"\\new-žluťoučký");
+            fixtures.Directories.push_back(child); fixtures.Files.push_back(full);
+            SalSafeFile.SafeFileClose(&created);
+        }
+        // A failed owned filename allocation must return INVALID_HANDLE_VALUE and
+        // release the just-created handle (a following exclusive open succeeds).
+        const auto oom = fixtures.Root + L"\\allocation.bin";
+        const auto oomText = Utf8(oom); FailDuplicate = true;
+        Check(SalSafeFile.SafeFileCreate(oomText.c_str(), GENERIC_WRITE, 0, FILE_ATTRIBUTE_NORMAL,
+            FALSE, nullptr, nullptr, nullptr, nullptr, TRUE, nullptr, nullptr, 0, nullptr, &created) == INVALID_HANDLE_VALUE, "allocation failure sentinel");
+        FailDuplicate = false; fixtures.Files.push_back(oom);
+        HANDLE h = CreateFileW(oom.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+        Check(h != INVALID_HANDLE_VALUE, "allocation failure releases handle");
+        if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
+        const std::string unc = "\\\\" + std::string(180, 's') + "\\" + std::string(180, 'h') + "\\child";
+        Check(SafeFileRootLength(unc.c_str()) == 364, "UNC root boundary exceeds MAX_PATH");
+        Check(SafeFileRootLength("\\\\?\\C:\\folder") == 7, "extended drive root boundary");
+        Check(SafeFileRootLength("\\\\?\\UNC\\server\\share\\child") == 21, "extended UNC root boundary");
+    }
+    std::printf("SafeFile actual I/O: %d checks, %d failures\n", Checks, Failures);
+    return Failures ? 1 : 0;
+}

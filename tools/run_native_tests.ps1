@@ -413,6 +413,42 @@ try {
             Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_operations_contract_tests.py'))
         },
         @{
+            Name = 'disk_selection_snapshot_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\disk_selection_snapshot_tests.py'))
+        },
+        @{
+            Name = 'pak_optimize_snapshot_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\pak_optimize_snapshot_tests.py'))
+        },
+        @{
+            Name = 'undelete_selection_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\undelete_selection_paths_tests.py'))
+        },
+        @{
+            Name = 'splitcbn_selection_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\plugins\splitcbn\tests\selection_paths_tests.py'))
+        },
+        @{
+            Name = 'pictview_thumbnail_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\pictview_thumbnail_paths_tests.py'))
+        },
+        @{
+            Name = 'checksum_selection_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\checksum_selection_paths_tests.py'))
+        },
+        @{
+            Name = 'safe_file_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\safe_file_paths_tests.py'))
+        },
+        @{
+            Name = 'archive_menu_selection_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\archive_menu_selection_tests.py'))
+        },
+        @{
+            Name = 'automation_selection_snapshot_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\plugins\automation\tests\selection_snapshot_tests.py'))
+        },
+        @{
             Name = 'renamer_panel_paths_tests'
             Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\renamer_panel_paths_tests.py'))
         },

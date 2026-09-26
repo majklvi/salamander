@@ -1,124 +1,161 @@
-# Branch View and plug-in paths
+# Disk selection SDK and Branch View
 
-## The shared contract
+## One selection contract for disk plug-ins
 
 A panel path identifies the location being browsed. In Branch View it is the
 scan root, while each file can have a different parent. `CFileData.Name` and
-`NameW` remain basenames. Combining `GetPanelPath()` with either field is not
-a valid way to locate a Branch View file.
+`NameW` remain basenames; joining them to `GetPanelPath()` cannot identify an
+arbitrary disk item. Replacing these fields with paths would break masks,
+extensions, rename rules and existing binary plug-ins.
 
-The host owns the mapping from each current row to its complete path. Disk
-plug-in commands obtain it through the optional `Salamander.PanelItemPaths`
-service, using the existing `QueryService` method:
+The standard SDK facade supplies complete paths and metadata together:
 
 ```cpp
-CSalamanderServiceQuery query = {SALAMANDER_SERVICE_PANEL_ITEM_PATHS,
-                                SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0, 0};
-CSalamanderServiceResult result = {};
-if (general->QueryService(&query, &result))
+#include "spl_com.h"
+#include "spl_gen.h"
+#include "spl_diskselection.h"
+
+// Capture on the host UI thread before starting a dialog or worker.
+CSalamanderDiskSelection selection;
+if (!selection.Capture(general, PANEL_SOURCE))
+    return FALSE;
+for (int i = 0; i < selection.GetCount(); ++i)
 {
-    // Validate result.Interface and result.Version, then use
-    // CSalamanderPanelItemPathsAbstract::GetItemFullPath(panel, item, ...).
+    const CSalamanderDiskSelectionItem* item = selection.GetItem(i);
+    // NameW: basename for masks/display.
+    // FullPathW: authoritative UTF-16 operation path.
+    // DirectoryW: actual parent for sibling/output defaults.
+    // RelativePathW: path below selection.GetRootPathW().
+    // Use wide I/O and an extended prefix where needed.
 }
 ```
 
-Resolve every item on the UI thread while its panel pointer is still current,
-then copy the resolved path into operation-owned storage before opening a
-modeless dialog or starting a worker. An advertised resolver is authoritative:
-a failed lookup must not fall back to a synthesized root/basename path or a
-partial selection. The output is complete UTF-16; file APIs must preserve it,
-including adding an extended prefix for long paths where required. A plug-in
-may use an ordinary-folder fallback only when an older host does not provide
-the service.
+The same code works for local folders, mapped drives, UNC and Branch View.
+Authors do not detect Branch View, inspect private metadata, resolve borrowed
+rows individually or implement a recursive fallback. DemoPlug's `.DOP File(s)`
+command demonstrates capture before progress work.
 
-The host validates the pointer against its current contiguous row arrays
-before dereferencing it. This takes constant time per lookup, including large
-selections. An active Branch file without its metadata yields an empty path;
-it cannot acquire the identity of an unrelated root-level file. The synthetic
-`..` navigation row retains its normal behavior.
+The default mode captures selected items, or the focus if nothing is selected.
+Other modes are `SALDISKSELECTION_SELECTED_ONLY`,
+`SALDISKSELECTION_FOCUSED_ONLY` and `SALDISKSELECTION_ALL_ITEMS`. Files and
+directories retain panel order; synthetic `..` is omitted. A valid empty
+selection succeeds with zero items. Archive and plug-in filesystem panels
+return `ERROR_NOT_SUPPORTED` and keep their existing virtual-path contracts.
 
-This is a generic per-item API, used in ordinary disk panels as well as Branch
-View. Plug-ins do not need to detect Branch View or interpret its private
-metadata. Existing SDK vtables, `CFileData` layout, names and extensions remain
-unchanged. Silently replacing a basename with a path would violate the old SDK
-contract and break filename masks, rename rules and binary plug-ins.
+## Ownership, errors and compatibility
+
+A successful capture owns immutable copies of all paths, names and metadata.
+Refresh, sorting, selection changes and source-panel destruction cannot alter
+it. Its const getters can be read on worker threads after UI-thread capture.
+The facade is movable and noncopyable; destruction or `Reset()` releases it.
+Returned item pointers remain valid until release. Keep the owner alive, and
+do not reset or move it concurrently with readers. Normal plug-in worker and
+unload lifetime rules still apply.
+
+Capture is atomic. Missing identities, wrong-thread calls, unsupported panels
+and allocation failures return false with `GetLastError()`, leaving the facade
+empty. Failure cannot produce a partial batch or a guessed root/basename path.
+The conversion helpers can throw `std::bad_alloc`; callers must handle it before
+starting work or clean up active work appropriately.
+
+The host exposes a new versioned `Salamander.DiskSelection` service through the
+existing `QueryService`. The facade handles discovery, version checks and
+release. On older **Samandarin hosts with the QueryService ABI**, it captures
+owned data through `PanelItemPaths`, or ordinary-folder enumeration if neither
+service exists. An advertised service is authoritative, including its errors.
+
+Newly rebuilt plug-ins are **not** promised to run on historical Open Salamander
+hosts whose general-interface vtable predates QueryService. A missing vtable
+slot cannot be safely probed. Existing binary plug-ins remain compatible with
+the new host: published vtable prefixes and `CFileData` are unchanged and
+`PluginData` is not repurposed. Old binaries that construct root/basename still
+need a one-time source migration; their old filename contract cannot silently
+be changed by the host.
+
+`PanelItemPaths` remains available for current-row lookups, with constant-time
+pointer-membership validation. New batch commands should use the owned
+selection instead of holding borrowed panel pointers.
+
+## Supplied consumers
+
+| Consumer | Disk-selection boundary |
+| --- | --- |
+| File Comparator | Owned source/focus/target paths; ambiguous target basenames leave the second field empty. |
+| Batch Rename | Owned full paths and per-item parents; relative mode retains the common root; Undo retains identities. |
+| Checksum | Captured Calculate seeds and modeless paths; Verify uses the manifest's actual parent. |
+| Split & Combine | Actual split parent; explicit selected parts retain individual paths; automatic siblings use the focused part's parent. |
+| Automation | COM disk items and collections own wide paths and metadata across refresh. |
+| Salamatrix | Shared sides layer supplies exact paths with the unchanged schema for all five runtime providers. |
+| PictView Regenerate Thumbnail | Captured files, wide paths, temporary replacement and EXIF I/O. |
+| ZIP menu / 7-Zip Test Archive | Owned selected/focused archive-file paths, including nested and Unicode parents. |
+| PAK Optimize | Owned archive-file paths and actual parent notifications; requires an existing input rather than creating a missing archive. |
+| Undelete Restore / Connect image | Owned per-item restore sources and exact wide image prefill; image backend limits are checked explicitly. |
+| DemoPlug | Working example of capture before progress work. |
+
+PictView navigation uses the separate wide viewer-enumeration service. Host
+disk actions and Shell integration use host item resolvers. These contracts
+serve different consumers; support in one command does not certify every
+third-party plug-in command.
+
+Consumers must preserve paths through their I/O. Central `SafeFile` now uses
+wide Windows APIs and long-path handling for create/open/overwrite/retry.
+Write retry reopens without truncating completed data and restores its offset.
+`SalGetFileSize2` similarly opens UTF-8 paths through wide APIs with an ACP
+fallback for legacy callers.
+
+Legacy engines can retain explicit limits. ZIP's archive filename and
+Automation's script filename still have a `SAL_MAX_PATH` **byte** capacity;
+migrated callers reject over-capacity UTF-8 paths instead of truncating them.
+File Comparator intake matches its existing byte capacity too. The SDK
+snapshot itself preserves complete UTF-16 paths. Undelete's legacy disk-image
+backend requires losslessly ACP-encodable paths within its existing buffer;
+Connect image displays the exact wide path but rejects unsupported input.
+Restore encrypted files uses full wide source and destination paths.
+
+Salamatrix JSON context keeps the existing 64-selected-item limit and reports
+`selectedCount` / `selectedItemsTruncated`. All five providers retain their
+65,536-byte result buffer: the complete escaped JSON payload must fit in
+65,535 UTF-8 bytes plus its terminator. Larger responses fail explicitly,
+without partial or truncated paths. Native `ItemInfo` keeps its existing field
+capacities; dynamic JSON serialization does not change that native ABI.
+
 
 ## Host-managed archive operations
 
-Packing uses a different, existing contract: `PackToArchive` receives a source
-root and a `SalEnumSelection2` callback returning relative names. The host
-adapts Branch View to this contract centrally. For example, the two files
-`one/same.png` and `two/same.png` are distinct archive entries, and the packer
-opens each under the supplied source root.
+Packing retains the existing `PackToArchive` contract: a source root and a
+`SalEnumSelection2` callback with relative names. The host adapts recursive
+selections centrally. `one/same.png` and `two/same.png` become distinct entries,
+opened under the supplied root. ZIP and 7-Zip packing need no Branch-specific
+interpretation in the plug-in.
 
-The callback preserves the chosen file order and metadata and restarts that
-same selection after an enumeration reset. Missing identities, invalid indexes
-and allocation/conversion failures cancel enumeration instead of returning a
-guessed path or a success-shaped partial selection. In mode 3, a file symlink
-has its target's size, using the same Retry/Ignore/Ignore All/Cancel handling
-as ordinary directory packing. The ignore-all decision survives an enumeration
-reset within the operation.
+The callback preserves order, metadata and selection across enumeration reset.
+Invalid identities, indexes or conversions cancel instead of returning guessed
+names. Mode 3 file-link size queries retain Retry/Ignore/Ignore All/Cancel.
+Cached sizes and ignored queries survive reset, including cleanup after a move
+packer has deleted sources. External packers still require their executable
+and configuration and retain their own encoding and archive-format limits.
 
-Resolved link sizes, including an ignored query, also survive reset. This is
-necessary for move packers that enumerate once more to remove directories
-after their source files have already been deleted; that pass must not reopen
-the removed links or show a new file-size error.
+The historical Borland WinSCP source tree is outside the current native build;
+its selected-only synchronization still uses a common root and basename filter.
+That separate synchronization contract has not been migrated or certified by
+this change. It is distinct from the current SFTP plug-in and host-managed
+file-transfer callbacks.
 
-The shared `SalGetFileSize2` helper opens UTF-8 paths through wide Windows APIs,
-with a validated ACP fallback for older callers. Long unprefixed paths are
-made absolute on the heap before receiving an extended prefix. Already
-extended paths are retained. Failure clears the size and reports the error;
-allocation failure follows the same non-throwing error contract. This helper
-also serves other host and plug-in operations, not only Branch View.
+## Validation boundaries
 
-An external packer still needs its executable and configuration. Neither this
-adapter nor the item-path service can remove encoding or archive-format limits
-inside an older binary packer.
+Native fixtures compile actual host, SDK and consumer methods. They check
+lifetime after refresh, modes, metadata, duplicates, thread restrictions,
+failure handling, legacy fallback and unchanged vtable prefixes. SafeFile and
+consumer I/O fixtures use disposable Unicode and long-path files. Command
+harnesses replace archive engines and UI dependencies; they are not GUI tests.
 
-## Consumer audit
-
-These are separate entry points. Support in one command does not certify every
-command in the same plug-in. The audit below records source findings, not GUI
-verification of the pending consumers.
-
-| Consumer | Path boundary | Status |
-| --- | --- | --- |
-| Host disk actions, viewer/editor launch and shell selection | Host per-item resolvers | Adapted in Branch View implementation; see its action tests. |
-| File Comparator | Optional item-path service | Adapted; per-item paths copied before comparison. |
-| Batch Rename | Optional item-path service | Adapted; owned selection and wide filesystem operations. |
-| PictView viewer navigation | Optional wide viewer-enumeration service | Adapted; distinct from thumbnail menu commands. |
-| Host-managed ZIP/7-Zip packing | Source root plus relative-name callback | Adapted centrally; GUI and content audit described below. |
-| Checksum Calculate/Verify | `GetPanelPath` plus seed/focused basename | Needs consumer migration. |
-| Split & Combine commands | One source directory plus item basename | Needs consumer migration. |
-| Automation item objects | Panel path plus basename | Needs consumer migration. |
-| Salamatrix item information | Shared sides layer joins panel path and basename | Needs migration in the shared layer, preserving parity across all runtimes. |
-| PictView Regenerate Thumbnail | Its own panel enumeration | Needs consumer migration; normal viewer support is independent. |
-| ZIP menu commands / 7-Zip Test Archive | Their own focused/selected-item path assembly | Needs consumer migration; host-managed packing is independent. |
-
-Updated consumers should all use the same host service. Legacy binaries that
-assemble paths themselves do not automatically adopt it. The host has no
-per-command capability declaration in the current SDK; this change does not
-claim that every installed plug-in command is Branch-compatible, nor introduce
-a blanket block of unrelated commands. Future capability negotiation must
-distinguish commands consuming item paths from commands using only the panel
-root or no panel items, and check both menu state and actual execution.
-
-## Verification
-
-In the isolated all-PR x64 build, Computer Use packed the same seven disposable
-files through **ZIP (Plugin)** and **7-Zip (Plugin)**. Both archives contain the
-exact seven relative names and all seven uncompressed SHA-256 hashes match the
-source manifest. Source paths and bytes remained unchanged. The selection
-includes six identical basenames under different parents, Czech/CJK directory
-components, a Unicode basename, an absolute path of 287 UTF-8 bytes but fewer
-than 260 UTF-16 units, and a true 333-unit UTF-16 path. Tests did not enable
-delete-after-packing or exercise external packer executables.
-
-Native fixtures compile the real host resolver, panel getters, archive callback
-and file-size helper extracted from production sources. Dependencies are
-mocked only at the surrounding panel/UI boundary; the file-size fixture uses
-real disposable files and Windows handles. Tests cover ordinary-panel behavior,
-exact identities, enumeration reset, symlink-size requests, cancellation,
-Unicode/long paths, error reporting, and the resolver's linear total work for
-large selections. Previous-revision runs demonstrate failures at the corrected
-boundaries. The normal native-test runner includes these fixtures.
+Earlier integration-runtime Computer Use tests packed seven Branch files with
+internal ZIP and 7-Zip. Each archive retained seven exact relative names and
+matching decompressed SHA-256 hashes; originals were unchanged. Coverage
+included six duplicate basenames, Czech/CJK parents, a Unicode basename, a path
+over 260 UTF-8 bytes and a 333-unit UTF-16 path. This is packing coverage, not
+manual verification of every plug-in command. Focused suites are registered
+in the normal native-test runner. Undelete's restore fixtures exercise actual
+copy/read/write and cleanup with a controlled EFS callback stub. They do not
+exercise Windows EFS import/export on truly encrypted files or change encryption
+settings.
