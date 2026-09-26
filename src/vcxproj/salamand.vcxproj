@@ -1067,6 +1067,7 @@
     </ClInclude>
     <ClInclude Include="..\plugins\shared\spl_fs.h">
     </ClInclude>
+    <ClInclude Include="..\plugins\shared\spl_diskselection.h" />
     <ClInclude Include="..\plugins\shared\spl_gen.h">
     </ClInclude>
     <ClInclude Include="..\plugins\shared\spl_gui.h">

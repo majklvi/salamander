@@ -163,7 +163,7 @@ CCopyProgressDlg::CCopyProgressDlg(HWND parent, CObjectOrigin origin)
     ProgressBar1 = ProgressBar2 = NULL;
     WantCancel = FALSE;
     FileProgress = TotalProgress = 0;
-    SrcName[0] = DestName[0] = 0;
+
     Changed[0] = Changed[1] = Changed[2] = Changed[3] = 0;
     LastTick = 0;
 }
@@ -171,7 +171,8 @@ CCopyProgressDlg::CCopyProgressDlg(HWND parent, CObjectOrigin origin)
 void CCopyProgressDlg::SetSourceFileName(const char* fileName)
 {
     CALL_STACK_MESSAGE2("CCopyProgressDlg::SetSourceFileName(%s)", fileName);
-    strcpy(SrcName, fileName);
+    try { SrcName = fileName; }
+    catch (const std::bad_alloc&) { SrcName.clear(); }
     Changed[0] = TRUE;
     UpdateControls();
 }
@@ -179,7 +180,8 @@ void CCopyProgressDlg::SetSourceFileName(const char* fileName)
 void CCopyProgressDlg::SetDestFileName(const char* fileName)
 {
     CALL_STACK_MESSAGE2("CCopyProgressDlg::SetDestFileName(%s)", fileName);
-    strcpy(DestName, fileName);
+    try { DestName = fileName; }
+    catch (const std::bad_alloc&) { DestName.clear(); }
     Changed[1] = TRUE;
     UpdateControls();
 }
@@ -211,12 +213,12 @@ void CCopyProgressDlg::UpdateControls(BOOL now)
     {
         if (Changed[0])
         {
-            Label1->SetText(SrcName);
+            Label1->SetText(SrcName.c_str());
             Changed[0] = FALSE;
         }
         if (Changed[1])
         {
-            Label2->SetText(DestName);
+            Label2->SetText(DestName.c_str());
             Changed[1] = FALSE;
         }
         if (Changed[2])
@@ -415,6 +417,14 @@ void CConnectDialog::InitDrives()
     // prepare the image list and fill in the list view
     hDrivesImg = ImageList_Create(16, 16, SalamanderGeneral->GetImageListColorFlags() | ILC_MASK, 0, 1);
 
+    try
+    {
+        const std::wstring image = UndeletePaths::FocusedImagePath(SalamanderGeneral, Panel);
+        SetDlgItemTextW(HWindow, IDC_EDIT_IMAGE, image.c_str());
+    }
+    catch (const std::bad_alloc&)
+    { SetLastError(ERROR_NOT_ENOUGH_MEMORY); String<char>::SysError(IDS_UNDELETE, IDS_ERROR); }
+
     // get info about current panel and focused item
     int sourcePanelType;
     char sourcePanelPath[MAX_PATH];
@@ -429,20 +439,6 @@ void CConnectDialog::InitDrives()
         // DOS/WIN or UNC path
         case PATH_TYPE_WINDOWS:
         {
-            // pre-fill the disk image path with focused file
-            BOOL isDir;
-            const CFileData* data = SalamanderGeneral->GetPanelFocusedItem(Panel, &isDir);
-            if (data && !isDir)
-            {
-                size_t len = MAX_PATH - strlen(sourcePanelPath);
-                if (len - 1 > data->NameLen)
-                {
-                    strcat(sourcePanelPath, "\\");
-                    strncat(sourcePanelPath, data->Name, len - 1);
-                    sourcePanelPath[MAX_PATH - 1] = 0;
-                    SetDlgItemText(HWindow, IDC_EDIT_IMAGE, sourcePanelPath);
-                }
-            }
             break;
         }
 
@@ -548,18 +544,24 @@ BOOL CConnectDialog::OnDialogOK()
     // check if dealing with volume or image
     if (BST_CHECKED == SendMessage(GetDlgItem(HWindow, IDC_CHECK_IMAGE), BM_GETCHECK, 0, 0))
     {
-        // disk image
-        GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, MAX_PATH);
-
-        // reset the volume if the image file does not exist
-        DWORD attr = SalamanderGeneral->SalGetFileAttributes(Volume);
-        if (attr == INVALID_FILE_ATTRIBUTES ||
-            attr & FILE_ATTRIBUTE_DIRECTORY)
+        // The image backend still accepts ACP paths in a fixed-capacity buffer.
+        // Validate before passing it any path; display and input remain wide.
+        try
         {
-            SalamanderGeneral->SalMessageBox(HWindow, String<char>::LoadStr(IDS_IMAGENOTFOUND),
-                                             String<char>::LoadStr(IDS_UNDELETE), MSGBOXEX_ICONEXCLAMATION | MSGBOXEX_OK);
-            return FALSE;
+            const std::wstring image = UndeletePaths::ReadText(GetDlgItem(HWindow, IDC_EDIT_IMAGE));
+            if (!UndeletePaths::LegacyImagePath(image, Volume, sizeof(Volume)))
+                return String<char>::SysError(IDS_UNDELETE, IDS_ERROR);
+            DWORD attr = GetFileAttributesW(image.c_str());
+            if (attr == INVALID_FILE_ATTRIBUTES || (attr & FILE_ATTRIBUTE_DIRECTORY))
+            {
+                SalamanderGeneral->SalMessageBox(HWindow, String<char>::LoadStr(IDS_IMAGENOTFOUND),
+                                                 String<char>::LoadStr(IDS_UNDELETE), MSGBOXEX_ICONEXCLAMATION | MSGBOXEX_OK);
+                return FALSE;
+            }
         }
+        catch (const std::bad_alloc&)
+        { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return String<char>::SysError(IDS_UNDELETE, IDS_ERROR); }
+
     }
     else
     {
@@ -598,32 +600,32 @@ BOOL CConnectDialog::OnDialogOK()
 }
 
 void CConnectDialog::OnImageBrowse()
+try
 {
-    GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, MAX_PATH);
-
-    OPENFILENAME openInfo;
-    memset(&openInfo, 0, sizeof(OPENFILENAME));
-    openInfo.lStructSize = sizeof(OPENFILENAME);
+    const std::wstring current = UndeletePaths::ReadText(GetDlgItem(HWindow, IDC_EDIT_IMAGE));
+    std::vector<wchar_t> filename(SAL_MAX_PATH);
+    if (current.size() < filename.size()) memcpy(filename.data(), current.c_str(), (current.size() + 1) * sizeof(wchar_t));
+    OPENFILENAMEW openInfo = {};
+    openInfo.lStructSize = sizeof(openInfo);
     openInfo.hwndOwner = HWindow;
-    openInfo.lpstrFilter = "Image Files (*.img;*.ima)\0*.IMG;*.IMA\0AllFiles (*.*)\0*.*\0\0\0";
-    openInfo.lpstrFile = Volume;
-    // TODO: this still feels wrong; when the volume is e.g. C:\Work\Altap\, the initial dir becomes garbage because of lpstrFile
-    openInfo.lpstrInitialDir = Volume;
-    openInfo.nMaxFile = MAX_PATH;
-    openInfo.Flags = OFN_FILEMUSTEXIST | OFN_READONLY;
-    BOOL ret = GetOpenFileName(&openInfo);
+    openInfo.lpstrFilter = L"Image Files (*.img;*.ima)\0*.IMG;*.IMA\0AllFiles (*.*)\0*.*\0\0\0";
+    openInfo.lpstrFile = filename.data();
+    openInfo.nMaxFile = static_cast<DWORD>(filename.size());
+    openInfo.Flags = OFN_FILEMUSTEXIST | OFN_READONLY | OFN_NOCHANGEDIR;
+    BOOL ret = GetOpenFileNameW(&openInfo);
     if (!ret && FNERR_INVALIDFILENAME == CommDlgExtendedError())
     {
-        // Windows refuse to open dialog with initial path e.g. C:\. Oh well...
-        strcpy(Volume, "");
-        ret = GetOpenFileName(&openInfo);
+        filename[0] = 0;
+        ret = GetOpenFileNameW(&openInfo);
     }
     if (ret)
     {
-        SetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume);
+        SetDlgItemTextW(HWindow, IDC_EDIT_IMAGE, filename.data());
         ApplyUndeleteDarkModeIfSelected(GetDlgItem(HWindow, IDC_EDIT_IMAGE));
     }
 }
+catch (const std::bad_alloc&)
+{ SetLastError(ERROR_NOT_ENOUGH_MEMORY); String<char>::SysError(IDS_UNDELETE, IDS_ERROR); }
 
 INT_PTR CConnectDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -809,12 +811,24 @@ INT_PTR CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 //  CRestoreDialog
 //
 
+static int CALLBACK RestoreBrowseCallback(HWND window, UINT message, LPARAM, LPARAM data)
+{
+    if (message == BFFM_INITIALIZED)
+    {
+        ApplyUndeleteDarkMode(window);
+        const wchar_t* initial = reinterpret_cast<const wchar_t*>(data);
+        if (initial != NULL && *initial != 0) SendMessageW(window, BFFM_SETSELECTIONW, TRUE, data);
+    }
+    return 0;
+}
+
 CRestoreDialog::CRestoreDialog(HWND parent)
     : CDialog(HLanguage, IDD_RESTORE, IDD_RESTORE, parent)
 {
 }
 
 INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+try
 {
     INT_PTR darkResult = 0;
     if (HandleUndeleteDarkDialogMessage(HWindow, uMsg, wParam, lParam, &darkResult))
@@ -830,8 +844,9 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (Parent != NULL)
             SalamanderGeneral->MultiMonCenterWindow(HWindow, Parent, TRUE);
 
-        SalamanderGeneral->GetPanelPath(PANEL_TARGET, path, MAX_PATH, NULL, NULL);
-        SetDlgItemText(HWindow, IDC_EDIT_TARGET, path);
+        std::vector<char> target(4 * SAL_MAX_PATH);
+        if (SalamanderGeneral->GetPanelPath(PANEL_TARGET, target.data(), static_cast<int>(target.size()), NULL, NULL))
+            SetDlgItemTextW(HWindow, IDC_EDIT_TARGET, UndeletePaths::Wide(target.data()).c_str());
         ApplyUndeleteDarkModeIfSelected(GetDlgItem(HWindow, IDC_EDIT_TARGET));
 
         int files, dirs;
@@ -877,19 +892,30 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
         case IDC_BUTTON_BROWSE:
         {
-            char title[100];
-            GetDlgItemText(HWindow, IDC_EDIT_TARGET, path, MAX_PATH);
-            GetWindowText(HWindow, title, 100);
-            SalamanderGeneral->GetTargetDirectory(HWindow, HWindow, title, String<char>::LoadStr(IDS_CHOOSETARGET),
-                                                  path, FALSE, path);
-            SetDlgItemText(HWindow, IDC_EDIT_TARGET, path);
+            const std::wstring title = UndeletePaths::Wide(String<char>::LoadStr(IDS_CHOOSETARGET));
+            const std::wstring initial = UndeletePaths::ReadText(GetDlgItem(HWindow, IDC_EDIT_TARGET));
+            BROWSEINFOW browse = {};
+            browse.hwndOwner = HWindow;
+            browse.lpszTitle = title.c_str();
+            browse.ulFlags = BIF_RETURNONLYFSDIRS | BIF_NEWDIALOGSTYLE;
+            browse.lpfn = RestoreBrowseCallback;
+            browse.lParam = reinterpret_cast<LPARAM>(initial.c_str());
+            std::vector<wchar_t> directory(SAL_MAX_PATH);
+            PIDLIST_ABSOLUTE pidl = SHBrowseForFolderW(&browse);
+            if (pidl != NULL)
+            {
+                if (SHGetPathFromIDListEx(pidl, directory.data(), static_cast<DWORD>(directory.size()), GPFIDL_DEFAULT))
+                    SetDlgItemTextW(HWindow, IDC_EDIT_TARGET, directory.data());
+                CoTaskMemFree(pidl);
+            }
             ApplyUndeleteDarkModeIfSelected(GetDlgItem(HWindow, IDC_EDIT_TARGET));
             return TRUE;
         }
 
         case IDOK:
         {
-            GetDlgItemText(HWindow, IDC_EDIT_TARGET, TargetPath, MAX_PATH);
+            TargetPath = UndeletePaths::Utf8(UndeletePaths::ReadText(GetDlgItem(HWindow, IDC_EDIT_TARGET)).c_str());
+            if (TargetPath.empty()) { SetLastError(ERROR_INVALID_PARAMETER); String<char>::SysError(IDS_UNDELETE, IDS_ERRORENCRYPTED); return TRUE; }
             break;
         }
         }
@@ -898,6 +924,9 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
     return CDialog::DialogProc(uMsg, wParam, lParam);
 }
+
+catch (const std::bad_alloc&)
+{ SetLastError(ERROR_NOT_ENOUGH_MEMORY); String<char>::SysError(IDS_UNDELETE, IDS_ERRORENCRYPTED); return TRUE; }
 
 // ****************************************************************************
 //

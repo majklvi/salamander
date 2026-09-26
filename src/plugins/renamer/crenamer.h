@@ -21,6 +21,7 @@ struct CSourceFile
 
     CSourceFile(const CFileData* fileData, const char* path, int pathLen, BOOL isDir);
     CSourceFile(const CFileData* fileData, const char* fullName, BOOL isDir);
+    explicit CSourceFile(const CSalamanderDiskSelectionItem& item);
     BOOL IsGood() const { return FullName != NULL; }
     CSourceFile(CSourceFile* orig);
     CSourceFile(CSourceFile* orig, const char* newName);

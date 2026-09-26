@@ -27,6 +27,7 @@ enum { PANEL_SOURCE, PANEL_TARGET, PANEL_LEFT, PANEL_RIGHT, PATH_TYPE_WINDOWS=10
 struct CQuadWord { DWORD LoDWord, HiDWord; CQuadWord(DWORD lo=0,DWORD hi=0):LoDWord(lo),HiDWord(hi){} };
 struct CFileData {
     int NameLen=0; CQuadWord Size; DWORD Attr=0; FILETIME LastWrite={};
+    const char* Ext=""; BOOL Selected=FALSE, SizeValid=TRUE, Hidden=FALSE, IsLink=FALSE, IsOffline=FALSE;
     const char* Name = nullptr;
     const wchar_t* NameW = nullptr;
     BOOL UseWideName() const { return NameW != nullptr; }
@@ -43,7 +44,7 @@ struct Row {
     Row(std::wstring name, std::wstring full, bool selected, bool directory, std::string mirror)
         : Name(mirror.empty() ? PluginWideToMultiBytePath(name.c_str(), CP_UTF8) : mirror),
           Wide(std::move(name)), Full(std::move(full)), Selected(selected), Directory(directory) {
-        Data.Name = Name.c_str(); Data.NameLen=(int)Name.size(); Data.NameW = Wide.c_str();
+        Data.Selected=selected; Data.Name = Name.c_str(); Data.NameLen=(int)Name.size(); Data.NameW = Wide.c_str();
     }
 };
 static size_t ArrayAtCalls = 0, ArrayDataCalls = 0;
@@ -72,6 +73,23 @@ struct CFilesWindow {
     std::wstring GetItemFullPathW(const CFileData& file) {
         Row* row = Find(&file); return FailPath || row == nullptr ? std::wstring() : row->Full;
     }
+    const char* GetPath() { return Root.c_str(); }
+    const wchar_t* GetPathW() { return nullptr; }
+    int GetCaretIndex() {
+        for(int i=0;i<Dirs->Count+Files->Count;++i) {
+            const auto* data=i<Dirs->Count?&Dirs->Data[i]:&Files->Data[i-Dirs->Count];
+            if(data==Focus)return i;
+        }
+        return -1;
+    }
+    std::wstring GetItemDirectoryW(const CFileData& item) {
+        const auto full=GetItemFullPathW(item); const auto slash=full.find_last_of(L"\\/");
+        return slash==std::wstring::npos?std::wstring():full.substr(0,slash);
+    }
+    std::wstring GetItemRelativePathW(const CFileData& item) {
+        const auto full=GetItemFullPathW(item); const auto slash=full.find_last_of(L"\\/");
+        return full.empty()?std::wstring():full.substr(slash==std::wstring::npos?0:slash+1);
+    }
     const CFileData* Add(std::wstring name, std::wstring full, bool selected=false,
                          bool directory=false, std::string mirror={}) {
         CFilesArray* array = directory ? Dirs : Files;
@@ -99,13 +117,17 @@ static MainWindowStub* MainWindow=&Window;
 static DWORD MainThreadID;
 @@SERVICE@@
 static CPanelItemPathsService Service;
+static void* DiskSelectionServiceInterface();
+static HWND TestWindow;
 struct CSalamanderGeneralAbstract {
-    bool Available=true, NullInterface=false, OldVersion=false;
+    bool Available=true, DiskAvailable=true, NullInterface=false, OldVersion=false;
     int RootReads=0, AdditionalReportedFiles=0, SelectionLimit=-1, ThrowOnSelectionIndex=-1;
     std::vector<int> Worked;
     BOOL QueryService(const CSalamanderServiceQuery* query, CSalamanderServiceResult* result) {
         if (!Available) return FALSE;
-        result->Interface = NullInterface ? nullptr : &Service;
+        const bool disk=strcmp(query->ServiceId,SALAMANDER_SERVICE_DISK_SELECTION)==0;
+        if(disk&&!DiskAvailable)return FALSE;
+        result->Interface = NullInterface ? nullptr : disk?DiskSelectionServiceInterface():&Service;
         result->Version = OldVersion ? 0 : query->MinimumVersion;
         return TRUE;
     }
@@ -129,10 +151,10 @@ struct CSalamanderGeneralAbstract {
         return nullptr;
     }
     const CFileData* GetPanelSelectedItem(int panel,int* index,BOOL* isDir) { if(ThrowOnSelectionIndex>=0&&*index>=ThrowOnSelectionIndex)throw std::bad_alloc();if(SelectionLimit>=0&&*index>=SelectionLimit)return nullptr;return Enumerate(panel,index,isDir,true); }
-    const CFileData* GetPanelItem(int panel,int* index,BOOL* isDir) { return Enumerate(panel,index,isDir,false); }
+    const CFileData* GetPanelItem(int panel,int* index,BOOL* isDir) { if(ThrowOnSelectionIndex>=0&&*index>=ThrowOnSelectionIndex)throw std::bad_alloc();if(SelectionLimit>=0&&*index>=SelectionLimit)return nullptr;return Enumerate(panel,index,isDir,false); }
     const CFileData* GetPanelFocusedItem(int panel,BOOL* isDir) {
         auto window=Window.GetPanel(panel); auto file=window->Focus;
-        if (file) *isDir=window->Find(file)->Directory;
+        if (file && isDir) *isDir=window->Find(file)->Directory;
         return file;
     }
     char* DupStr(const char* p) { return _strdup(p); }
@@ -142,6 +164,7 @@ struct CSalamanderGeneralAbstract {
             if(row->Selected){if(row->Directory)++d;else ++f;}
         if(files)*files=f+AdditionalReportedFiles;if(dirs)*dirs=d;return TRUE;
     }
+    HWND GetMainWindowHWND() { return TestWindow; }
     int GetSourcePanel() { return Window.SourceRight ? PANEL_RIGHT : PANEL_LEFT; }
     void GetConfigParameter(int,void*,size_t,void*) {}
     void SetUserWorkedOnPanelPath(int panel) { Worked.push_back(panel); }
@@ -153,6 +176,9 @@ struct CSalamanderGeneralAbstract {
 };
 static CSalamanderGeneralAbstract General;
 static CSalamanderGeneralAbstract* SG=&General;
+@@FACADE@@
+@@DISK_SERVICE@@
+static void* DiskSelectionServiceInterface() { static CDiskSelectionService service; return &service; }
 
 #if defined(_DEBUG) && defined(_MSC_VER)
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -307,8 +333,8 @@ static void FallbackAndFailureTests() {
     Reset();General.Available=false;auto panel=Window.GetPanel(PANEL_SOURCE);panel->Add(L"\u010d\u0159.png",L"ignored",true,false,"??.png");CRenamerDialog legacy;legacy.LoadSelection();ExpectPaths(legacy,{L"C:\\left-root\\\u010d\u0159.png"},"old host without optional service retains ordinary-panel wide-name fallback");
 #if @@NEW_API@@
     for(int fail:{0,1,2,3}) {Reset();panel=Window.GetPanel(PANEL_SOURCE);panel->Add(L"first.png",L"C:\\actual\\first.png",true);panel->Add(L"second.png",fail==3?L"":L"C:\\actual\\second.png",true);if(fail==0)panel->FailPath=true;if(fail==1)General.NullInterface=true;if(fail==2)General.OldVersion=true;CRenamerDialog dialog;dialog.LoadSelection();Check(!dialog.SelectionValid&&dialog.NotRenamedFiles.Count==0,"available service failure rejects complete intake without fabricated root or partial selection");}
-    Reset();panel=Window.GetPanel(PANEL_SOURCE);panel->Add(L"first.png",L"C:\\actual\\first.png",true);panel->Add(L"second.png",L"C:\\actual\\second.png",true);General.AdditionalReportedFiles=1;CRenamerDialog missing;missing.LoadSelection();Check(!missing.SelectionValid&&missing.NotRenamedFiles.Count==0,"count mismatch rejects prematurely exhausted selection without partial batch");
-    Reset();panel=Window.GetPanel(PANEL_SOURCE);panel->Add(L"first.png",L"C:\\actual\\first.png",true);panel->Add(L"second.png",L"C:\\actual\\second.png",true);General.ThrowOnSelectionIndex=1;CRenamerDialog allocationFailure;allocationFailure.LoadSelection();Check(!allocationFailure.SelectionValid&&allocationFailure.NotRenamedFiles.Count==0&&GetLastError()==ERROR_NOT_ENOUGH_MEMORY,"iterator bad_alloc after first captured row rejects and clears the complete batch");
+    Reset();panel=Window.GetPanel(PANEL_SOURCE);panel->Add(L"first.png",L"C:\\actual\\first.png",true);panel->Add(L"second.png",L"C:\\actual\\second.png",true);panel->Root="C:\\actual";General.DiskAvailable=false;General.AdditionalReportedFiles=1;CRenamerDialog missing;missing.LoadSelection();Check(!missing.SelectionValid&&missing.NotRenamedFiles.Count==0,"count mismatch rejects prematurely exhausted selection without partial batch");
+    Reset();panel=Window.GetPanel(PANEL_SOURCE);panel->Add(L"first.png",L"C:\\actual\\first.png",true);panel->Add(L"second.png",L"C:\\actual\\second.png",true);panel->Root="C:\\actual";General.DiskAvailable=false;General.ThrowOnSelectionIndex=1;CRenamerDialog allocationFailure;allocationFailure.LoadSelection();Check(!allocationFailure.SelectionValid&&allocationFailure.NotRenamedFiles.Count==0&&GetLastError()==ERROR_NOT_ENOUGH_MEMORY,"iterator bad_alloc after first captured row rejects and clears the complete batch");
     Reset();CRenamerDialog empty;empty.LoadSelection();Check(empty.NotRenamedFiles.Count==0,"empty panel intake does not dereference a missing focused item");
 #endif
 }
@@ -348,4 +374,4 @@ static void ComparisonTests(){
     Check(deterministic,"malformed-byte comparison is repeatable and antisymmetric");
 #endif
 }
-int main(){MainThreadID=GetCurrentThreadId();SelectionTests();LongPathTests();FallbackAndFailureTests();ConstructorAndCapacityTests();ComparisonTests();printf("Renamer panel paths: %d checks, %d failures; no filesystem mutation or UI.\n",Checks,Failures);return Failures?1:0;}
+int main(){MainThreadID=GetCurrentThreadId();TestWindow=CreateWindowExW(0,L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);SelectionTests();LongPathTests();FallbackAndFailureTests();ConstructorAndCapacityTests();ComparisonTests();printf("Renamer panel paths: %d checks, %d failures; no filesystem mutation or UI.\n",Checks,Failures);return Failures?1:0;}

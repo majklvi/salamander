@@ -7,7 +7,7 @@ folder or move any files.
 
 The [plug-in path contract and consumer audit](branch-view-plugin-paths.md)
 explains which operations use the shared host resolver, how archive packing
-preserves relative paths, and which legacy plug-in commands still need migration.
+preserves relative paths, and how supplied plug-ins use the standard owned selection.
 
 ## Using the view
 
@@ -119,22 +119,14 @@ Viewer enumeration passes complete paths and validates the source tab and
 current item, including after reorder. PictView consumes the new wide viewer
 enumeration service; existing plug-in interface slots remain in place.
 
-File Comparator queries the optional `Salamander.PanelItemPaths` service for
-complete UTF-16 paths of current disk-panel items on the host UI thread. The
-resolver validates panel membership before reading the item, rejects stale or
-cross-panel pointers, and never returns a truncated path. It is a separate
-interface obtained through the existing `QueryService`; published vtables and
-`CFileData` are unchanged. Older hosts without this service keep the ordinary
-folder-path fallback. A failed service call never synthesizes a Branch root/name
-path. Same-name matching uses the full Unicode name rather than its bounded
-narrow display mirror.
-
-Batch Rename uses the same optional per-item service during its synchronous
-selection capture, before starting its dialog thread. A failed lookup rejects
-the selection rather than reconstructing a root/name path. Its file operations
-convert the owned UTF-8 paths to UTF-16 and use wide Windows APIs, with extended
-paths for long names. Older hosts retain ordinary-folder selection support
-when the service is unavailable.
+Disk plug-ins use the standard `CSalamanderDiskSelection` facade in
+`spl_diskselection.h`. The host captures full paths, names and metadata atomically
+into an immutable owned snapshot; plug-in code is the same for ordinary and
+recursive disk panels. Refresh cannot invalidate the captured data. File
+Comparator, Batch Rename and the other supplied disk-selection consumers use
+this boundary before dialogs or workers start. Existing SDK vtable prefixes and
+`CFileData` remain unchanged. See the [SDK contract and consumer audit](branch-view-plugin-paths.md)
+for lifetime, error handling, migration and host-version requirements.
 
 The worker uses wide `FindFirstFileExW`/`FindNextFileW` and an explicit stack of
 directories. It publishes groups of up to 256 files and also publishes at

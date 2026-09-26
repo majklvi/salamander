@@ -1212,57 +1212,32 @@ void CRenamerDialog::LoadSelection()
             throw std::bad_alloc();
         Root = RootBuffer.Get();
         Root[0] = 0;
-        SetLastError(ERROR_SUCCESS);
-        if (SG->GetPanelPath(PANEL_SOURCE, Root, RenamerPaths::Capacity, NULL, NULL))
+        CSalamanderDiskSelection selection;
+        if (selection.Capture(SG, PANEL_SOURCE))
         {
-            const std::string encoded = RenamerPaths::ToUtf8(RenamerPaths::ToWide(Root).c_str());
+            const std::string encoded = RenamerPaths::ToUtf8(selection.GetRootPathW());
             if (!encoded.empty() && encoded.size() < (size_t)RenamerPaths::Capacity)
             {
                 memcpy(Root, encoded.c_str(), encoded.size() + 1);
                 RootLen = (int)encoded.size();
-                int files = 0, dirs = 0;
-                SG->GetPanelSelection(PANEL_SOURCE, &files, &dirs);
-                BOOL isDir = FALSE;
-                const auto append = [&](const CFileData* item, BOOL directory) -> BOOL
+                SelectionValid = selection.GetCount() > 0;
+                for (int i = 0; i < selection.GetCount(); ++i)
                 {
-                    std::string path;
-                    if (!RenamerPaths::ResolvePanelItemPath(SG, PANEL_SOURCE, item, Root, path))
-                        return FALSE;
-                    CSourceFile* source = NewSourceFile(item, path.c_str(), directory);
+                    const CSalamanderDiskSelectionItem* item = selection.GetItem(i);
+                    CSourceFile* source = item != NULL ? NewSourceFile(*item) : NULL;
                     if (source == NULL)
-                        return FALSE;
+                    {
+                        SelectionValid = FALSE;
+                        break;
+                    }
                     NotRenamedFiles.Add(source);
                     if (!NotRenamedFiles.IsGood())
                     {
                         delete source;
                         NotRenamedFiles.ResetState();
                         SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-                        return FALSE;
-                    }
-                    return TRUE;
-                };
-                if (files + dirs == 0)
-                {
-                    const CFileData* item = SG->GetPanelFocusedItem(PANEL_SOURCE, &isDir);
-                    SelectionValid = append(item, isDir);
-                }
-                else
-                {
-                    SelectionValid = TRUE;
-                    int index = 0;
-                    const CFileData* item;
-                    while ((item = SG->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir)) != NULL)
-                    {
-                        if (!append(item, isDir))
-                        {
-                            SelectionValid = FALSE;
-                            break;
-                        }
-                    }
-                    if (SelectionValid && NotRenamedFiles.Count != files + dirs)
-                    {
                         SelectionValid = FALSE;
-                        SetLastError(ERROR_INVALID_DATA);
+                        break;
                     }
                 }
             }
@@ -1277,7 +1252,6 @@ void CRenamerDialog::LoadSelection()
     }
     if (!SelectionValid)
     {
-        // Never start a partial batch or guess root/basename after a service error.
         DWORD error = GetLastError();
         if (error == ERROR_SUCCESS)
             error = ERROR_INVALID_DATA;

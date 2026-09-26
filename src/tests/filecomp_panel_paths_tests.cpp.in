@@ -17,7 +17,10 @@
 #define CALL_STACK_MESSAGE3(a,b,c) ((void)0)
 enum { PANEL_SOURCE, PANEL_TARGET, PANEL_LEFT, PANEL_RIGHT, PATH_TYPE_WINDOWS=10, ptDisk=10,
        MID_COMPAREFILES=1, SALCFG_ALWAYSONTOP=1, IDS_LOWMEM=1 };
+struct CQuadWord { DWORD LoDWord=0, HiDWord=0; };
 struct CFileData {
+    CQuadWord Size; DWORD Attr=0; FILETIME LastWrite={};
+    const char* Ext=""; BOOL Selected=FALSE, SizeValid=TRUE, Hidden=FALSE, IsLink=FALSE, IsOffline=FALSE;
     const char* Name = nullptr;
     const wchar_t* NameW = nullptr;
     BOOL UseWideName() const { return NameW != nullptr; }
@@ -34,7 +37,7 @@ struct Row {
     Row(std::wstring name, std::wstring full, bool selected, bool directory, std::string mirror)
         : Name(mirror.empty() ? PluginWideToMultiBytePath(name.c_str(), CP_UTF8) : mirror),
           Wide(std::move(name)), Full(std::move(full)), Selected(selected), Directory(directory) {
-        Data.Name = Name.c_str(); Data.NameW = Wide.c_str();
+        Data.Selected=selected; Data.Name = Name.c_str(); Data.NameW = Wide.c_str();
     }
 };
 static size_t ArrayAtCalls = 0, ArrayDataCalls = 0;
@@ -67,6 +70,23 @@ struct CFilesWindow {
         if (ConstantPath) return L"C:\\constant.txt";
         Row* row = Find(&file); return FailPath || row == nullptr ? std::wstring() : row->Full;
     }
+    const char* GetPath() { return Root.c_str(); }
+    const wchar_t* GetPathW() { return nullptr; }
+    int GetCaretIndex() {
+        for(int i=0;i<Dirs->Count+Files->Count;++i) {
+            const auto* data=i<Dirs->Count?&Dirs->Data[i]:&Files->Data[i-Dirs->Count];
+            if(data==Focus)return i;
+        }
+        return -1;
+    }
+    std::wstring GetItemDirectoryW(const CFileData& item) {
+        const auto full=GetItemFullPathW(item); const auto slash=full.find_last_of(L"\\/");
+        return slash==std::wstring::npos?std::wstring():full.substr(0,slash);
+    }
+    std::wstring GetItemRelativePathW(const CFileData& item) {
+        const auto full=GetItemFullPathW(item); const auto slash=full.find_last_of(L"\\/");
+        return full.empty()?std::wstring():full.substr(slash==std::wstring::npos?0:slash+1);
+    }
     const CFileData* Add(std::wstring name, std::wstring full, bool selected=false,
                          bool directory=false, std::string mirror={}) {
         CFilesArray* array = directory ? Dirs : Files;
@@ -94,13 +114,17 @@ static MainWindowStub* MainWindow=&Window;
 static DWORD MainThreadID;
 @@SERVICE@@
 static CPanelItemPathsService Service;
+static void* DiskSelectionServiceInterface();
+static HWND TestWindow;
 struct GeneralStub {
-    bool Available=true, NullInterface=false, OldVersion=false;
+    bool Available=true, DiskAvailable=true, NullInterface=false, OldVersion=false;
     int RootReads=0;
     std::vector<int> Worked;
     BOOL QueryService(const CSalamanderServiceQuery* query, CSalamanderServiceResult* result) {
         if (!Available) return FALSE;
-        result->Interface = NullInterface ? nullptr : &Service;
+        const bool disk=strcmp(query->ServiceId,SALAMANDER_SERVICE_DISK_SELECTION)==0;
+        if(disk&&!DiskAvailable)return FALSE;
+        result->Interface = NullInterface ? nullptr : disk?DiskSelectionServiceInterface():&Service;
         result->Version = OldVersion ? 0 : query->MinimumVersion;
         return TRUE;
     }
@@ -127,8 +151,15 @@ struct GeneralStub {
     const CFileData* GetPanelItem(int panel,int* index,BOOL* isDir) { return Enumerate(panel,index,isDir,false); }
     const CFileData* GetPanelFocusedItem(int panel,BOOL* isDir) {
         auto window=Window.GetPanel(panel); auto file=window->Focus;
-        if (file) *isDir=window->Find(file)->Directory;
+        if (file && isDir) *isDir=window->Find(file)->Directory;
         return file;
+    }
+    HWND GetMainWindowHWND() { return TestWindow; }
+    BOOL GetPanelSelection(int panel,int* files,int* dirs) {
+        auto window=Window.GetPanel(panel);int f=0,d=0;
+        for(auto array:{window->Dirs,window->Files})for(auto& row:array->Rows)
+            if(row->Selected){if(row->Directory)++d;else ++f;}
+        if(files)*files=f;if(dirs)*dirs=d;return TRUE;
     }
     int GetSourcePanel() { return Window.SourceRight ? PANEL_RIGHT : PANEL_LEFT; }
     void GetConfigParameter(int,void*,size_t,void*) {}
@@ -141,6 +172,10 @@ struct GeneralStub {
 };
 static GeneralStub General;
 static GeneralStub* SG=&General;
+using CSalamanderGeneralAbstract=GeneralStub;
+@@FACADE@@
+@@DISK_SERVICE@@
+static void* DiskSelectionServiceInterface() { static CDiskSelectionService service; return &service; }
 static BOOL AlwaysOnTop=FALSE;
 static int ThreadQueue=0, LaunchCount=0, Checks=0, Failures=0;
 static std::string OpenedFirst,OpenedSecond;
@@ -192,10 +227,10 @@ static void SelectionTests() {
         Expect(right?second:first,right?first:second,"case-insensitive same-name target uses target real path");
         Reset(right);source=Window.GetPanel(PANEL_SOURCE);target=Window.GetPanel(PANEL_TARGET);
         const std::wstring name=std::wstring(110,L'\u6f22')+L"-right.txt";
-        source->Focus=source->Add(name,first,false,false,"bounded-mirror");
+        source->Focus=source->Add(name,first.substr(0,first.find_last_of(L'\\')+1)+name,false,false,"bounded-mirror");
         target->Add(std::wstring(110,L'\u6f22')+L"-wrong.txt",L"D:\\wrong.txt",false,false,"bounded-mirror");
-        target->Add(name,second,false,false,"bounded-mirror");Run();
-        Expect(right?second:first,right?first:second,"same-name lookup ignores colliding truncated UTF8 display mirrors");
+        target->Add(name,second.substr(0,second.find_last_of(L'\\')+1)+name,false,false,"bounded-mirror");Run();
+        Expect(right?second.substr(0,second.find_last_of(L'\\')+1)+name:first.substr(0,first.find_last_of(L'\\')+1)+name, right?first.substr(0,first.find_last_of(L'\\')+1)+name:second.substr(0,second.find_last_of(L'\\')+1)+name,"same-name lookup ignores colliding truncated UTF8 display mirrors");
     }
     Reset();auto source=Window.GetPanel(PANEL_SOURCE);auto target=Window.GetPanel(PANEL_TARGET);
     source->Focus=source->Add(L"same.txt",first,true);target->Add(L"same.txt",second);Run();
@@ -221,7 +256,19 @@ static void PathTests() {
     Check(LaunchCount==0 && General.RootReads==0,"service failure aborts comparison without guessed root/name paths");
     Reset();General.Available=false;source=Window.GetPanel(PANEL_SOURCE);source->Add(L"\u010d\u0159.txt",L"ignored",true);source->Add(L"other.txt",L"ignored",true);Run();
     Expect(L"C:\\left-root\\\u010d\u0159.txt",L"C:\\left-root\\other.txt","ordinary old host retains root plus wide filename fallback");
-#if @@HAS_HELPER@@
+#if @@SNAPSHOT@@
+    CSalamanderDiskSelectionItem snapshotItem={};snapshotItem.FullPathW=L"C:\\actual\\東京\\same.txt";
+    char tiny[8]="filled";Check(!GetFileCompPanelItemPath(&snapshotItem,tiny,sizeof(tiny)) && tiny[0]==0 && GetLastError()==ERROR_INSUFFICIENT_BUFFER,"short UTF8 output fails empty instead of truncating");
+    for(int invalid:{0,1}) {
+        Reset();Window.Left.Add(L"same.txt",L"C:\\actual\\same.txt",true);
+        General.NullInterface=invalid==0;General.OldVersion=invalid==1;Run();
+        Check(LaunchCount==0&&General.RootReads==0,"invalid advertised service aborts without guessed fallback");
+    }
+    Reset();Window.Left.Focus=Window.Left.Add(L"same.txt",L"C:\\left-root\\same.txt");
+    Window.Right.Add(L"same.txt",L"D:\\right-root\\one\\same.txt");
+    Window.Right.Add(L"same.txt",L"D:\\right-root\\two\\same.txt");Run();
+    Expect(L"C:\\left-root\\same.txt",L"","ambiguous target basename leaves second path empty instead of guessing");
+#elif @@HAS_HELPER@@
     Reset();source=Window.GetPanel(PANEL_SOURCE);auto item=source->Add(L"same.txt",L"C:\\actual\\\u6771\u4eac\\same.txt");
     char tiny[8]="filled";Check(!GetFileCompPanelItemPath(PANEL_SOURCE,item,tiny,sizeof(tiny)) && tiny[0]==0 && GetLastError()==ERROR_INSUFFICIENT_BUFFER,"short UTF8 output fails empty instead of truncating");
     General.NullInterface=true;char buffer[100]="filled";Check(!GetFileCompPanelItemPath(PANEL_SOURCE,item,buffer,sizeof(buffer)) && buffer[0]==0 && General.RootReads==0,"invalid available service never enables legacy fallback");
@@ -313,7 +360,7 @@ static void ServiceMembershipTests() {
            requests,count,ArrayAtCalls,ArrayDataCalls);
 }
 int main() {
-    MainThreadID=GetCurrentThreadId();SelectionTests();PathTests();ServiceMembershipTests();
+    MainThreadID=GetCurrentThreadId();TestWindow=CreateWindowExW(0,L"STATIC",L"",0,0,0,0,0,HWND_MESSAGE,nullptr,GetModuleHandleW(nullptr),nullptr);SelectionTests();PathTests();ServiceMembershipTests();
     printf("File Comparator panel paths: %d checks, %d failures; no file I/O or UI.\n",Checks,Failures);
     return Failures ? 1 : 0;
 }

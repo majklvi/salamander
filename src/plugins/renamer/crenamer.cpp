@@ -33,6 +33,24 @@ CSourceFile::CSourceFile(const CFileData* fileData, const char* fullName, BOOL i
     FileTimeToLocalFileTime(&fileData->LastWrite, &LastWrite);
 }
 
+// The SDK supplies complete, owned paths in every disk-panel view.
+CSourceFile::CSourceFile(const CSalamanderDiskSelectionItem& item)
+    : FullName(NULL), Name(NULL), Ext(NULL), NameLen(0), IsDir(item.IsDir ? 1 : 0), State(0)
+{
+    const std::string fullName = RenamerPaths::ToUtf8(item.FullPathW);
+    if (fullName.empty())
+    {
+        SetLastError(ERROR_INVALID_NAME);
+        return;
+    }
+    SetName(fullName.c_str());
+    if (FullName != NULL && Ext == Name + 1)
+        Ext = FullName + NameLen;
+    Size = item.Size;
+    Attr = item.Attr;
+    FileTimeToLocalFileTime(&item.LastWrite, &LastWrite);
+}
+
 CSourceFile::CSourceFile(CSourceFile* orig)
     : FullName(NULL), Name(NULL), Ext(NULL), NameLen(0), IsDir(orig->IsDir), State(0)
 {
