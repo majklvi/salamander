@@ -721,13 +721,14 @@ BOOL ExpandVarString(HWND msgParent, const char* varText, char* buffer, int buff
 
 // ulozi na clipboard Unicode verzi textu str o delce len znaku
 // vraci ERROR_SUCCESS nebo GetLastError
-DWORD AddUnicodeToClipboard(const char* str, int len);
+DWORD AddUnicodeToClipboard(const char* str, int len, UINT sourceCodePage = CP_ACP);
 
 // vrzne text na clipboard; pokud showEcho, zobrazi message box, ze jako OK
 // pokud je textLen==-1, napocita si delku sam
 BOOL CopyTextToClipboard(const char* text, int textLen = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL);
 BOOL CopyTextToClipboardW(const wchar_t* text, int textLen = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL);
-BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL);
+BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen = -1, BOOL showEcho = FALSE, HWND hEchoParent = NULL,
+                          UINT sourceCodePage = CP_ACP);
 BOOL CopyHTextToClipboardW(HGLOBAL hGlobalText, int textLen = -1);
 
 // zjisti z bufferu 'pattern' o delce 'patternLen' jestli jde o text (existuje kodova stranka,
@@ -1020,6 +1021,7 @@ BOOL DirExists(const char* dirName);
 
 // tool tip
 void SetCurrentToolTip(HWND hNotifyWindow, DWORD id, int showDelay = 0); // popis v tooltip.h
+void RearmCurrentToolTip(HWND hNotifyWindow, DWORD id, int showDelay = 0);
 void SetCurrentPanelToolTip(HWND hNotifyWindow, DWORD id, int showDelay = 0);
 void SuppressToolTipOnCurrentMousePos();                                 // popis v tooltip.h
 
@@ -1057,6 +1059,7 @@ struct COpenViewerData
 #define WM_USER_REFRESHINDEX WM_APP + 105 // [int index, 0]
 
 #define WM_USER_END_SUSPMODE WM_APP + 106  // [0, 0] - rychlejsi aktivace okna
+#define WM_USER_DRIVE_FREESPACE_READY (WM_APP + 425) // cache result ready; no drive enumeration
 #define WM_USER_DRIVES_CHANGE WM_APP + 107 // [0, 0]
 #define WM_USER_ICON_NOTIFY WM_APP + 108   // [0, 0] - mysak je nad ikonkou v taskbare
 #define WM_USER_EDIT WM_APP + 110          // [begin, end] oznac tento interval
@@ -1389,9 +1392,10 @@ extern const char* SALAMANDER_TEXT_VERSION; // textove oznaceni aplikace vcetne 
 extern const char *LOW_MEMORY,
     *MAINWINDOW_NAME,
     *CMAINWINDOW_CLASSNAME,
-    *CFILESBOX_CLASSNAME,
     *SAVEBITS_CLASSNAME,
     *SHELLEXECUTE_CLASSNAME;
+
+extern const wchar_t* CFILESBOX_CLASSNAMEW;
 
 extern const char* STR_NONE; // "(none)" - plug-iny: pro DLLName a Version pokud jsou nezjistitelne
 
@@ -1828,6 +1832,7 @@ DWORD CfgSkillLevelToMenu(BYTE cfgSkillLevel);
 #define IDT_UPDATETASKLIST 951
 #define IDT_FINISHSTARTUPREVEAL 952
 #define IDT_RESTOREWINDOWPLACEMENT 953
+#define IDT_BRANCHVIEW_POLL 954 // poll asynchronous Branch View scan batches
 
 // POZOR: skoro vsechny funkce v teto sekci pri chybe zobrazuji hlaseni o LOAD / SAVE
 //        konfigurace, coz z nich dela nevhodne pro bezny pristup do Registry,
@@ -2240,11 +2245,11 @@ struct CFileNamesEnumData
     CFileNamesEnumRequestType RequestType; // typ pozadavku
     int SrcUID;
     int LastFileIndex;
-    char LastFileName[MAX_PATH];
+    std::wstring LastFileName;
     BOOL PreferSelected;
     BOOL OnlyAssociatedExtensions;
     CPluginInterfaceAbstract* Plugin; // pouziva se pri 'OnlyAssociatedExtensions'==TRUE, oznacuje pro jaky plugin filtrovat jmena souboru ('Plugin'==NULL = interni viewer)
-    char FileName[MAX_PATH];
+    std::wstring FileName;
     BOOL Select;
     BOOL TimedOut; // TRUE pokud uz na vysledek nikdo neceka (zbytecne provadet hledani jmena)
 
@@ -2335,6 +2340,22 @@ BOOL IsFileNameForViewerSelected(int srcUID, int lastFileIndex, const char* last
 // vraci se v nem TRUE)
 BOOL SetSelectionOnFileNameForViewer(int srcUID, int lastFileIndex, const char* lastFileName,
                                      BOOL select, BOOL* srcBusy);
+
+// Internal viewer enumeration keeps complete UTF-16 paths. The legacy plug-in
+// entry points retain their MAX_PATH output contract and never return truncation.
+BOOL GetNextFileNameForViewerW(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
+                              BOOL preferSelected, BOOL onlyAssociatedExtensions,
+                              std::wstring* fileName, BOOL* noMoreFiles, BOOL* srcBusy,
+                              CPluginInterfaceAbstract* plugin);
+BOOL GetPreviousFileNameForViewerW(int srcUID, int* lastFileIndex, const wchar_t* lastFileName,
+                                  BOOL preferSelected, BOOL onlyAssociatedExtensions,
+                                  std::wstring* fileName, BOOL* noMoreFiles, BOOL* srcBusy,
+                                  CPluginInterfaceAbstract* plugin);
+BOOL IsFileNameForViewerSelectedW(int srcUID, int lastFileIndex, const wchar_t* lastFileName,
+                                 BOOL* isFileSelected, BOOL* srcBusy);
+BOOL SetSelectionOnFileNameForViewerW(int srcUID, int lastFileIndex, const wchar_t* lastFileName,
+                                     BOOL select, BOOL* srcBusy);
+CSalamanderViewerEnumerationAbstract* GetViewerEnumerationService();
 
 // zmeni zdroji (panelu nebo Findu) UID (negeneruje nove, aktualizuje pole
 // FileNamesEnumSources a vrati nove UID v 'srcUID')

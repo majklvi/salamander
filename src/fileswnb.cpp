@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "viewerpath.h"
 
 #include "common/winlibdpi.h"
 
@@ -424,6 +425,11 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_TIMER:
     {
+        if (wParam == IDT_BRANCHVIEW_POLL)
+        {
+            PollBranchView();
+            return 0;
+        }
         if (wParam == IDT_SM_END_NOTIFY)
         {
             KillTimer(HWindow, IDT_SM_END_NOTIFY);
@@ -507,7 +513,9 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_ICONREADING_BEGIN:
     {
-        if (UseThumbnails && DirectoryLine != NULL)
+        // Branch View reports scanner progress in its status text. Background
+        // thumbnail enrichment must not make a completed listing look like a rescan.
+        if (!IsBranchView() && UseThumbnails && DirectoryLine != NULL)
         {
             IconReadingThrobberID = DirectoryLine->ChangeThrobberID();
             DirectoryLine->SetThrobber(TRUE, 150);
@@ -723,7 +731,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (uMsg == WM_USER_REFRESH_DIR || uMsg == WM_USER_REFRESH_DIR_EX_DELAYED ||
                             uMsg == WM_USER_ICONREADING_END || uMsg == WM_USER_INACTREFRESH_DIR)
                         {
-                            setWait = ShouldShowWaitCursorForRefresh() &&
+                            // Branch refresh only schedules asynchronous work here.
+                            setWait = !IsBranchView() && ShouldShowWaitCursorForRefresh() &&
                                       GetCursor() != LoadCursor(NULL, IDC_WAIT); // ceka uz ?
                             if (setWait)
                                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -741,7 +750,14 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         LastRefreshTime = MyTimeCounter++;
                         HANDLES(LeaveCriticalSection(&TimeCounterSection));
 
-                        RefreshDirectory(probablyUselessRefresh, FALSE, isInactiveRefresh);
+                        if (IsBranchView())
+                        {
+                            // Snooper/deferred notifications use bounded background
+                            // scheduling. An explicit refresh resumes Stop Scan.
+                            const BOOL automatic = uMsg != WM_USER_REFRESH_DIR || wParam != 0;
+                            RefreshBranchView(automatic);
+                        }
+                        else RefreshDirectory(probablyUselessRefresh, FALSE, isInactiveRefresh);
 
                         if (isInactiveRefresh)
                         {
@@ -814,6 +830,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL icoFileIcon = iconSize == ICONSIZE_16 && *(DWORD*)extension == *(DWORD*)"ico";
                 if (!icoFileIcon &&
                     Associations.GetIndex(extension, index) &&       // pripona ma ikonku (asociaci)
+                    Associations[index].GetIndex(iconSize) != -2 && // per-file icons must never become shared extension icons
                     (Associations[index].GetIndex(iconSize) == -1 || // jde o ikonku, ktera se nacita
                      Associations[index].GetIndex(iconSize) == -3 ||
                      Associations.GetPixelIconIndex(index, GetIconSize(iconSize)) < 0))
@@ -821,10 +838,13 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int icon;
                     CIconList* srcIconList;
                     int srcIconListIndex;
-                    char fileName[MAX_PATH + 4];
-                    memmove(fileName, file->Name, file->NameLen);
-                    *(DWORD*)(fileName + file->NameLen) = 0;
-                    if (IconCache->GetIndex(fileName, icon, NULL, NULL) &&                            // icon-thread ji nacita
+                    // Branch rows are cached by their full identity, not by a
+                    // possibly duplicated basename. GetIndex reads padded DWORDs.
+                    const char* cacheKey = GetItemCacheKeyPtr(*file);
+                    const size_t cacheKeyLength = strlen(cacheKey);
+                    std::vector<char> fileName(cacheKeyLength + sizeof(DWORD), 0);
+                    memcpy(fileName.data(), cacheKey, cacheKeyLength);
+                    if (IconCache->GetIndex(fileName.data(), icon, NULL, NULL) &&                            // icon-thread ji nacita
                         (IconCache->At(icon).GetFlag() == 1 || IconCache->At(icon).GetFlag() == 2) && // ikona je nactena nova nebo stara
                         IconCache->GetIcon(IconCache->At(icon).GetIndex(),
                                            &srcIconList, &srcIconListIndex)) // povede se ziskat nactenou ikonku
@@ -1130,9 +1150,13 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         ToggleDirectoryLine();
         //---  nahozeni typu viewu + nacteni obsahu adresare
         SetThumbnailSize(Configuration.ThumbnailSize); // musi existovat ListBox
+#ifndef _UNICODE
+        if (!ListBox->CreateExW(WS_EX_WINDOWEDGE,
+#else
         if (!ListBox->CreateEx(WS_EX_WINDOWEDGE,
-                               CFILESBOX_CLASSNAME,
-                               "",
+#endif
+                               CFILESBOX_CLASSNAMEW,
+                               L"",
                                WS_BORDER | WS_CHILD | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                                0, 0, 0, 0, // dummy
                                HWindow,
@@ -1177,6 +1201,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_DESTROY:
     {
+        StopExplorerSortAsync(); // disconnect completion before this HWND can be reused
         //---  zruseni tohoto panelu z pole zdroju pro enumeraci souboru ve viewerech
         EnumFileNamesRemoveSourceUID(HWindow);
 
@@ -1246,33 +1271,13 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 else
                 {
-                    if (FileNamesEnumData.LastFileName[0] != 0) // zname plne jmeno souboru na 'index', zkontrolujeme jestli nedoslo k rozesunuti/sesunuti pole + pripadne dohledame novy index
+                    int matchingIndex = Salamander::ViewerPaths::FindIndex(index, count,
+                        FileNamesEnumData.LastFileName,
+                        [this](int i) { return GetItemFullPathW(Files->At(i)); });
+                    if (matchingIndex >= 0)
                     {
-                        int pathLen = (int)strlen(GetPath());
-                        if (StrNICmp(GetPath(), FileNamesEnumData.LastFileName, pathLen) == 0)
-                        { // cesta k souboru se musi shodovat s cestou v panelu ("always true")
-                            const char* name = FileNamesEnumData.LastFileName + pathLen;
-                            if (*name == '\\' || *name == '/')
-                                name++;
-
-                            CFileData* f = (index >= 0 && index < count) ? &Files->At(index) : NULL;
-                            BOOL nameIsSame = f != NULL && StrICmp(name, f->Name) == 0;
-                            if (nameIsSame)
-                                indexNotFound = FALSE;
-                            if (f == NULL || !nameIsSame)
-                            { // jmeno na indexu 'index' neni FileNamesEnumData.LastFileName, zkusime najit novy index tohoto jmena
-                                int i;
-                                for (i = 0; i < count && StrICmp(name, Files->At(i).Name) != 0; i++)
-                                    ;
-                                if (i != count) // novy index nalezen
-                                {
-                                    indexNotFound = FALSE;
-                                    index = i;
-                                }
-                            }
-                        }
-                        else
-                            TRACE_E("Unexpected situation in WM_USER_ENUMFILENAMES: paths are different!");
+                        index = matchingIndex;
+                        indexNotFound = FALSE;
                     }
                     if (index >= count)
                     {
@@ -1389,8 +1394,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 if (FileNamesEnumData.Found)
                 {
-                    lstrcpyn(FileNamesEnumData.FileName, GetPath(), MAX_PATH);
-                    SalPathAppend(FileNamesEnumData.FileName, Files->At(index).Name, MAX_PATH);
+                    FileNamesEnumData.FileName = GetItemFullPathW(Files->At(index));
                     FileNamesEnumData.LastFileIndex = index;
                 }
                 else

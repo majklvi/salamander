@@ -499,6 +499,9 @@
     </ClCompile>
     <ClCompile Include="..\dialogsp.cpp">
     </ClCompile>
+    <ClCompile Include="..\drivefreespace.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\drivelst.cpp">
     </ClCompile>
     <ClCompile Include="..\editwnd.cpp">
@@ -514,6 +517,9 @@
     <ClCompile Include="..\filesmap.cpp">
     </ClCompile>
     <ClCompile Include="..\fileswn0.cpp">
+    </ClCompile>
+    <ClCompile Include="..\branch_view.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\fileswn1.cpp">
     </ClCompile>
@@ -998,6 +1004,9 @@
     </ClInclude>
     <ClInclude Include="..\dialogs.h">
     </ClInclude>
+    <ClInclude Include="..\drivefreespace.h" />
+    <ClInclude Include="..\drivefreespace_cache.h" />
+    <ClInclude Include="..\drivefreespace_text.h" />
     <ClInclude Include="..\drivelst.h">
     </ClInclude>
     <ClInclude Include="..\editwnd.h">
@@ -1008,6 +1017,16 @@
     </ClInclude>
     <ClInclude Include="..\filesbox.h">
     </ClInclude>
+    <ClInclude Include="..\branch_view.h" />
+    <ClInclude Include="..\branch_view_text.h" />
+    <ClInclude Include="..\panel_temporary_selection.h" />
+    <ClInclude Include="..\branchshell.h" />
+    <ClInclude Include="..\branchclipboard.h" />
+    <ClInclude Include="..\viewerpath.h" />
+    <ClInclude Include="..\workerpath.h" />
+    <ClInclude Include="..\fileactionpath.h" />
+    <ClInclude Include="..\operationrecycle.h" />
+    <ClInclude Include="..\explorerpropertywork.h" />
     <ClInclude Include="..\fileswnd.h">
     </ClInclude>
     <ClInclude Include="..\filenamecase.h">

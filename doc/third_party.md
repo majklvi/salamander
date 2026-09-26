@@ -9,6 +9,8 @@ making their work available.
 
 | Component | Used for | Attribution and license notes |
 | --- | --- | --- |
+| Microsoft Win32 documentation | Background drive free-space queries | The query and connection checks follow Microsoft Corporation's [GetDiskFreeSpaceExW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getdiskfreespaceexw) quota semantics and [WNetGetConnectionW](https://learn.microsoft.com/en-us/windows/win32/api/winnetwk/nf-winnetwk-wnetgetconnectionw) disconnected-mapping status. Used as API references; no third-party source code copied. |
+| Other file managers | Branch View behavior | Inspired by other file managers that already provide recursive flat/branch views. Independently implemented for Salamander. |
 | REGEXP | Regular expression matching | Copyright (C) 1986 Henry Spencer, University of Toronto. |
 | AES code | Cryptographic routines | Written by Dr Brian Gladman. Copyright (C) 2001 Dr Brian Gladman. |
 | PNGLite | PNG image support | Based on PNGLite by Daniel Karling. Copyright (C) 2007 Daniel Karling. |
@@ -54,7 +56,7 @@ making their work available.
 | Newtonsoft.Json 13.0.3 | JSON Viewer plugin | By James Newton-King, released under the MIT License. |
 | Microsoft .NET Framework 4.8 | JSON Viewer plugin | Provided by Microsoft Corporation under the Microsoft .NET Framework license terms. |
 | Prism.js 1.29.0 | Viewer Frame (Salamatrix and Prism Text Viewer) | By Lea Verou and PrismJS contributors, released under the MIT License. |
-| Microsoft.Web.WebView2 1.0.2420.47 | Viewer Frame | By Microsoft Corporation, distributed under the BSD 3-Clause License. |
+| Microsoft.Web.WebView2 1.0.2420.47 | Viewer Frame | By Microsoft Corporation, distributed under the BSD 3-Clause License. Prism virtual-host naming follows Microsoft's [virtual host mapping guidance](https://learn.microsoft.com/en-us/dotnet/api/microsoft.web.webview2.core.corewebview2.setvirtualhostnametofoldermapping) to avoid navigation delays with `.local`. Bounded Prism instance reuse follows Microsoft's [WebView2 performance guidance](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance#avoid-redundant-webview2-instances). |
 | Markdig 0.36.2 | MarkdigRenderer for WebView2 Render Viewer | By Alexandre Mutel and contributors, released under the BSD 2-Clause License. |
 
 ## Network, Synchronization, and Device Plugins

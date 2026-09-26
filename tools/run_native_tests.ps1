@@ -197,14 +197,36 @@ try {
         }
 
         Write-Host "Running $testName..."
+        $nativeArguments = @()
+        if ($testName -eq 'branch_context_menu_tests') {
+            $contextFixtureRoot = Join-Path $ciBuildRoot 'fixtures\branch-context-menu'
+            New-Item -ItemType Directory -Path $contextFixtureRoot -Force | Out-Null
+            $nativeArguments = @($contextFixtureRoot)
+        }
         $testResult = Invoke-TestProcess -FilePath $testExecutable `
-            -WorkingDirectory $repositoryRoot
+            -Arguments $nativeArguments -WorkingDirectory $repositoryRoot
         Add-TestResult -ClassName 'native-test' -Name $testName `
             -ProcessResult $testResult
     }
 
     $python = Resolve-ApplicationPath -Name 'python.exe'
     foreach ($contractTest in @(
+        @{
+            Name = 'viewer_hex_contract_tests'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot `
+                    'src\tests\viewer_hex_contract_tests.py')
+            )
+        },
+        @{
+            Name = 'quick_search_unicode_contract_tests'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot `
+                    'src\tests\quick_search_unicode_contract_tests.py')
+            )
+        },
         @{
             Name = 'salamatrix_regression_tests'
             Arguments = @(
@@ -268,6 +290,14 @@ try {
                 '-B',
                 (Join-Path $repositoryRoot `
                     'src\tests\panel_rendering_contract_tests.py')
+            )
+        },
+        @{
+            Name = 'association_icon_cache_tests'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot `
+                    'src\tests\association_icon_cache_tests.py')
             )
         },
         @{
@@ -359,11 +389,47 @@ try {
             )
         },
         @{
+            Name = 'branch_view_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_view_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_activation_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_activation_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_properties_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_properties_contract_tests.py'))
+        },
+        @{
+            Name = 'worker_copy_path_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\worker_copy_path_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_view_file_action_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_view_file_action_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_operations_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_operations_contract_tests.py'))
+        },
+        @{
+            Name = 'filecomp_panel_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\filecomp_panel_paths_tests.py'))
+        },
+        @{
             Name = 'copy_move_scheduling_contract_tests'
             Arguments = @(
                 '-B',
                 (Join-Path $repositoryRoot `
                     'src\tests\copy_move_scheduling_contract_tests.py')
+            )
+        },
+        @{
+            Name = 'operations_queue_tests'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot `
+                    'src\tests\operations_queue_tests.py')
             )
         }
     )) {

@@ -1175,7 +1175,6 @@ const char* CONFIG_USESALOPEN_REG = "Use salopen.exe";
 const char* CONFIG_NETWAREFASTDIRMOVE_REG = "Netware Fast Dir Move";
 const char* CONFIG_ASYNCCOPYALG_REG = "Async Copy Alg On Network";
 const char* CONFIG_COPYMOVESCHEDULING_REG = "Copy Move Scheduling"; // legacy transfer-preference value
-const char* CONFIG_COPYMOVEOPERATIONPOLICY_REG = "Copy Move Operation Policy";
 const char* CONFIG_COPYMOVELASTTRANSFERMODE_REG = "Copy Move Last Transfer Mode";
 const char* CONFIG_COPYMOVECONFLICTPREFERENCE_REG = "Copy Move Conflict Preference";
 const char* CONFIG_COPYMOVELASTCONFLICTMODE_REG = "Copy Move Last Conflict Mode";
@@ -1383,6 +1382,8 @@ const char* CONFIG_DRVSPEC_REMOTE_SIMPLE = "Remote Simple Icons";
 const char* CONFIG_DRVSPEC_REMOTE_ACT = "Remote Do Not Refresh on Activation";
 const char* CONFIG_DRVSPEC_CDROM_MON = "CDROM Automatic Refresh";
 const char* CONFIG_DRVSPEC_CDROM_SIMPLE = "CDROM Simple Icons";
+const char* CONFIG_REMOVABLE_FREE_SPACE_POLICY = "Removable Free Space Policy";
+const char* CONFIG_REMOTE_FREE_SPACE_POLICY = "Remote Free Space Policy";
 
 const char* SALAMANDER_HOTPATHS_REG = "Hot Paths";
 
@@ -3390,8 +3391,6 @@ void CMainWindow::SaveConfig(HWND parent, BOOL showConfigFileSaveError)
                 if (Windows7AndLater)
                     SetValue(actKey, CONFIG_ASYNCCOPYALG_REG, REG_DWORD,
                              &Configuration.UseAsyncCopyAlg, sizeof(DWORD));
-                SetValue(actKey, CONFIG_COPYMOVEOPERATIONPOLICY_REG, REG_DWORD,
-                         &Configuration.CopyMoveOperationPolicy, sizeof(DWORD));
                 SetValue(actKey, CONFIG_COPYMOVESCHEDULING_REG, REG_DWORD,
                          &Configuration.CopyMoveScheduling, sizeof(DWORD));
                 SetValue(actKey, CONFIG_COPYMOVELASTTRANSFERMODE_REG, REG_DWORD,
@@ -3603,6 +3602,10 @@ void CMainWindow::SaveConfig(HWND parent, BOOL showConfigFileSaveError)
                              &Configuration.DrvSpecCDROMMon, sizeof(DWORD));
                     SetValue(actSubKey, CONFIG_DRVSPEC_CDROM_SIMPLE, REG_DWORD,
                              &Configuration.DrvSpecCDROMSimple, sizeof(DWORD));
+                    SetValue(actSubKey, CONFIG_REMOVABLE_FREE_SPACE_POLICY, REG_DWORD,
+                             &Configuration.RemovableFreeSpacePolicy, sizeof(DWORD));
+                    SetValue(actSubKey, CONFIG_REMOTE_FREE_SPACE_POLICY, REG_DWORD,
+                             &Configuration.RemoteFreeSpacePolicy, sizeof(DWORD));
                     CloseKey(actSubKey);
                 }
 
@@ -5549,11 +5552,8 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             if (Windows7AndLater)
                 GetValue(actKey, CONFIG_ASYNCCOPYALG_REG, REG_DWORD,
                          &Configuration.UseAsyncCopyAlg, sizeof(DWORD));
-            if (!GetValue(actKey, CONFIG_COPYMOVEOPERATIONPOLICY_REG, REG_DWORD,
-                          &Configuration.CopyMoveOperationPolicy, sizeof(DWORD)) ||
-                Configuration.CopyMoveOperationPolicy < COSP_STORAGE_AWARE ||
-                Configuration.CopyMoveOperationPolicy > COSP_ASK)
-                Configuration.CopyMoveOperationPolicy = COSP_STORAGE_AWARE;
+            // Transfer mode selects admission per operation; obsolete operation-policy
+            // settings must not override the user-controlled or storage-aware choice.
             if (!GetValue(actKey, CONFIG_COPYMOVESCHEDULING_REG, REG_DWORD,
                           &Configuration.CopyMoveScheduling, sizeof(DWORD)) ||
                 Configuration.CopyMoveScheduling < CMTP_SEQUENTIAL ||
@@ -5809,6 +5809,9 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                 CloseKey(actSubKey);
             }
 
+            // Missing or invalid opt-in settings must preserve the conservative default.
+            Configuration.RemovableFreeSpacePolicy = 0;
+            Configuration.RemoteFreeSpacePolicy = 0;
             if (OpenKey(actKey, SALAMANDER_DRVSPEC_REG, actSubKey))
             {
                 GetValue(actSubKey, CONFIG_DRVSPEC_FLOPPY_MON, REG_DWORD,
@@ -5833,6 +5836,14 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                          &Configuration.DrvSpecCDROMMon, sizeof(DWORD));
                 GetValue(actSubKey, CONFIG_DRVSPEC_CDROM_SIMPLE, REG_DWORD,
                          &Configuration.DrvSpecCDROMSimple, sizeof(DWORD));
+                GetValue(actSubKey, CONFIG_REMOVABLE_FREE_SPACE_POLICY, REG_DWORD,
+                         &Configuration.RemovableFreeSpacePolicy, sizeof(DWORD));
+                GetValue(actSubKey, CONFIG_REMOTE_FREE_SPACE_POLICY, REG_DWORD,
+                         &Configuration.RemoteFreeSpacePolicy, sizeof(DWORD));
+                if ((unsigned)Configuration.RemovableFreeSpacePolicy > 2)
+                    Configuration.RemovableFreeSpacePolicy = 0;
+                if ((unsigned)Configuration.RemoteFreeSpacePolicy > 2)
+                    Configuration.RemoteFreeSpacePolicy = 0;
 
                 // for old versions we force icon reading on removable drives because we introduced the floppy category
                 if (Configuration.ConfigVersion < 31)

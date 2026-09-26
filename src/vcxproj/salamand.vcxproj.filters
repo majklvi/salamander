@@ -117,6 +117,9 @@
     <ClCompile Include="..\dialogsp.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\drivefreespace.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\drivelst.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
@@ -588,6 +591,15 @@
     <ClInclude Include="..\dialogs.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\drivefreespace.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\drivefreespace_cache.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\drivefreespace_text.h">
+      <Filter>h</Filter>
+    </ClInclude>
     <ClInclude Include="..\drivelst.h">
       <Filter>h</Filter>
     </ClInclude>
@@ -603,7 +615,16 @@
     <ClInclude Include="..\filesbox.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\explorerpropertywork.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\panel_temporary_selection.h">
+      <Filter>h</Filter>
+    </ClInclude>
     <ClInclude Include="..\fileswnd.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\branch_view_text.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\filenamecase.h">
