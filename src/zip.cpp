@@ -26,6 +26,7 @@
 #include "pack.h"
 
 #include <string>
+#include <new>
 extern "C"
 {
 #include "shexreg.h"
@@ -713,6 +714,80 @@ BOOL CSalamanderGeneral::UnregisterServiceOwned(const char* serviceId,
     return UnregisterServiceInternal(serviceId, serviceInterface, providerOwner, TRUE);
 }
 
+namespace
+{
+class CPanelItemPathsService : public CSalamanderPanelItemPathsAbstract
+{
+public:
+    virtual BOOL WINAPI GetItemFullPath(int panel, const CFileData* item,
+                                        wchar_t* path, int capacity)
+    {
+        if (path != NULL && capacity > 0) path[0] = 0;
+        if (MainThreadID != GetCurrentThreadId())
+        {
+            SetLastError(ERROR_INVALID_THREAD_ID);
+            return FALSE;
+        }
+        if (path == NULL || capacity <= 0 || item == NULL || MainWindow == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        CFilesWindow* window = MainWindow->GetPanel(panel);
+        if (window == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        if (!window->Is(ptDisk))
+        {
+            SetLastError(ERROR_NOT_SUPPORTED);
+            return FALSE;
+        }
+        // Compare addresses before touching caller-supplied item data. A pointer
+        // from another panel or an obsolete listing must not become a guessed path.
+        const CFileData* current = NULL;
+        for (int i = 0; i < window->Dirs->Count && current == NULL; ++i)
+            if (&window->Dirs->At(i) == item) current = &window->Dirs->At(i);
+        for (int i = 0; i < window->Files->Count && current == NULL; ++i)
+            if (&window->Files->At(i) == item) current = &window->Files->At(i);
+        if (current == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        try
+        {
+            const std::wstring fullPath = window->GetItemFullPathW(*current);
+            if (fullPath.empty())
+            {
+                SetLastError(ERROR_INVALID_DATA);
+                return FALSE;
+            }
+            if (fullPath.size() >= static_cast<size_t>(capacity))
+            {
+                SetLastError(ERROR_INSUFFICIENT_BUFFER);
+                return FALSE;
+            }
+            memcpy(path, fullPath.c_str(), (fullPath.size() + 1) * sizeof(wchar_t));
+            SetLastError(ERROR_SUCCESS);
+            return TRUE;
+        }
+        catch (const std::bad_alloc&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return FALSE;
+        }
+    }
+};
+
+CSalamanderPanelItemPathsAbstract* GetPanelItemPathsService()
+{
+    static CPanelItemPathsService service;
+    return &service;
+}
+}
+
 BOOL CSalamanderGeneral::QueryService(const CSalamanderServiceQuery* query, CSalamanderServiceResult* result)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::QueryService(,)");
@@ -733,6 +808,18 @@ BOOL CSalamanderGeneral::QueryService(const CSalamanderServiceQuery* query, CSal
         {
             result->Interface = GetViewerEnumerationService();
             result->Version = SALAMANDER_VIEWER_ENUMERATION_VERSION_1_0;
+            result->ProviderName = "Samandarin";
+        }
+        return TRUE;
+    }
+
+    if (strcmp(query->ServiceId, SALAMANDER_SERVICE_PANEL_ITEM_PATHS) == 0 &&
+        query->MinimumVersion <= SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0)
+    {
+        if (result != NULL)
+        {
+            result->Interface = GetPanelItemPathsService();
+            result->Version = SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0;
             result->ProviderName = "Samandarin";
         }
         return TRUE;
