@@ -39,6 +39,10 @@ folder or move any files.
 - File Comparator (**Ctrl+Shift+C**) receives the actual paths of both files,
   including duplicate names in different subfolders, selected-plus-focused
   pairs, and comparisons between panels.
+- Batch Rename receives an owned snapshot of every selected file's actual
+  path. In **Filename** mode, each renamed file stays in its own parent folder;
+  equal names in different folders remain distinct. **Relative path** mode
+  continues to use the Branch View root. Undo restores the original full paths.
 - F5/F6 initially copy or move selected files into the destination as a flat
   selection. The optional **Keep subfolder paths relative to the Branch View
   root** checkbox preserves their relative directory structure. Ordinary
@@ -120,6 +124,13 @@ interface obtained through the existing `QueryService`; published vtables and
 folder-path fallback. A failed service call never synthesizes a Branch root/name
 path. Same-name matching uses the full Unicode name rather than its bounded
 narrow display mirror.
+
+Batch Rename uses the same optional per-item service during its synchronous
+selection capture, before starting its dialog thread. A failed lookup rejects
+the selection rather than reconstructing a root/name path. Its file operations
+convert the owned UTF-8 paths to UTF-16 and use wide Windows APIs, with extended
+paths for long names. Older hosts retain ordinary-folder selection support
+when the service is unavailable.
 
 The worker uses wide `FindFirstFileExW`/`FindNextFileW` and an explicit stack of
 directories. It publishes groups of up to 256 files and also publishes at

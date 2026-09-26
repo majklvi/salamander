@@ -296,6 +296,8 @@
     </ClInclude>
     <ClInclude Include="..\..\shared\listview_sort_header.h">
     </ClInclude>
+    <ClInclude Include="..\renamer_paths.h" />
+    <ClInclude Include="..\renamer_io.h" />
     <ClInclude Include="..\crenamer.h">
     </ClInclude>
     <ClInclude Include="..\dialogs.h">
