@@ -85,6 +85,18 @@ class DriveFreeSpaceUIContracts(unittest.TestCase):
             self.assertNotIn(blocking_call, callback)
         self.assertIn("MenuPopup->SetRightTextToolTip(GetDriveMenuFreeSpaceToolTip, this);", source)
 
+    def test_description_template_is_expanded_without_printf(self):
+        source = read("src/drivelst.cpp")
+        append = source.split("static void AppendOptionalDriveFreeSpace(", 1)[1].split("// Menu hover", 1)[0]
+        self.assertIn('#include "drivefreespace_text.h"', source)
+        self.assertRegex(append, r"FormatDescription\(\s*(?:pattern|LoadStr\(format\)),\s*size,\s*timestamp\)")
+        self.assertIn("CopyStringTruncateUtf8", append)
+        # Locale data is text, never a variadic format string. The timestamp's
+        # separate constant wide format remains legitimate.
+        self.assertNotRegex(append, r"\b(?:_scprintf|_snprintf_s|snprintf|sprintf)\s*\(")
+        helper = read("src/drivefreespace_text.h")
+        self.assertNotRegex(helper, r"\b(?:_scprintf|_snprintf_s|snprintf|sprintf|vsnprintf|vsprintf)\s*\(")
+
     def test_english_modes_and_timestamp_formats(self):
         resources = read("src/lang/texts.rc2")
         for key in ("FREE", "CACHED", "STALE"):

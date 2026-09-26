@@ -7,6 +7,7 @@
 #include "menu.h"
 #include "drivelst.h"
 #include "drivefreespace.h"
+#include "drivefreespace_text.h"
 
 #include <string>
 #include "cfgdlg.h"
@@ -2655,11 +2656,8 @@ static void AppendOptionalDriveFreeSpace(const CDriveData& drive, char* text)
     const int format = policy == dfsOnce ? IDS_DRIVE_SPACE_CACHED
         : value.Stale || value.Pending ? IDS_DRIVE_SPACE_STALE : IDS_DRIVE_SPACE_FREE;
     const char* pattern = LoadStr(format);
-    const int length = _scprintf(pattern, size, timestamp);
-    if (length < 0)
-        return;
-    std::string description(static_cast<size_t>(length) + 1, '\0');
-    _snprintf_s(&description[0], description.size(), _TRUNCATE, pattern, size, timestamp);
+    const std::string description =
+        Salamander::DriveFreeSpaceText::FormatDescription(pattern, size, timestamp);
     size_t used = strlen(text);
     if (used && used < TOOLTIP_TEXT_MAX - 1)
     {
