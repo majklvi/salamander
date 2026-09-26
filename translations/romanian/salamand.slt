@@ -4139,9 +4139,29 @@ SLGINCOMPLETE,""
 14493,1,"Neconcordanta tip fisier/director"
 
 [STRINGTABLE 182]
-14991,1,"Citesc asocierile din stocarea fișierelor, vă rugăm așteptați..."
+14500,1,"Vizualizare ramură"
+14501,1,"&Vizualizare ramură\tCtrl+B"
+14502,1,"Cale"
+14503,1,"Folderul părinte real"
+14504,1,"Deschide &folderul care conține fișierul"
+14505,1,"Oprește scanarea ramurii"
+14506,1,"Vizualizare ramură - scanare... %I64u fișiere"
+14507,1,"Vizualizare ramură - %I64u fișiere"
+14508,1,"Vizualizare ramură - oprită; %I64u fișiere (incomplet)"
+14509,1,"Vizualizare ramură - %I64u fișiere; %I64u foldere nu au putut fi citite"
+14510,1,"Păstrează căile subfolderelor relative la rădăcina vizualizării ramurii"
+14511,1,"Cale: "
 
 [STRINGTABLE 183]
+14512,1,"Arborele de foldere nu a putut fi citit. Reîmprospătează vizualizarea pentru a reîncerca."
+14513,1,"Vizualizare ramură - reîmprospătare... %I64u fișiere păstrate"
+14514,1,"Vizualizare ramură - reîmprospătare oprită; rezultatele anterioare păstrate (%I64u fișiere)"
+14515,1,"Vizualizare ramură - pregătirea a %I64u fișiere; %I64u rezultate anterioare păstrate"
+
+[STRINGTABLE 184]
+14991,1,"Citesc asocierile din stocarea fișierelor, vă rugăm așteptați..."
+
+[STRINGTABLE 185]
 14992,1,"Salvez configurația în stocarea fișierelor, vă rugăm așteptați..."
 14993,1,"Șterg configurația veche din stocarea fișierelor, vă rugăm așteptați..."
 14994,1,"Citesc asocierile din stocarea fișierelor..."

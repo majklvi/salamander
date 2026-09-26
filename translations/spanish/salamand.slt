@@ -4139,9 +4139,29 @@ SLGINCOMPLETE,""
 14493,1,"No coincide el tipo de archivo/directorio"
 
 [STRINGTABLE 182]
-14991,1,"Leyendo asociaciones del almacenamiento de archivos, espere por favor..."
+14500,1,"Vista de rama"
+14501,1,"&Vista de rama\tCtrl+B"
+14502,1,"Ruta"
+14503,1,"Carpeta superior real"
+14504,1,"Abrir la &carpeta contenedora"
+14505,1,"Detener la exploración de la rama"
+14506,1,"Vista de rama - explorando... %I64u archivos"
+14507,1,"Vista de rama - %I64u archivos"
+14508,1,"Vista de rama - detenida; %I64u archivos (incompleto)"
+14509,1,"Vista de rama - %I64u archivos; no se pudieron leer %I64u carpetas"
+14510,1,"Conservar las rutas de subcarpetas relativas a la raíz de la vista de rama"
+14511,1,"Ruta: "
 
 [STRINGTABLE 183]
+14512,1,"No se pudo leer el árbol de carpetas. Actualice la vista para intentarlo de nuevo."
+14513,1,"Vista de rama - actualizando... %I64u archivos conservados"
+14514,1,"Vista de rama - actualización detenida; resultados anteriores conservados (%I64u archivos)"
+14515,1,"Vista de rama - preparando %I64u archivos; %I64u resultados anteriores conservados"
+
+[STRINGTABLE 184]
+14991,1,"Leyendo asociaciones del almacenamiento de archivos, espere por favor..."
+
+[STRINGTABLE 185]
 14992,1,"Guardando configuración en el almacenamiento de archivos, espere por favor..."
 14993,1,"Eliminando configuración antigua del almacenamiento de archivos, espere por favor..."
 14994,1,"Leyendo asociaciones del almacenamiento de archivos..."

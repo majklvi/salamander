@@ -4139,9 +4139,29 @@ SLGINCOMPLETE,""
 14493,1,"Datei/Verzeichnis-Typ stimmt nicht überein"
 
 [STRINGTABLE 182]
-14991,1,"Lese Dateizuordnungen aus dem Dateispeicher, bitte warten..."
+14500,1,"Zweigansicht"
+14501,1,"&Zweigansicht\tCtrl+B"
+14502,1,"Pfad"
+14503,1,"Tatsächlicher übergeordneter Ordner"
+14504,1,"Enthaltenden &Ordner öffnen"
+14505,1,"Suche in der Zweigansicht stoppen"
+14506,1,"Zweigansicht - Suche läuft... %I64u Dateien"
+14507,1,"Zweigansicht - %I64u Dateien"
+14508,1,"Zweigansicht - gestoppt; %I64u Dateien (unvollständig)"
+14509,1,"Zweigansicht - %I64u Dateien; %I64u Ordner konnten nicht gelesen werden"
+14510,1,"Unterordnerpfade relativ zum Stamm der Zweigansicht beibehalten"
+14511,1,"Pfad: "
 
 [STRINGTABLE 183]
+14512,1,"Der Ordnerbaum konnte nicht gelesen werden. Aktualisieren Sie die Ansicht, um es erneut zu versuchen."
+14513,1,"Zweigansicht - Aktualisierung läuft... %I64u Dateien beibehalten"
+14514,1,"Zweigansicht - Aktualisierung gestoppt; vorherige Ergebnisse beibehalten (%I64u Dateien)"
+14515,1,"Zweigansicht - %I64u Dateien werden vorbereitet; %I64u vorherige Ergebnisse beibehalten"
+
+[STRINGTABLE 184]
+14991,1,"Lese Dateizuordnungen aus dem Dateispeicher, bitte warten..."
+
+[STRINGTABLE 185]
 14992,1,"Konfiguration wird im Dateispeicher gespeichert, bitte warten..."
 14993,1,"Alte Konfiguration wird aus dem Dateispeicher gelöscht, bitte warten..."
 14994,1,"Lese Dateizuordnungen aus dem Dateispeicher..."

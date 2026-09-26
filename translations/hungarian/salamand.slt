@@ -4139,9 +4139,29 @@ SLGINCOMPLETE,""
 14493,1,"Fájl/mappa típus eltérés"
 
 [STRINGTABLE 182]
-14991,1,"Társítások beolvasása fájltárolóból, kérem várjon..."
+14500,1,"Ágnézet"
+14501,1,"&Ágnézet\tCtrl+B"
+14502,1,"Útvonal"
+14503,1,"Tényleges szülőmappa"
+14504,1,"Tartalmazó &mappa megnyitása"
+14505,1,"Az ágnézet beolvasásának leállítása"
+14506,1,"Ágnézet - beolvasás... %I64u fájl"
+14507,1,"Ágnézet - %I64u fájl"
+14508,1,"Ágnézet - leállítva; %I64u fájl (hiányos)"
+14509,1,"Ágnézet - %I64u fájl; %I64u mappa nem olvasható"
+14510,1,"Az almappák útvonalának megtartása az ágnézet gyökeréhez képest"
+14511,1,"Útvonal: "
 
 [STRINGTABLE 183]
+14512,1,"A mappafa nem olvasható. Frissítse a nézetet az újrapróbáláshoz."
+14513,1,"Ágnézet - frissítés... %I64u fájl megtartva"
+14514,1,"Ágnézet - frissítés leállítva; korábbi eredmények megtartva (%I64u fájl)"
+14515,1,"Ágnézet - %I64u fájl előkészítése; %I64u korábbi eredmény megtartva"
+
+[STRINGTABLE 184]
+14991,1,"Társítások beolvasása fájltárolóból, kérem várjon..."
+
+[STRINGTABLE 185]
 14992,1,"Beállítások mentése fájltárolóba, kérem várjon..."
 14993,1,"Régi beállítások törlése fájltárolóból, kérem várjon..."
 14994,1,"Társítások beolvasása fájltárolóból..."

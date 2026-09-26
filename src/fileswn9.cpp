@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/widepath.h"
 #include "audio_metadata_legacy.h"
 
 #include <shlwapi.h>
@@ -15,6 +16,8 @@
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
+#include "branch_view.h"
+#include "branchclipboard.h"
 #include "stswnd.h"
 #include "filesbox.h"
 #include "dialogs.h"
@@ -1542,6 +1545,11 @@ void CFilesWindow::GetPanelItemToolTip(DWORD id, char* text, int textSize)
     char displayName[256];
     FormatPanelTipName(f, displayName, _countof(displayName));
     AppendTipLine(text, textSize, IDS_PANELTIP_NAME, displayName);
+    if (IsBranchView())
+    {
+        const std::string parent = SalWideToMultiBytePath(GetItemDirectoryW(*f).c_str(), CP_UTF8);
+        AppendTipLine(text, textSize, IDS_BRANCH_PATH_LABEL, parent.c_str());
+    }
 
     // File-system plug-ins already provide the most useful item summary for
     // the information line.  Reuse it in the panel tooltip as well, so the
@@ -1567,8 +1575,8 @@ void CFilesWindow::GetPanelItemToolTip(DWORD id, char* text, int textSize)
     BOOL categoryAppended = FALSE;
     if (!isDir && Is(ptDisk) && category != ptcUnknown)
     {
-        std::wstring pathW;
-        if (BuildPanelFilePathW(GetPathW(), GetPath(), f, pathW))
+        std::wstring pathW = GetItemFullPathW(*f);
+        if (!pathW.empty())
             categoryAppended = AppendCategoryProperties(text, textSize, pathW.c_str(), category,
                                                        IsLegacyOggFile(f));
     }
@@ -2323,6 +2331,29 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
     if (FocusedIndex < 0 || FocusedIndex >= Files->Count + Dirs->Count)
         return FALSE; // ignore an invalid index
 
+    if (IsBranchView())
+    {
+        const CFileData& file = FocusedIndex < Dirs->Count ? Dirs->At(FocusedIndex) : Files->At(FocusedIndex - Dirs->Count);
+        const std::wstring fullPath = GetItemFullPathW(file);
+        if (mode == cfnmShort)
+            return CopyTextToClipboardW(SalPathFindFileNameW(fullPath.c_str()));
+        if (mode == cfnmFull)
+            return CopyTextToClipboardW(fullPath.c_str());
+        if (mode == cfnmUNC)
+        {
+            std::wstring unc;
+            if (BranchClipboardUNCPath(fullPath, unc))
+                return CopyTextToClipboardW(unc.c_str());
+            std::wstring message = SalMultiByteToWidePath(LoadStr(IDS_CANNOT_CREATE_UNC_NAME), CP_ACP);
+            const size_t marker = message.find(L"%s");
+            if (marker != std::wstring::npos) message.replace(marker, 2, fullPath);
+            const std::string text = SalWideToMultiBytePath(message.c_str(), CP_UTF8);
+            SalMessageBox(HWindow, text.c_str(), LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            return FALSE;
+        }
+        return FALSE;
+    }
+
     char buff[2 * MAX_PATH];
     buff[0] = 0;
 
@@ -2434,6 +2465,21 @@ void AddStrToStr(char* dstStr, int dstBufSize, const char* srcStr)
 }
 
 // prepare a template for the 'Columns' variable
+
+static void WINAPI InternalGetBranchPath()
+{
+    TransferLen = 0;
+    if (TransferPanelWindow == NULL || TransferFileData == NULL || TransferIsDir == 2)
+        return;
+    const std::string path = SalWideToMultiBytePath(
+        TransferPanelWindow->GetItemDirectoryW(*TransferFileData).c_str(), CP_UTF8);
+    size_t length = (std::min)(path.size(), (size_t)TRANSFER_BUFFER_MAX - 1);
+    while (length < path.size() && length > 0 && ((unsigned char)path[length] & 0xc0) == 0x80)
+        --length;
+    memcpy(TransferBuffer, path.data(), length);
+    TransferBuffer[length] = 0;
+    TransferLen = (int)length;
+}
 
 BOOL CFilesWindow::BuildColumnsTemplate()
 {
@@ -2551,6 +2597,27 @@ BOOL CFilesWindow::BuildColumnsTemplate()
         }
     }
 
+    if (IsBranchView())
+    {
+        CColumn pathColumn = {};
+        lstrcpyn(pathColumn.Name, LoadStr(IDS_BRANCH_PATH), COLUMN_NAME_MAX);
+        lstrcpyn(pathColumn.Description, LoadStr(IDS_BRANCH_PATH_DESC), COLUMN_DESCRIPTION_MAX);
+        pathColumn.ID = COLUMN_ID_CUSTOM;
+        pathColumn.CustomData = BRANCH_VIEW_PATH_COLUMN;
+        pathColumn.GetText = InternalGetBranchPath;
+        pathColumn.SupportSorting = 1;
+        pathColumn.LeftAlignment = 1;
+        pathColumn.FixedWidth = 1;
+        pathColumn.Width = GetBranchViewPathColumnWidth();
+        // Keep the real parent visible beside Name, including duplicate names.
+        const int pathIndex = ColumnsTemplate.Count > 1 && ColumnsTemplate[1].ID == COLUMN_ID_EXTENSION ? 2 : 1;
+        ColumnsTemplate.Insert(pathIndex, pathColumn);
+        if (!ColumnsTemplate.IsGood())
+        {
+            ColumnsTemplate.ResetState();
+            return FALSE;
+        }
+    }
     return TRUE;
 }
 
@@ -2658,7 +2725,11 @@ void CFilesWindow::OnHeaderLineColWidthChanged()
             colIndex = 8;
             break;
         }
-        if (column->ID == COLUMN_ID_CUSTOM &&
+        if (column->ID == COLUMN_ID_CUSTOM && column->CustomData == BRANCH_VIEW_PATH_COLUMN)
+        {
+            SetBranchViewPathColumnWidth(column->Width);
+        }
+        else if (column->ID == COLUMN_ID_CUSTOM &&
             column->GetText == InternalGetExplorerColumn &&
             column->CustomData < EXPLORER_COLUMNS_COUNT)
         {

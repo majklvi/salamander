@@ -197,8 +197,14 @@ try {
         }
 
         Write-Host "Running $testName..."
+        $nativeArguments = @()
+        if ($testName -eq 'branch_context_menu_tests') {
+            $contextFixtureRoot = Join-Path $ciBuildRoot 'fixtures\branch-context-menu'
+            New-Item -ItemType Directory -Path $contextFixtureRoot -Force | Out-Null
+            $nativeArguments = @($contextFixtureRoot)
+        }
         $testResult = Invoke-TestProcess -FilePath $testExecutable `
-            -WorkingDirectory $repositoryRoot
+            -Arguments $nativeArguments -WorkingDirectory $repositoryRoot
         Add-TestResult -ClassName 'native-test' -Name $testName `
             -ProcessResult $testResult
     }
@@ -357,6 +363,90 @@ try {
                 (Join-Path $repositoryRoot `
                     'src\tests\viewer_live_log_contract_tests.py')
             )
+        },
+        @{
+            Name = 'branch_view_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_view_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_activation_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_activation_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_properties_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_properties_contract_tests.py'))
+        },
+        @{
+            Name = 'worker_copy_path_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\worker_copy_path_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_view_file_action_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_view_file_action_contract_tests.py'))
+        },
+        @{
+            Name = 'branch_operations_contract_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_operations_contract_tests.py'))
+        },
+        @{
+            Name = 'disk_selection_snapshot_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\disk_selection_snapshot_tests.py'))
+        },
+        @{
+            Name = 'pak_optimize_snapshot_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\pak_optimize_snapshot_tests.py'))
+        },
+        @{
+            Name = 'undelete_selection_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\undelete_selection_paths_tests.py'))
+        },
+        @{
+            Name = 'splitcbn_selection_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\plugins\splitcbn\tests\selection_paths_tests.py'))
+        },
+        @{
+            Name = 'pictview_thumbnail_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\pictview_thumbnail_paths_tests.py'))
+        },
+        @{
+            Name = 'checksum_selection_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\checksum_selection_paths_tests.py'))
+        },
+        @{
+            Name = 'safe_file_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\safe_file_paths_tests.py'))
+        },
+        @{
+            Name = 'archive_menu_selection_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\archive_menu_selection_tests.py'))
+        },
+        @{
+            Name = 'automation_selection_snapshot_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\plugins\automation\tests\selection_snapshot_tests.py'))
+        },
+        @{
+            Name = 'renamer_panel_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\renamer_panel_paths_tests.py'))
+        },
+        @{
+            Name = 'renamer_io_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\renamer_io_tests.py'))
+        },
+        @{
+            Name = 'filecomp_panel_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\filecomp_panel_paths_tests.py'))
+        },
+        @{
+            Name = 'branch_panel_getters_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_panel_getters_tests.py'))
+        },
+        @{
+            Name = 'branch_archive_selection_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_archive_selection_tests.py'))
+        },
+        @{
+            Name = 'disk_file_size_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\disk_file_size_paths_tests.py'))
         },
         @{
             Name = 'copy_move_scheduling_contract_tests'

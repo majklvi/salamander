@@ -9,6 +9,7 @@ making their work available.
 
 | Component | Used for | Attribution and license notes |
 | --- | --- | --- |
+| Other file managers | Branch View behavior | Inspired by other file managers that already provide recursive flat/branch views. Independently implemented for Salamander. |
 | REGEXP | Regular expression matching | Copyright (C) 1986 Henry Spencer, University of Toronto. |
 | AES code | Cryptographic routines | Written by Dr Brian Gladman. Copyright (C) 2001 Dr Brian Gladman. |
 | PNGLite | PNG image support | Based on PNGLite by Daniel Karling. Copyright (C) 2007 Daniel Karling. |

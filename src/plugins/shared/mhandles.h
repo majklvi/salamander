@@ -379,7 +379,13 @@ public:
     HANDLE OpenFileMapping(DWORD dwDesiredAccess, BOOL bInheritHandle,
                            LPCTSTR lpName);
 
-    HANDLE CreateFile(LPCTSTR lpFileName, DWORD dwDesiredAccess,
+    HANDLE CreateFileA(LPCSTR lpFileName, DWORD dwDesiredAccess,
+                      DWORD dwShareMode,
+                      LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                      DWORD dwCreationDistribution, DWORD dwFlagsAndAttributes,
+                      HANDLE hTemplateFile);
+
+    HANDLE CreateFileW(LPCWSTR lpFileName, DWORD dwDesiredAccess,
                       DWORD dwShareMode,
                       LPSECURITY_ATTRIBUTES lpSecurityAttributes,
                       DWORD dwCreationDistribution, DWORD dwFlagsAndAttributes,
@@ -595,7 +601,8 @@ public:
 
     VOID LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
 
-    HANDLE FindFirstFile(LPCTSTR lpFileName, LPWIN32_FIND_DATA lpFindFileData);
+    HANDLE FindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
+    HANDLE FindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData);
 
     BOOL FindClose(HANDLE hFindFile);
 
