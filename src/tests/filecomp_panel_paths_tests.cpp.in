@@ -37,35 +37,44 @@ struct Row {
         Data.Name = Name.c_str(); Data.NameW = Wide.c_str();
     }
 };
-struct RowArray {
+static size_t ArrayAtCalls = 0, ArrayDataCalls = 0;
+struct CFilesArray {
     std::vector<std::unique_ptr<Row>> Rows;
+    std::vector<CFileData> Data;
     int Count = 0;
-    CFileData& At(int i) { return Rows.at(i)->Data; }
-    void Clear() { Rows.clear(); Count = 0; }
+    CFilesArray() { Data.reserve(64); }
+    CFileData& At(int i) { ++ArrayAtCalls; return Data.at(i); }
+    CFileData* GetData() { ++ArrayDataCalls; return Data.data(); }
+    void Clear() { Rows.clear(); Data.clear(); Count = 0; }
 };
 struct CFilesWindow {
-    RowArray Directories, FileRows;
-    RowArray* Dirs = &Directories;
-    RowArray* Files = &FileRows;
+    CFilesArray Directories, FileRows;
+    CFilesArray* Dirs = &Directories;
+    CFilesArray* Files = &FileRows;
     const CFileData* Focus = nullptr;
     std::string Root = "C:\\root";
-    bool Disk = true, FailPath = false;
+    bool Disk = true, FailPath = false, ThrowPath = false, ConstantPath = false;
+    int PathReads = 0;
     BOOL Is(int type) { return Disk && type == ptDisk; }
     Row* Find(const CFileData* file) {
         for (auto array : {Dirs, Files})
-            for (auto& row : array->Rows) if (&row->Data == file) return row.get();
+            for (int i=0; i<array->Count; ++i) if (&array->Data[i] == file) return array->Rows[i].get();
         return nullptr;
     }
     std::wstring GetItemFullPathW(const CFileData& file) {
+        ++PathReads;
+        if (ThrowPath) throw std::bad_alloc();
+        if (ConstantPath) return L"C:\\constant.txt";
         Row* row = Find(&file); return FailPath || row == nullptr ? std::wstring() : row->Full;
     }
     const CFileData* Add(std::wstring name, std::wstring full, bool selected=false,
                          bool directory=false, std::string mirror={}) {
-        RowArray* array = directory ? Dirs : Files;
+        CFilesArray* array = directory ? Dirs : Files;
         array->Rows.emplace_back(new Row(std::move(name),std::move(full),selected,directory,std::move(mirror)));
-        ++array->Count; return &array->Rows.back()->Data;
+        array->Data.push_back(array->Rows.back()->Data);
+        ++array->Count; return &array->Data.back();
     }
-    void Clear() { Dirs->Clear(); Files->Clear(); Focus=nullptr; Disk=true; FailPath=false; }
+    void Clear() { Dirs->Clear(); Files->Clear(); Focus=nullptr; Disk=true; FailPath=false; ThrowPath=false; ConstantPath=false; PathReads=0; }
 };
 struct MainWindowStub {
     CFilesWindow Left, Right;
@@ -110,7 +119,7 @@ struct GeneralStub {
         for (; *index < window->Dirs->Count+window->Files->Count;) {
             int i=(*index)++;
             Row* row=i<window->Dirs->Count ? window->Dirs->Rows[i].get() : window->Files->Rows[i-window->Dirs->Count].get();
-            if (!selected || row->Selected) { *isDir=row->Directory; return &row->Data; }
+            if (!selected || row->Selected) { *isDir=row->Directory; return i<window->Dirs->Count ? &window->Dirs->At(i) : &window->Files->At(i-window->Dirs->Count); }
         }
         return nullptr;
     }
@@ -221,8 +230,90 @@ static void PathTests() {
     std::vector<char> full(SAL_MAX_PATH,'x');Check(!GetFileCompPanelItemPath(PANEL_SOURCE,item,full.data(),(int)full.size()) && full[0]==0 && GetLastError()==ERROR_INSUFFICIENT_BUFFER,"UTF16 path fitting service capacity cannot overflow UTF8 consumer capacity");
 #endif
 }
+
+static void ServiceMembershipTests() {
+    Reset();
+    auto& panel=Window.Left;
+    const auto first=panel.Add(L"same.txt",L"C:\\root\\first\\same.txt");
+    const auto middle=panel.Add(L"same.txt",L"C:\\root\\middle\\same.txt");
+    const auto last=panel.Add(L"same.txt",L"C:\\root\\last\\same.txt");
+    const auto directory=panel.Add(L"child",L"C:\\root\\child",false,true);
+    wchar_t output[128];
+    for (const auto item : {first,middle,last,directory}) {
+        Check(Service.GetItemFullPath(PANEL_LEFT,item,output,128) &&
+              std::wstring(output)==panel.Find(item)->Full,
+              "first/middle/last files and directories resolve exact current identities");
+    }
+    const auto reject=[&](int requestedPanel,const CFileData* item,DWORD error,const char* label) {
+        output[0]=L'x'; const int reads=panel.PathReads;
+        const BOOL result=Service.GetItemFullPath(requestedPanel,item,output,128);
+        Check(!result && GetLastError()==error && output[0]==0 && panel.PathReads==reads,label);
+    };
+    const UINT_PTR base=reinterpret_cast<UINT_PTR>(panel.Files->Data.data());
+    reject(PANEL_LEFT,nullptr,ERROR_INVALID_PARAMETER,"null item rejected without path access");
+    reject(PANEL_LEFT,reinterpret_cast<const CFileData*>(UINT_PTR(1)),ERROR_INVALID_PARAMETER,"unmapped foreign address rejected before dereference");
+    reject(PANEL_LEFT,reinterpret_cast<const CFileData*>(~UINT_PTR(0)),ERROR_INVALID_PARAMETER,"maximum foreign address cannot overflow into membership");
+    reject(PANEL_LEFT,reinterpret_cast<const CFileData*>(base-1),ERROR_INVALID_PARAMETER,"address preceding array rejected without pointer subtraction");
+    reject(PANEL_LEFT,reinterpret_cast<const CFileData*>(base+1),ERROR_INVALID_PARAMETER,"interior misaligned address rejected before path access");
+    reject(PANEL_LEFT,panel.Files->Data.data()+panel.Files->Count,ERROR_INVALID_PARAMETER,"one-past-live-array address rejected");
+    const auto other=Window.Right.Add(L"same.txt",L"D:\\elsewhere\\same.txt");
+    reject(PANEL_LEFT,other,ERROR_INVALID_PARAMETER,"other-panel item rejected even with duplicate basename");
+    reject(99,first,ERROR_INVALID_PARAMETER,"invalid panel rejected");
+    panel.Disk=false;
+    reject(PANEL_LEFT,first,ERROR_NOT_SUPPORTED,"non-disk panel rejected");
+    panel.Disk=true;
+    MainThreadID=GetCurrentThreadId()+1;
+    reject(PANEL_LEFT,first,ERROR_INVALID_THREAD_ID,"wrong thread rejected before item inspection");
+    MainThreadID=GetCurrentThreadId();
+    MainWindow=nullptr;
+    reject(PANEL_LEFT,first,ERROR_INVALID_PARAMETER,"missing host window rejected");
+    MainWindow=&Window;
+    struct {wchar_t Text[2]; wchar_t Canary;} shortBuffer={{L'x',L'x'},L'z'};
+    Check(!Service.GetItemFullPath(PANEL_LEFT,first,shortBuffer.Text,2) &&
+          GetLastError()==ERROR_INSUFFICIENT_BUFFER && shortBuffer.Text[0]==0 && shortBuffer.Canary==L'z',
+          "short output remains empty and cannot overwrite adjacent memory");
+    output[0]=L'x';
+    Check(!Service.GetItemFullPath(PANEL_LEFT,first,output,0) && GetLastError()==ERROR_INVALID_PARAMETER && output[0]==L'x',
+          "zero capacity leaves inaccessible output untouched");
+    Check(!Service.GetItemFullPath(PANEL_LEFT,first,nullptr,10) && GetLastError()==ERROR_INVALID_PARAMETER,
+          "null output rejected");
+    panel.FailPath=true;output[0]=L'x';
+    Check(!Service.GetItemFullPath(PANEL_LEFT,first,output,128) && GetLastError()==ERROR_INVALID_DATA && output[0]==0,
+          "missing path fails empty without fabricated fallback");
+    panel.FailPath=false;panel.ThrowPath=true;output[0]=L'x';
+    Check(!Service.GetItemFullPath(PANEL_LEFT,first,output,128) && GetLastError()==ERROR_NOT_ENOUGH_MEMORY && output[0]==0,
+          "path allocation failure retains service error contract");
+    panel.ThrowPath=false;
+    --panel.Files->Count;
+    reject(PANEL_LEFT,last,ERROR_INVALID_PARAMETER,"removed row in allocated capacity is not live membership");
+    ++panel.Files->Count;
+    // Keep the retired allocation alive so its address cannot be recycled.
+    std::vector<CFileData> retired;
+    retired.swap(panel.Files->Data);
+    panel.Files->Data=retired;
+    reject(PANEL_LEFT,first,ERROR_INVALID_PARAMETER,"stale previous-array pointer rejected after reallocation");
+    panel.Files->Count=0;
+    reject(PANEL_LEFT,panel.Files->Data.data(),ERROR_INVALID_PARAMETER,"empty reserved array has no live elements");
+    Reset();
+    panel.ConstantPath=true;
+    const int count=175000;
+    panel.Files->Data.resize(count);
+    panel.Files->Count=count;
+    ArrayAtCalls=ArrayDataCalls=0;
+    const int requests=1000;
+    bool resolved=true;
+    for(int i=0;i<requests;++i) {
+        const int index=count-1-(i%997);
+        resolved=Service.GetItemFullPath(PANEL_LEFT,&panel.Files->Data[index],output,128) && resolved;
+    }
+    Check(resolved,"large current listing resolves all selected rows");
+    Check(ArrayAtCalls<=size_t(requests)*2 && ArrayDataCalls<=size_t(requests)*4,
+          "membership touches a bounded number of array locations independent of 175k rows");
+    printf("Panel membership: %d requests over %d rows, %zu At and %zu GetData calls.\n",
+           requests,count,ArrayAtCalls,ArrayDataCalls);
+}
 int main() {
-    MainThreadID=GetCurrentThreadId();SelectionTests();PathTests();
+    MainThreadID=GetCurrentThreadId();SelectionTests();PathTests();ServiceMembershipTests();
     printf("File Comparator panel paths: %d checks, %d failures; no file I/O or UI.\n",Checks,Failures);
     return Failures ? 1 : 0;
 }

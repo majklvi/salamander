@@ -718,6 +718,24 @@ namespace
 {
 class CPanelItemPathsService : public CSalamanderPanelItemPathsAbstract
 {
+    static const CFileData* FindCurrentItem(CFilesArray* rows, const CFileData* item)
+    {
+        if (rows == NULL || rows->Count <= 0 || rows->GetData() == NULL)
+            return NULL;
+        // CFilesArray stores live CFileData objects contiguously. Integer address
+        // arithmetic is defined even for a foreign pointer; never subtract or
+        // dereference caller pointers before proving exact element membership.
+        const UINT_PTR first = reinterpret_cast<UINT_PTR>(rows->GetData());
+        const UINT_PTR address = reinterpret_cast<UINT_PTR>(item);
+        if (address < first)
+            return NULL;
+        const UINT_PTR offset = address - first;
+        if (offset % sizeof(CFileData) != 0 ||
+            offset / sizeof(CFileData) >= static_cast<UINT_PTR>(rows->Count))
+            return NULL;
+        return &rows->At(static_cast<int>(offset / sizeof(CFileData)));
+    }
+
 public:
     virtual BOOL WINAPI GetItemFullPath(int panel, const CFileData* item,
                                         wchar_t* path, int capacity)
@@ -746,11 +764,9 @@ public:
         }
         // Compare addresses before touching caller-supplied item data. A pointer
         // from another panel or an obsolete listing must not become a guessed path.
-        const CFileData* current = NULL;
-        for (int i = 0; i < window->Dirs->Count && current == NULL; ++i)
-            if (&window->Dirs->At(i) == item) current = &window->Dirs->At(i);
-        for (int i = 0; i < window->Files->Count && current == NULL; ++i)
-            if (&window->Files->At(i) == item) current = &window->Files->At(i);
+        const CFileData* current = FindCurrentItem(window->Dirs, item);
+        if (current == NULL)
+            current = FindCurrentItem(window->Files, item);
         if (current == NULL)
         {
             SetLastError(ERROR_INVALID_PARAMETER);

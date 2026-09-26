@@ -401,6 +401,18 @@ try {
             Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\filecomp_panel_paths_tests.py'))
         },
         @{
+            Name = 'branch_panel_getters_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_panel_getters_tests.py'))
+        },
+        @{
+            Name = 'branch_archive_selection_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_archive_selection_tests.py'))
+        },
+        @{
+            Name = 'disk_file_size_paths_tests'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\disk_file_size_paths_tests.py'))
+        },
+        @{
             Name = 'copy_move_scheduling_contract_tests'
             Arguments = @(
                 '-B',

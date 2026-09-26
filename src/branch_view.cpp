@@ -272,6 +272,10 @@ std::wstring CFilesWindow::GetItemDirectoryW(const CFileData& file) const
         std::lock_guard<std::mutex> lock(BranchView->ItemsMutex);
         auto item = BranchView->Items.find(file.Name);
         if (item != BranchView->Items.end()) return item->second.Directory;
+        // An active Branch row without its identity must never be treated as a
+        // file in the root. The up-directory row is the only synthetic item.
+        if (BranchView->Enabled && (file.Name == NULL || strcmp(file.Name, "..") != 0))
+            return std::wstring();
     }
     return GetPathW() != NULL && GetPathW()[0] != 0 ? std::wstring(GetPathW()) : SalMultiByteToWidePath(GetPath());
 }
@@ -282,6 +286,8 @@ std::wstring CFilesWindow::GetItemFullPathW(const CFileData& file) const
         std::lock_guard<std::mutex> lock(BranchView->ItemsMutex);
         auto item = BranchView->Items.find(file.Name);
         if (item != BranchView->Items.end()) return item->second.FullPath();
+        if (BranchView->Enabled && (file.Name == NULL || strcmp(file.Name, "..") != 0))
+            return std::wstring();
     }
     std::wstring name = file.UseWideName() ? file.NameW : SalMultiByteToWidePath(file.Name);
     return Salamander::BranchView::Join(GetItemDirectoryW(file), name);
@@ -294,6 +300,8 @@ std::wstring CFilesWindow::GetItemRelativePathW(const CFileData& file) const
         std::lock_guard<std::mutex> lock(BranchView->ItemsMutex);
         auto item = BranchView->Items.find(file.Name);
         if (item != BranchView->Items.end()) return item->second.RelativePath;
+        if (BranchView->Enabled && (file.Name == NULL || strcmp(file.Name, "..") != 0))
+            return std::wstring();
     }
     return file.UseWideName() ? file.NameW : SalMultiByteToWidePath(file.Name);
 }

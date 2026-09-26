@@ -1,0 +1,167 @@
+// SPDX-FileCopyrightText: 2026 Samandarin Contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+// The three production getters, Entry, Entry::FullPath, Join and conversion
+// function are extracted verbatim. Only unrelated panel state is replaced.
+#define NOMINMAX
+#include <windows.h>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <utility>
+
+std::wstring SalMultiByteToWidePath(const char*, UINT codePage = CP_ACP);
+@@CONVERSION@@
+namespace Salamander { namespace BranchView {
+@@ENTRY@@
+@@JOIN@@
+@@ENTRY_FULL_PATH@@
+} }
+struct CFileData
+{
+    const char* Name = nullptr;
+    const wchar_t* NameW = nullptr;
+    BOOL UseWideName() const { return NameW != nullptr; }
+};
+struct CBranchViewState
+{
+    bool Enabled = true;
+    std::mutex ItemsMutex;
+    std::unordered_map<const char*, Salamander::BranchView::Entry> Items;
+};
+struct CFilesWindow
+{
+    CBranchViewState* BranchView = nullptr;
+    std::wstring WideRoot = L"C:\\root";
+    std::string AnsiRoot = "C:\\root";
+    bool NullWideRoot = false;
+    const wchar_t* GetPathW() const { return NullWideRoot ? nullptr : WideRoot.c_str(); }
+    const char* GetPath() const { return AnsiRoot.c_str(); }
+    std::wstring GetItemDirectoryW(const CFileData&) const;
+    std::wstring GetItemFullPathW(const CFileData&) const;
+    std::wstring GetItemRelativePathW(const CFileData&) const;
+};
+@@GETTERS@@
+
+static int Checks = 0, Failures = 0;
+static void Check(bool success, const char* description)
+{
+    ++Checks;
+    if (!success) { ++Failures; std::printf("FAIL: %s\n", description); }
+}
+static void Paths(CFilesWindow& panel, const CFileData& file,
+                  const std::wstring& directory, const std::wstring& full,
+                  const std::wstring& relative, const char* description)
+{
+    Check(panel.GetItemDirectoryW(file) == directory, (std::string(description) + " directory").c_str());
+    Check(panel.GetItemFullPathW(file) == full, (std::string(description) + " full").c_str());
+    Check(panel.GetItemRelativePathW(file) == relative, (std::string(description) + " relative").c_str());
+}
+static void Add(CBranchViewState& state, const CFileData& file,
+                const std::wstring& directory, const std::wstring& actualName,
+                const std::wstring& relative)
+{
+    Salamander::BranchView::Entry entry = {};
+    entry.Directory = directory;
+    entry.RelativePath = relative;
+    if (wcscpy_s(entry.Data.cFileName, actualName.c_str()) != 0) std::abort();
+    state.Items.emplace(file.Name, std::move(entry));
+}
+static int Utf8Length(const std::wstring& path)
+{
+    return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.c_str(), -1,
+                               nullptr, 0, nullptr, nullptr) - 1;
+}
+int main()
+{
+    CFilesWindow panel;
+    CFileData ordinary = {"same.png", L"same.png"};
+    Paths(panel, ordinary, L"C:\\root", L"C:\\root\\same.png", L"same.png", "ordinary panel");
+    panel.WideRoot = L"C:\\žluťoučký\\東京";
+    CFileData unicode = {"lossy-name.png", L"český-東京-\U0001F642.png"};
+    Paths(panel, unicode, panel.WideRoot, panel.WideRoot + L"\\český-東京-\U0001F642.png",
+          L"český-東京-\U0001F642.png", "ordinary wide name and root");
+    panel.NullWideRoot = true;
+    Paths(panel, ordinary, L"C:\\root", L"C:\\root\\same.png", L"same.png", "ordinary null wide root");
+    panel.NullWideRoot = false;
+    panel.WideRoot.clear();
+    CFileData narrow = {"plain.txt", nullptr};
+    Paths(panel, narrow, L"C:\\root", L"C:\\root\\plain.txt", L"plain.txt", "ordinary empty wide root");
+    panel.WideRoot = L"C:\\root";
+
+    CBranchViewState branch;
+    panel.BranchView = &branch;
+    // Identical display text at three distinct addresses is intentional.
+    std::string firstName = "same.png", secondName = "same.png", thirdName = "same.png";
+    CFileData first = {firstName.c_str(), L"same.png"};
+    CFileData second = {secondName.c_str(), L"same.png"};
+    CFileData third = {thirdName.c_str(), L"same.png"};
+    Add(branch, first, L"C:\\root\\ascii", L"same.png", L"ascii\\same.png");
+    Add(branch, second, L"C:\\root\\žluťoučký\\東京", L"same.png", L"žluťoučký\\東京\\same.png");
+    Add(branch, third, L"C:\\root\\third", L"same.png", L"third\\same.png");
+    Paths(panel, first, L"C:\\root\\ascii", L"C:\\root\\ascii\\same.png", L"ascii\\same.png", "duplicate first");
+    Paths(panel, second, L"C:\\root\\žluťoučký\\東京", L"C:\\root\\žluťoučký\\東京\\same.png",
+          L"žluťoučký\\東京\\same.png", "duplicate second");
+    Paths(panel, third, L"C:\\root\\third", L"C:\\root\\third\\same.png", L"third\\same.png", "duplicate third");
+    CFileData reordered = second; // Shallow panel sorting preserves the Name allocation.
+    Paths(panel, reordered, L"C:\\root\\žluťoučký\\東京", L"C:\\root\\žluťoučký\\東京\\same.png",
+          L"žluťoučký\\東京\\same.png", "shallow reordered row");
+
+    std::wstring wideName(100, L'東'); wideName += L"-\U0001F642.png";
+    std::string truncatedMirror = "truncated-name.png";
+    CFileData longUtf8 = {truncatedMirror.c_str(), wideName.c_str()};
+    std::wstring relative = L"žluťoučký\\東京\\" + wideName;
+    std::wstring directory = L"C:\\root\\žluťoučký\\東京";
+    Add(branch, longUtf8, directory, wideName, relative);
+    Check(Utf8Length(directory + L"\\" + wideName) > MAX_PATH &&
+          (directory + L"\\" + wideName).size() < MAX_PATH, "UTF8-only long fixture");
+    Paths(panel, longUtf8, directory, directory + L"\\" + wideName, relative, "UTF8 long exact metadata");
+
+    std::wstring longDirectory = L"C:\\root";
+    std::wstring longRelative;
+    for (int i = 0; i < 20; ++i) { longDirectory += L"\\žluťoučký-東京-directory"; longRelative += L"žluťoučký-東京-directory\\"; }
+    std::string longMirror = "same.png";
+    CFileData longWide = {longMirror.c_str(), L"same.png"};
+    Add(branch, longWide, longDirectory, L"same.png", longRelative + L"same.png");
+    Check(longDirectory.size() > MAX_PATH, "UTF16 long fixture");
+    Paths(panel, longWide, longDirectory, longDirectory + L"\\same.png", longRelative + L"same.png",
+          "Win32 long exact metadata");
+
+    std::string uncMirror = "unc.png";
+    CFileData unc = {uncMirror.c_str(), L"東京.png"};
+    Add(branch, unc, L"\\\\server\\share\\東京", L"東京.png", L"東京\\東京.png");
+    Paths(panel, unc, L"\\\\server\\share\\東京", L"\\\\server\\share\\東京\\東京.png",
+          L"東京\\東京.png", "UNC exact metadata");
+
+    CFileData missing = {"unmapped.png", L"not-the-root-file.png"};
+    Paths(panel, missing, L"", L"", L"", "missing active metadata");
+    std::string recycledMirror = "same.png";
+    CFileData recycled = {recycledMirror.c_str(), L"same.png"};
+    Paths(panel, recycled, L"", L"", L"", "same text new Name pointer cannot steal metadata");
+    branch.Items.erase(second.Name);
+    Paths(panel, second, L"", L"", L"", "removed row cannot reconstruct root path");
+    CFileData malformed = {nullptr, L"otherwise-valid.png"};
+    Paths(panel, malformed, L"", L"", L"", "null identity");
+    CFileData empty = {"", L""};
+    Paths(panel, empty, L"", L"", L"", "empty identity");
+    CFileData up = {"..", L".."};
+    Paths(panel, up, L"C:\\root", L"C:\\root\\..", L"..", "synthetic parent navigation");
+
+    // Disabling keeps metadata until the old listing is released.
+    branch.Enabled = false;
+    Paths(panel, first, L"C:\\root\\ascii", L"C:\\root\\ascii\\same.png", L"ascii\\same.png",
+          "disabled retained Branch row");
+    Paths(panel, missing, L"C:\\root", L"C:\\root\\not-the-root-file.png", L"not-the-root-file.png",
+          "disabled ordinary fallback");
+    Paths(panel, up, L"C:\\root", L"C:\\root\\..", L"..", "disabled parent navigation");
+    branch.Items.clear();
+    Paths(panel, ordinary, L"C:\\root", L"C:\\root\\same.png", L"same.png", "disabled cleared listing");
+    branch.Enabled = true;
+    Paths(panel, ordinary, L"", L"", L"", "new active Branch has no ordinary row fallback");
+    Paths(panel, up, L"C:\\root", L"C:\\root\\..", L"..", "first-scan empty listing parent navigation");
+
+    std::printf("Branch panel getters: %d checks, %d failures\n", Checks, Failures);
+    return Failures ? 1 : 0;
+}
