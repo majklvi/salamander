@@ -624,6 +624,9 @@
     <ClInclude Include="..\fileswnd.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\branch_view_text.h">
+      <Filter>h</Filter>
+    </ClInclude>
     <ClInclude Include="..\filenamecase.h">
       <Filter>h</Filter>
     </ClInclude>

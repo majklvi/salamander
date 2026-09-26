@@ -1018,6 +1018,7 @@
     <ClInclude Include="..\filesbox.h">
     </ClInclude>
     <ClInclude Include="..\branch_view.h" />
+    <ClInclude Include="..\branch_view_text.h" />
     <ClInclude Include="..\panel_temporary_selection.h" />
     <ClInclude Include="..\branchshell.h" />
     <ClInclude Include="..\branchclipboard.h" />

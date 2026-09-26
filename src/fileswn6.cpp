@@ -13,6 +13,7 @@
 #include "dialogs.h"
 #include "worker.h"
 #include "workerpath.h"
+#include "branch_view_text.h"
 #include "cache.h"
 #include "pack.h"
 #include "shellib.h"
@@ -3205,8 +3206,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             if (!script->SkipAllCountSizeErrors)
             {
-                _snprintf_s(message, _TRUNCATE, LoadStr(IDS_GETCOMPRFILESIZEERROR), name.c_str(), GetErrorText(err));
-                script->SkipAllCountSizeErrors = SalMessageBox(HWindow, message, LoadStr(IDS_ERRORTITLE),
+                const std::string errorMessage = Salamander::BranchViewText::FormatCompressedSizeError(
+                    LoadStr(IDS_GETCOMPRFILESIZEERROR), name.c_str(), GetErrorText(err));
+                script->SkipAllCountSizeErrors = SalMessageBox(HWindow, errorMessage.c_str(), LoadStr(IDS_ERRORTITLE),
                                                                MB_YESNO | MB_ICONEXCLAMATION) == IDYES;
                 UpdateWindow(MainWindow->HWindow);
             }

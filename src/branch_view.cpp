@@ -4,6 +4,7 @@
 #include "precomp.h"
 #endif
 #include "branch_view.h"
+#include "branch_view_text.h"
 #include <new>
 #include <algorithm>
 
@@ -331,11 +332,10 @@ std::wstring CFilesWindow::GetBranchViewStatusW() const
     // Background progress belongs to IncomingEntries. The user still sees the
     // previous snapshot, so do not describe it as a new/incomplete small list.
     const ULONGLONG files = (retainingSnapshot || BranchView->Status.Cancelled) ? (ULONGLONG)BranchView->Entries.size() : BranchView->Status.Files;
-    char text[512];
-    _snprintf_s(text, _countof(text), _TRUNCATE, LoadStr(id),
+    const std::string text = Salamander::BranchViewText::FormatStatus(LoadStr(id),
                 BranchView->Preparing ? BranchView->Status.Files : files,
                 BranchView->Preparing ? (ULONGLONG)BranchView->Entries.size() : (ULONGLONG)BranchView->Status.Errors);
-    return SalMultiByteToWidePath(text, CP_UTF8);
+    return SalMultiByteToWidePath(text.c_str(), CP_UTF8);
 }
 std::string CFilesWindow::GetBranchViewStatusText() const
 {
