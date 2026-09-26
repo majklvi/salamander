@@ -670,6 +670,75 @@ void CPluginInterface::ClearHistory(HWND parent)
 // CPluginInterfaceForMenu
 //
 
+// Resolve the individual disk item rather than assuming every row belongs to
+// the panel root. Branch View may contain duplicate names from different folders.
+static BOOL GetFileCompPanelItemPath(int panel, const CFileData* file,
+                                     char* path, int capacity)
+{
+    if (path == NULL || capacity <= 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    path[0] = 0;
+    if (file == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    std::wstring fullPath;
+    CSalamanderServiceQuery query = {SALAMANDER_SERVICE_PANEL_ITEM_PATHS,
+                                    SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0, 0};
+    CSalamanderServiceResult result = {};
+    if (SG->QueryService(&query, &result))
+    {
+        if (result.Interface == NULL || result.Version < query.MinimumVersion)
+            return FALSE;
+        std::vector<wchar_t> widePath(SAL_MAX_PATH, 0);
+        CSalamanderPanelItemPathsAbstract* itemPaths =
+            static_cast<CSalamanderPanelItemPathsAbstract*>(result.Interface);
+        if (!itemPaths->GetItemFullPath(panel, file, widePath.data(), (int)widePath.size()))
+            return FALSE; // Do not fabricate a root/name path after a service failure.
+        fullPath = widePath.data();
+    }
+    else
+    {
+        // Older hosts do not have Branch View or the optional item-path service.
+        std::vector<char> panelPath(SAL_MAX_PATH, 0);
+        if (!SG->GetPanelPath(panel, panelPath.data(), (int)panelPath.size(), NULL, NULL))
+            return FALSE;
+        fullPath = PluginMultiByteToWidePath(panelPath.data(), CP_UTF8);
+        if (!fullPath.empty() && fullPath.back() != L'\\')
+            fullPath += L'\\';
+        fullPath += file->UseWideName() ? file->NameW :
+            PluginMultiByteToWidePath(file->Name, CP_UTF8);
+    }
+    const std::string encoded = PluginWideToMultiBytePath(fullPath.c_str(), CP_UTF8);
+    if (encoded.empty())
+    {
+        SetLastError(ERROR_INVALID_NAME);
+        return FALSE;
+    }
+    if (encoded.size() >= (size_t)capacity)
+    {
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return FALSE;
+    }
+    memcpy(path, encoded.c_str(), encoded.size() + 1);
+    return TRUE;
+}
+
+static BOOL FileCompPanelItemNamesEqual(const CFileData* first, const CFileData* second)
+{
+    const std::wstring firstName = first->UseWideName() ? first->NameW :
+        PluginMultiByteToWidePath(first->Name, CP_UTF8);
+    const std::wstring secondName = second->UseWideName() ? second->NameW :
+        PluginMultiByteToWidePath(second->Name, CP_UTF8);
+    return CompareStringOrdinal(firstName.c_str(), (int)firstName.size(),
+                                secondName.c_str(), (int)secondName.size(), TRUE) == CSTR_EQUAL;
+}
+
 BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* salamander, HWND parent,
                                               int id, DWORD eventMask)
 {
@@ -679,8 +748,10 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
     {
     case MID_COMPAREFILES:
     {
-        char file1[SAL_MAX_PATH];
-        char file2[SAL_MAX_PATH];
+        std::vector<char> file1Buffer(SAL_MAX_PATH, 0);
+        std::vector<char> file2Buffer(SAL_MAX_PATH, 0);
+        char* file1 = file1Buffer.data();
+        char* file2 = file2Buffer.data();
         const CFileData *fd1, *fd2 = NULL;
         int index = 0;
         BOOL isDir;
@@ -741,16 +812,15 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
             goto SELECTION_FINISHED; // empty panel
 
         // store the name of the first file
-        if (!SG->GetPanelPath(PANEL_SOURCE, file1, SizeOf(file1), NULL, NULL))
-            return NULL;
-        SG->SalPathAppend(file1, fd1->UseWideName() ? PluginWideToMultiBytePath(fd1->NameW, CP_UTF8).c_str() : fd1->Name, SizeOf(file1));
+        if (!GetFileCompPanelItemPath(PANEL_SOURCE, fd1, file1, (int)file1Buffer.size()))
+            return FALSE;
 
         if (fd2 &&
             !isDir && fd2 != fd1) // in case we take the file from the focus
         {
             // store the name of the second file
-            SG->GetPanelPath(PANEL_SOURCE, file2, SizeOf(file2), NULL, NULL);
-            SG->SalPathAppend(file2, fd2->UseWideName() ? PluginWideToMultiBytePath(fd2->NameW, CP_UTF8).c_str() : fd2->Name, SizeOf(file2));
+            if (!GetFileCompPanelItemPath(PANEL_SOURCE, fd2, file2, (int)file2Buffer.size()))
+                return FALSE;
             secondFromSource = TRUE;
         }
         else
@@ -767,7 +837,7 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
                     index = 0;
                     while ((fd2 = SG->GetPanelItem(PANEL_TARGET, &index, &isDir)) != 0)
                     {
-                        if (!isDir && SG->StrICmp(fd1->Name, fd2->Name) == 0)
+                        if (!isDir && FileCompPanelItemNamesEqual(fd1, fd2))
                             break;
                     }
                 }
@@ -775,9 +845,8 @@ BOOL CPluginInterfaceForMenu::ExecuteMenuItem(CSalamanderForOperationsAbstract* 
                 if (fd2)
                 {
                     // store the name of the second file
-                    if (!SG->GetPanelPath(PANEL_TARGET, file2, SizeOf(file2), NULL, NULL))
-                        return NULL;
-                    SG->SalPathAppend(file2, fd2->UseWideName() ? PluginWideToMultiBytePath(fd2->NameW, CP_UTF8).c_str() : fd2->Name, SizeOf(file2));
+                    if (!GetFileCompPanelItemPath(PANEL_TARGET, fd2, file2, (int)file2Buffer.size()))
+                        return FALSE;
                 }
             }
         }

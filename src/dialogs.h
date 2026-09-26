@@ -96,6 +96,7 @@ protected:
     BOOL SupportsADS;
     const std::vector<std::string>* TargetPaths;
     BOOL AllowChangeTarget;
+    BOOL* KeepBranchPathsInOut;
     int* TransferModeInOut; // CMS_SEQUENTIAL / CMS_STORAGE_AWARE for this operation
     int* ConflictModeInOut; // CMCM_CURRENT / CMCM_SCAN_AHEAD for this operation
     int* OperationSchedulingOverrideInOut; // COSO_* for this operation; NULL outside Copy/Move
@@ -117,7 +118,7 @@ public:
                         BOOL havePermissions, BOOL supportsADS, int* transferModeInOut,
                         int* conflictModeInOut, int* operationSchedulingOverrideInOut,
                         const std::vector<std::string>* targetPaths = NULL,
-                        BOOL allowChangeTarget = FALSE);
+                        BOOL allowChangeTarget = FALSE, BOOL* keepBranchPathsInOut = NULL);
     ~CCopyMoveMoreDialog();
 
     virtual void Validate(CTransferInfo& ti);
