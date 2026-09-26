@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "branch_view.h"
 
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -28,8 +29,7 @@ void CFilesWindow::EndQuickSearch()
 {
     CALL_STACK_MESSAGE_NONE
     QuickSearchMode = FALSE;
-    QuickSearch[0] = 0;
-    QuickSearchMask[0] = 0;
+    QuickSearchHighSurrogate = 0;
     QuickSearchW.erase();
     QuickSearchMaskW.erase();
     SearchIndex = INT_MAX;
@@ -46,99 +46,11 @@ namespace
                MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, textLen, NULL, 0) != 0;
     }
 
-    BOOL GetUtf8QuickSearchText(WPARAM wParam, char* buffer, int bufferSize)
-    {
-        static unsigned char pendingUtf8[4];
-        static int pendingUtf8Len = 0;
-        static int pendingUtf8Expected = 0;
-
-        if (buffer == NULL || bufferSize <= 0)
-            return FALSE;
-        buffer[0] = 0;
-        if (wParam <= 31)
-            return FALSE;
-
-        if (GetACP() == CP_UTF8 && wParam >= 0x80 && wParam <= 0xFF)
-        {
-            unsigned char ch = (unsigned char)(wParam & 0xFF);
-            if (pendingUtf8Len == 0)
-            {
-                if ((ch & 0xE0) == 0xC0)
-                    pendingUtf8Expected = 2;
-                else if ((ch & 0xF0) == 0xE0)
-                    pendingUtf8Expected = 3;
-                else if ((ch & 0xF8) == 0xF0)
-                    pendingUtf8Expected = 4;
-                else
-                    pendingUtf8Expected = 0;
-
-                if (pendingUtf8Expected > 0)
-                {
-                    pendingUtf8[pendingUtf8Len++] = ch;
-                    return FALSE;
-                }
-            }
-            else if ((ch & 0xC0) == 0x80)
-            {
-                pendingUtf8[pendingUtf8Len++] = ch;
-                if (pendingUtf8Len < pendingUtf8Expected)
-                    return FALSE;
-
-                if (pendingUtf8Expected < bufferSize)
-                {
-                    memcpy(buffer, pendingUtf8, pendingUtf8Expected);
-                    buffer[pendingUtf8Expected] = 0;
-                    pendingUtf8Len = 0;
-                    pendingUtf8Expected = 0;
-                    return TRUE;
-                }
-                pendingUtf8Len = 0;
-                pendingUtf8Expected = 0;
-                return FALSE;
-            }
-
-            pendingUtf8Len = 0;
-            pendingUtf8Expected = 0;
-        }
-        else
-        {
-            pendingUtf8Len = 0;
-            pendingUtf8Expected = 0;
-        }
-
-        WCHAR wide[3] = {0, 0, 0};
-        if (wParam <= 0xFFFF)
-        {
-            wide[0] = (WCHAR)(wParam & 0xFFFF);
-        }
-        else if (wParam <= 0x10FFFF)
-        {
-            DWORD codePoint = (DWORD)wParam - 0x10000;
-            wide[0] = (WCHAR)(0xD800 + (codePoint >> 10));
-            wide[1] = (WCHAR)(0xDC00 + (codePoint & 0x3FF));
-        }
-        else
-            return FALSE;
-
-        int written = WideCharToMultiByte(CP_UTF8, 0, wide, -1, buffer, bufferSize, NULL, NULL);
-        return written > 1;
-    }
-
     std::wstring QuickSearchTextToWide(const char* text)
     {
         if (text != NULL && IsValidQuickSearchUtf8Text(text, (int)strlen(text)))
             return SalMultiByteToWidePath(text, CP_UTF8);
         return SalMultiByteToWidePath(text, GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
-    }
-
-    std::string QuickSearchWideToText(const std::wstring& text)
-    {
-        return SalWideToMultiBytePath(text.c_str(), CP_UTF8);
-    }
-
-    BOOL UseWideQuickSearch()
-    {
-        return TRUE;
     }
 
     std::wstring FileDataNameToWide(const CFileData& file)
@@ -156,95 +68,53 @@ namespace
     }
 } // namespace
 
-BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL wholeString, const char* newText, int& index)
+BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL wholeString, const wchar_t* newText, int& index)
 {
-    CALL_STACK_MESSAGE6("CFilesWindow::QSFindNext(%d, %d, %d, %d, %s)", currentIndex, next, skip, wholeString, newText != NULL ? newText : "");
-    int len = (int)strlen(QuickSearchMask);
-    int newTextLen = newText != NULL ? (int)strlen(newText) : 0;
-    std::wstring newTextW;
-    BOOL useWideQS = UseWideQuickSearch();
-
-    if (newTextLen > 0)
+    CALL_STACK_MESSAGE5("CFilesWindow::QSFindNext(%d, %d, %d, %d,)", currentIndex, next, skip, wholeString);
+    const size_t previousLength = QuickSearchMaskW.length();
+    if (newText != NULL)
     {
-        if (len + newTextLen >= MAX_PATH)
+        const size_t addedLength = wcslen(newText);
+        if (addedLength >= SAL_MAX_PATH || previousLength >= SAL_MAX_PATH - addedLength)
             return FALSE;
-        memcpy(QuickSearchMask + len, newText, newTextLen + 1);
-        len += newTextLen;
-        if (useWideQS)
-        {
-            newTextW = QuickSearchTextToWide(newText);
-            QuickSearchMaskW += newTextW;
-        }
+        QuickSearchMaskW += newText;
     }
-    else if (useWideQS && QuickSearchMaskW.empty() && QuickSearchMask[0] != 0)
-        QuickSearchMaskW = QuickSearchTextToWide(QuickSearchMask);
 
-    int delta = skip ? 1 : 0;
-
-    int offset = 0;
-    char mask[MAX_PATH];
-    PrepareQSMask(mask, QuickSearchMask);
-    std::wstring maskW;
-    if (useWideQS)
-        PrepareQSMaskW(maskW, QuickSearchMaskW);
-
-    int count = Dirs->Count + Files->Count;
-    int dirCount = Dirs->Count;
+    const int delta = skip ? 1 : 0;
+    std::wstring mask;
+    PrepareQSMaskW(mask, QuickSearchMaskW);
+    const int count = Dirs->Count + Files->Count;
+    const int dirCount = Dirs->Count;
     for (int i = next ? currentIndex + delta : currentIndex - delta;
          next ? i < count : i >= 0;
          next ? i++ : i--)
     {
-        CFileData& file = i < dirCount ? Dirs->At(i) : Files->At(i - dirCount);
-        char* name = file.Name;
-        BOOL isDir = i < dirCount;
-        BOOL hasExtension = useWideQS ? FileHasExtensionForQS(file, isDir) :
-                            (isDir ? strchr(name, '.') != NULL : *file.Ext != 0);
-        if (i == 0 && isDir && strcmp(name, "..") == 0)
+        const CFileData& file = i < dirCount ? Dirs->At(i) : Files->At(i - dirCount);
+        const BOOL isDir = i < dirCount;
+        std::wstring name = FileDataNameToWide(file);
+        if (i == 0 && isDir && name == L"..")
         {
-            if (len == 0)
+            if (QuickSearchMaskW.empty())
             {
-                QuickSearch[0] = 0;
-                QuickSearchW.erase();
+                QuickSearchW.clear();
                 index = i;
                 return TRUE;
             }
         }
         else
         {
-            BOOL agree;
-            if (useWideQS)
+            int offset = 0;
+            if (AgreeQSMaskW(name.c_str(), FileHasExtensionForQS(file, isDir),
+                             mask.c_str(), wholeString, offset))
             {
-                std::wstring nameW = FileDataNameToWide(file);
-                agree = AgreeQSMaskW(nameW.c_str(), hasExtension, maskW.c_str(), wholeString, offset);
-                if (agree)
-                {
-                    QuickSearchW.assign(nameW.c_str(), offset);
-                    std::string quickSearch = QuickSearchWideToText(QuickSearchW);
-                    lstrcpyn(QuickSearch, quickSearch.c_str(), MAX_PATH);
-                    index = i;
-                    return TRUE;
-                }
-            }
-            else
-            {
-                agree = AgreeQSMask(name, hasExtension, mask, wholeString, offset);
-                if (agree)
-                {
-                    lstrcpyn(QuickSearch, name, offset + 1);
-                    index = i;
-                    return TRUE;
-                }
+                QuickSearchW.assign(name, 0, offset);
+                index = i;
+                return TRUE;
             }
         }
     }
-
-    if (newTextLen > 0)
-    {
-        len -= newTextLen;
-        QuickSearchMask[len] = 0;
-        if (useWideQS && !newTextW.empty() && QuickSearchMaskW.length() >= newTextW.length())
-            QuickSearchMaskW.erase(QuickSearchMaskW.length() - newTextW.length());
-    }
+    // A failed append must be rolled back before the opposite-direction retry.
+    QuickSearchMaskW.resize(previousLength);
     return FALSE;
 }
 
@@ -342,8 +212,8 @@ void CFilesWindow::TryEnterFileAsArchive(int index)
 
     CFileData* file = &Files->At(index - Dirs->Count);
     char fullName[SAL_MAX_PATH];
-    lstrcpyn(fullName, GetPath(), SAL_MAX_PATH);
-    if (!SalPathAppend(fullName, file->Name, SAL_MAX_PATH))
+    const std::string sourcePath = SalWideToMultiBytePath(GetItemFullPathW(*file).c_str(), CP_UTF8);
+    if (sourcePath.size() >= SAL_MAX_PATH)
     {
         SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORCHANGINGDIR),
                       MB_OK | MB_ICONEXCLAMATION);
@@ -351,6 +221,7 @@ void CFilesWindow::TryEnterFileAsArchive(int index)
         return;
     }
 
+    memcpy(fullName, sourcePath.c_str(), sourcePath.size() + 1);
     CPluginData* plugin = PackProbeArchivePlugin(fullName, this);
     if (plugin == NULL)
     {
@@ -390,6 +261,12 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
         return;
     BOOL isDir = index < Dirs->Count;
     CFileData* file = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
+
+    if (IsBranchView())
+    {
+        FocusBranchShortcutTarget(panel, *file);
+        return;
+    }
 
     char shortName[MAX_PATH];
     strcpy(shortName, file->Name);
@@ -909,9 +786,9 @@ BOOL CFilesWindow::SelectionContainsFile()
     return FALSE;
 }
 
-void CFilesWindow::SelectFocusedItemAndGetName(char* name, int nameSize)
+void CFilesWindow::SelectFocusedItemAndGetName(CPanelTemporarySelection& selection)
 {
-    name[0] = 0;
+    selection.Clear();
     if (GetSelCount() == 0)
     {
         int deselectIndex = GetCaretIndex();
@@ -920,15 +797,8 @@ void CFilesWindow::SelectFocusedItemAndGetName(char* name, int nameSize)
             BOOL isDir = deselectIndex < Dirs->Count;
             CFileData* f = isDir ? &Dirs->At(deselectIndex) : &Files->At(deselectIndex - Dirs->Count);
 
-            int len = (int)strlen(f->Name);
-            if (len >= nameSize)
-            {
-                TRACE_E("len > nameMax");
-                len = nameSize - 1;
-            }
-
-            memcpy(name, f->Name, len);
-            name[len] = 0;
+            selection.Name = f->Name;
+            if (IsBranchView()) selection.BranchIdentity = GetItemIdentityW(*f);
 
             SetSel(TRUE, deselectIndex);
             PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);
@@ -937,8 +807,26 @@ void CFilesWindow::SelectFocusedItemAndGetName(char* name, int nameSize)
     }
 }
 
-void CFilesWindow::UnselectItemWithName(const char* name)
+void CFilesWindow::UnselectItemWithName(const CPanelTemporarySelection& selection)
 {
+    if (!selection.BranchIdentity.empty())
+    {
+        const int index = FindBranchTemporarySelection(selection, Dirs->Count + Files->Count,
+            [&](int i) {
+                const CFileData& file = i < Dirs->Count ? Dirs->At(i) : Files->At(i - Dirs->Count);
+                // Only a still-selected row needs path resolution. Large
+                // Branch listings otherwise allocate a path for every item.
+                return file.Selected ? GetItemIdentityW(file) : std::wstring();
+            });
+        if (index != -1)
+        {
+            SetSel(FALSE, index);
+            PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);
+            RepaintListBox(DRAWFLAG_DIRTY_ONLY | DRAWFLAG_SKIP_VISTEST);
+        }
+        return;
+    }
+    const char* name = selection.Name.c_str();
     if (name[0] != 0)
     {
         int count = Dirs->Count + Files->Count;
@@ -1051,25 +939,40 @@ BOOL CFilesWindow::OnSysChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
         return TRUE;
     }
 
+    if (Configuration.QuickSearchEnterAlt && wParam > 31 &&
+        (lParam & (1L << 29)) != 0 && (GetKeyState(VK_CONTROL) & 0x8000) == 0)
+    {
+        // Use the Unicode character produced by TranslateMessage, including
+        // dead-key composition. Translating this key again can consume its state.
+        OnChar(wParam, lParam, lResult, TRUE);
+        *lResult = 0;
+        return TRUE;
+    }
     return FALSE;
 }
 
-BOOL CFilesWindow::OnChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
+BOOL CFilesWindow::OnChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult, BOOL fromSystemChar)
 {
     CALL_STACK_MESSAGE_NONE
     if (SkipCharacter || MainWindow->DragMode || DragBox || !IsWindowEnabled(MainWindow->HWindow))
     {
+        QuickSearchHighSurrogate = 0;
         *lResult = 0;
         return TRUE;
     }
+    std::wstring quickSearchText;
+    if (!Salamander::Panel::AppendQuickSearchCodeUnit(QuickSearchHighSurrogate,
+                                                     (std::uint32_t)wParam, quickSearchText))
+        return FALSE;
+
     BOOL controlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
-    BOOL altPressed = (GetKeyState(VK_MENU) & 0x8000) != 0;
+    BOOL altPressed = fromSystemChar || (GetKeyState(VK_MENU) & 0x8000) != 0;
 
     // if we are in QuickSearchEnterAlt mode, we must set the focus to
     // the command line and buffer the letter there
     if (!controlPressed && !altPressed &&
         !QuickSearchMode &&
-        wParam > 32 && wParam < 256 &&
+        quickSearchText[0] > 32 &&
         Configuration.QuickSearchEnterAlt)
     {
         if (MainWindow->EditWindow->IsEnabled())
@@ -1078,14 +981,13 @@ BOOL CFilesWindow::OnChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
             // we send the character there
             HWND hEditLine = MainWindow->GetEditLineHWND(TRUE);
             if (hEditLine != NULL)
-                PostMessage(hEditLine, WM_CHAR, wParam, lParam);
+                for (size_t i = 0; i < quickSearchText.length(); ++i)
+                    PostMessageW(hEditLine, WM_CHAR, quickSearchText[i], lParam);
         }
         return FALSE;
     }
 
-    char quickSearchText[8];
-    if (GetUtf8QuickSearchText(wParam, quickSearchText, _countof(quickSearchText)) &&
-        Dirs->Count + Files->Count > 0) // at least 1 item
+    if (Dirs->Count + Files->Count > 0) // at least 1 item
     {
         int index = FocusedIndex;
         // On a German keyboard, the slash is on Shift+7, so it conflicts with HotPaths
@@ -1106,8 +1008,8 @@ BOOL CFilesWindow::OnChar(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
         //}
         //else
         //{
-        if (!QSFindNext(GetCaretIndex(), TRUE, FALSE, FALSE, quickSearchText, index))
-            QSFindNext(GetCaretIndex(), FALSE, TRUE, FALSE, quickSearchText, index);
+        if (!QSFindNext(GetCaretIndex(), TRUE, FALSE, FALSE, quickSearchText.c_str(), index))
+            QSFindNext(GetCaretIndex(), FALSE, TRUE, FALSE, quickSearchText.c_str(), index);
         //}
 
         if (!QuickSearchMode) // initialization of search
@@ -1195,22 +1097,16 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
     BOOL controlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
     BOOL altPressed = (GetKeyState(VK_MENU) & 0x8000) != 0;
 
-    if (((Configuration.QuickSearchEnterAlt &&
-          altPressed && !controlPressed)) &&
-        wParam > 31 && wParam < 256 &&
-        Dirs->Count + Files->Count > 0)
+    if (wParam != VK_SHIFT && wParam != VK_CONTROL && wParam != VK_MENU && wParam != VK_PACKET)
+        QuickSearchHighSurrogate = 0;
+    if (Configuration.QuickSearchEnterAlt && altPressed && !controlPressed &&
+        wParam > 31 && wParam < 256 && Dirs->Count + Files->Count > 0 &&
+        MapVirtualKeyExW((UINT)wParam, MAPVK_VK_TO_CHAR, GetKeyboardLayout(0)) != 0)
     {
-        BYTE ks[256];
-        GetKeyboardState(ks);
-        ks[VK_CONTROL] = 0;
-        WORD ch;
-        int ret = ToAscii((UINT)wParam, 0, ks, &ch, 0);
-        if (ret == 1)
-        {
-            SkipSysCharacter = TRUE;
-            SendMessage(ListBox->HWindow, WM_CHAR, LOBYTE(ch), 0);
-            return TRUE;
-        }
+        // Reserve printable/dead keys for quick search. The actual text arrives
+        // as WM_SYSCHAR; this lookup does not change the keyboard dead-key state.
+        SkipCharacter = FALSE;
+        return TRUE;
     }
 
     SkipCharacter = FALSE;
@@ -1536,6 +1432,12 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         return TRUE;
     }
 
+    if (wParam == VK_ESCAPE && IsBranchViewScanning() && !QuickSearchMode)
+    {
+        CancelBranchViewScan();
+        SkipCharacter = TRUE;
+        return TRUE;
+    }
     if (QuickSearchMode)
     {
         BOOL processed = TRUE;
@@ -1559,25 +1461,11 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
             goto INSERT_KEY;
         }
 
-        case VK_BACK: // backspace - we delete a character in the quicksearch mask
+        case VK_BACK: // remove the last complete character from the mask
         {
-            if (QuickSearchMask[0] != 0)
+            if (!QuickSearchMaskW.empty())
             {
-                if (UseWideQuickSearch())
-                {
-                    if (QuickSearchMaskW.empty())
-                        QuickSearchMaskW = QuickSearchTextToWide(QuickSearchMask);
-                    if (!QuickSearchMaskW.empty())
-                        QuickSearchMaskW.erase(QuickSearchMaskW.length() - 1);
-                    std::string mask = QuickSearchWideToText(QuickSearchMaskW);
-                    lstrcpyn(QuickSearchMask, mask.c_str(), MAX_PATH);
-                }
-                else
-                {
-                    int len = (int)strlen(QuickSearchMask) - 1; // we remove a character
-                    QuickSearchMask[len] = 0;
-                }
-
+                Salamander::Panel::RemoveLastQuickSearchCharacter(QuickSearchMaskW);
                 int index;
                 QSFindNext(GetCaretIndex(), FALSE, FALSE, FALSE, NULL, index);
                 SetQuickSearchCaretPos();
@@ -1585,34 +1473,19 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
             return TRUE;
         }
 
-        case VK_LEFT: // left arrow - we convert the mask to a string and remove a character
+        case VK_LEFT: // shorten the matched prefix and keep its mask in sync
         {
-            if (QuickSearch[0] != 0)
+            if (!QuickSearchW.empty())
             {
-                if (UseWideQuickSearch())
-                {
-                    if (QuickSearchW.empty())
-                        QuickSearchW = QuickSearchTextToWide(QuickSearch);
-                    if (!QuickSearchW.empty())
-                        QuickSearchW.erase(QuickSearchW.length() - 1);
-                    std::string qs = QuickSearchWideToText(QuickSearchW);
-                    lstrcpyn(QuickSearch, qs.c_str(), MAX_PATH);
-                }
-                else
-                {
-                    int len = (int)strlen(QuickSearch) - 1; // we remove a character
-                    QuickSearch[len] = 0;
-                }
-                int len2 = (int)strlen(QuickSearchMask);
-                if (len2 > 1 && !IsQSWildChar(QuickSearchMask[len2 - 1]) && !IsQSWildChar(QuickSearchMask[len2 - 2]))
-                {
-                    QuickSearchMask[len2 - 1] = 0;
-                }
-                else
-                {
-                    // in this case, we discard the "wild" characters and switch to normal search, because
-                    strcpy(QuickSearchMask, QuickSearch);
-                }
+                Salamander::Panel::ShortenQuickSearchPrefix(QuickSearchW, QuickSearchMaskW);
+                // The filename prefix may be decomposed while the typed mask is
+                // composed. Keep a wildcard suffix only if it still describes
+                // the complete shortened prefix in the same Unicode matcher.
+                std::wstring mask;
+                PrepareQSMaskW(mask, QuickSearchMaskW);
+                int matchedLength;
+                if (!AgreeQSMaskW(QuickSearchW.c_str(), TRUE, mask.c_str(), TRUE, matchedLength))
+                    QuickSearchMaskW = QuickSearchW;
                 SetQuickSearchCaretPos();
             }
             return TRUE;
@@ -1622,38 +1495,11 @@ BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT
         {
             if (FocusedIndex >= 0 && FocusedIndex < Dirs->Count + Files->Count)
             {
-                char* name = (FocusedIndex < Dirs->Count) ? Dirs->At(FocusedIndex).Name : Files->At(FocusedIndex - Dirs->Count).Name;
-                int len = (int)strlen(QuickSearch); // we add a character
-                if ((FocusedIndex > Dirs->Count || FocusedIndex != 0 ||
-                     strcmp(name, "..") != 0) &&
-                    name[len] != 0)
-                {
-                    // if there is still another one
-                    if (UseWideQuickSearch())
-                    {
-                        std::wstring nameW = FileDataNameToWide(FocusedIndex < Dirs->Count ? Dirs->At(FocusedIndex) : Files->At(FocusedIndex - Dirs->Count));
-                        if (QuickSearchW.empty())
-                            QuickSearchW = QuickSearchTextToWide(QuickSearch);
-                        if (QuickSearchW.length() < nameW.length())
-                        {
-                            QuickSearchW += nameW[QuickSearchW.length()];
-                            QuickSearchMaskW += nameW[QuickSearchW.length() - 1];
-                            std::string qs = QuickSearchWideToText(QuickSearchW);
-                            std::string mask = QuickSearchWideToText(QuickSearchMaskW);
-                            lstrcpyn(QuickSearch, qs.c_str(), MAX_PATH);
-                            lstrcpyn(QuickSearchMask, mask.c_str(), MAX_PATH);
-                        }
-                    }
-                    else
-                    {
-                        QuickSearch[len] = name[len];
-                        QuickSearch[len + 1] = 0;
-                        int len2 = (int)strlen(QuickSearchMask);
-                        QuickSearchMask[len2] = name[len];
-                        QuickSearchMask[len2 + 1] = 0;
-                    }
+                const CFileData& file = FocusedIndex < Dirs->Count ? Dirs->At(FocusedIndex) : Files->At(FocusedIndex - Dirs->Count);
+                std::wstring name = FileDataNameToWide(file);
+                if (!(FocusedIndex == 0 && FocusedIndex < Dirs->Count && name == L"..") &&
+                    Salamander::Panel::ExtendQuickSearchPrefix(QuickSearchW, QuickSearchMaskW, name))
                     SetQuickSearchCaretPos();
-                }
             }
             return TRUE;
         }
@@ -2294,6 +2140,7 @@ void CFilesWindow::OnSetFocus(BOOL focusVisible)
 
 void CFilesWindow::OnKillFocus(HWND hwndGetFocus)
 {
+    QuickSearchHighSurrogate = 0;
     CALL_STACK_MESSAGE_NONE
     if (Parent->EditWindowKnowHWND(hwndGetFocus))
         Parent->EditMode = TRUE;
@@ -2537,6 +2384,40 @@ BOOL CFilesWindow::ShouldShowWaitCursorForRefresh()
 void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloadThumbnails, BOOL isInactiveRefresh)
 {
     CALL_STACK_MESSAGE1("CFilesWindow::RefreshDirectory()");
+    if (IsBranchView() && !BranchView->Applying)
+    {
+        RefreshBranchView();
+        return;
+    }
+    struct CBranchSavedState { bool Selected; bool Cut; unsigned Overlay; };
+    std::unordered_map<std::string, CBranchSavedState> branchSelection;
+    std::unordered_set<std::string> branchRestoreSelected;
+    std::string branchFocus;
+    if (IsBranchView())
+    {
+        for (int bi = 0; bi < Files->Count; ++bi)
+        {
+            const CFileData& file = Files->At(bi);
+            // During history/tab restoration, even a cleared selection is an
+            // explicit user choice that must override the saved selection.
+            if (BranchView->RestoreState != NULL || file.Selected || file.CutToClip ||
+                file.IconOverlayIndex != ICONOVERLAYINDEX_NOTUSED)
+            {
+                const char* key = GetItemCacheKeyPtr(file);
+                branchSelection[key == file.Name ? SalWideToMultiBytePath(GetItemIdentityW(file).c_str(), CP_UTF8) : std::string(key)] =
+                    {file.Selected != 0, file.CutToClip != 0, file.IconOverlayIndex};
+            }
+        }
+        int bi = GetCaretIndex() - Dirs->Count;
+        if (bi >= 0 && bi < Files->Count) branchFocus = SalWideToMultiBytePath(GetItemIdentityW(Files->At(bi)).c_str(), CP_UTF8);
+        if (!BranchView->PendingFocus.empty()) branchFocus = SalWideToMultiBytePath(BranchView->PendingFocus.c_str(), CP_UTF8);
+        if (BranchView->RestoreState != NULL)
+        {
+            branchRestoreSelected.reserve(BranchView->RestoreSelected.size());
+            for (const auto& identity : BranchView->RestoreSelected)
+                branchRestoreSelected.insert(SalWideToMultiBytePath(identity.c_str(), CP_UTF8));
+        }
+    }
     //  if (QuickSearchMode) EndQuickSearch();   // We will try to make the quick search mode survive a refresh.
 
 #ifdef _DEBUG
@@ -2624,8 +2505,10 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     BOOL sortDirectoryPostponed = FALSE;
     CSortType currentSortType;
     BOOL currentReverseSort;
-    if (SortType != stName || ReverseSort || SortedWithRegSet != Configuration.SortUsesLocale ||
-        SortedWithDetectNum != Configuration.SortDetectNumbers)
+    // Branch selection/focus is merged by exact path, independently of order.
+    // Its old and new lists do not need the legacy temporary basename sorts.
+    if (!IsBranchView() && (SortType != stName || ReverseSort || SortedWithRegSet != Configuration.SortUsesLocale ||
+        SortedWithDetectNum != Configuration.SortDetectNumbers))
     {
         changeSortType = TRUE;
         currentReverseSort = ReverseSort;
@@ -2811,7 +2694,12 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     {
     case ptDisk:
     {
-        result = ChangePathToDisk(HWindow, GetPath(), -1, NULL, &noChange, FALSE, FALSE, TRUE);
+        if (IsBranchView())
+        {
+            noChange = FALSE;
+            result = ReadDirectory(HWindow, TRUE);
+        }
+        else result = ChangePathToDisk(HWindow, GetPath(), -1, NULL, &noChange, FALSE, FALSE, TRUE);
         break;
     }
 
@@ -3022,185 +2910,190 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
 
     int firstNewItemIsDir = -1; // -1 (unknown), 0 (is file), 1 (is directory)
     int i = 0;
-    if (i < Dirs->Count) // we skip the ".." (up-dir symbol) in the new data
-    {
-        CFileData* newData = &Dirs->At(i);
-        if (newData->NameLen == 2 && newData->Name[0] == '.' && newData->Name[1] == '.')
-            i++;
-    }
     int j = 0;
-    if (j < oldDirs->Count) // we skip the ".." (up-dir symbol) in the old data
+    if (!IsBranchView())
     {
-        CFileData* oldData = &oldDirs->At(j);
-        if (oldData->NameLen == 2 && oldData->Name[0] == '.' && oldData->Name[1] == '.')
-            j++;
-    }
-    for (; j < oldDirs->Count; j++) // first directories
-    {
-        CFileData* oldData = &oldDirs->At(j);
-        if (focusFirstNewItem || oldData->Selected || oldData->SizeValid || oldData->CutToClip ||
-            oldData->IconOverlayIndex != ICONOVERLAYINDEX_NOTUSED)
+        if (i < Dirs->Count) // we skip the ".." (up-dir symbol) in the new data
         {
-            while (i < Dirs->Count)
-            {
-                CFileData* newData = &Dirs->At(i);
-                if (!LessNameExtIgnCase(*newData, *oldData, FALSE)) // new >= old
-                {
-                    if (LessNameExtIgnCase(*oldData, *newData, FALSE))
-                        break; // new > old -> new != old
-                    else       // new == old
-                    {
-                        // we look for an exact match between otherwise identical names
-                        int ii = i;
-                        BOOL exactMatch = FALSE; // TRUE if the old and new name match case sensitive
-                        while (ii < Dirs->Count)
-                        {
-                            CFileData* newData2 = &Dirs->At(ii);
-                            if (!LessNameExt(*newData2, *oldData, FALSE)) // new >= old
-                            {
-                                if (!LessNameExt(*oldData, *newData2, FALSE)) // old == new (exact) - we prefer exact match over case insensitive match
-                                {
-                                    exactMatch = TRUE;
-                                    if (ii > i) // we skipped at least one item (it was smaller than the searched old item)
-                                    {
-                                        if (focusFirstNewItem) // found a new item
-                                        {
-                                            strcpy(NextFocusName, newData->Name);
-                                            firstNewItemIsDir = 1 /* is directory */;
-                                            focusFirstNewItem = FALSE;
-                                        }
-                                        i = ii;
-                                        newData = newData2;
-                                    }
-                                }
-                                break; // in any case, we end the search for exact match
-                            }
-                            ii++;
-                        }
-
-                        if (!caseSensitive || exactMatch)
-                        {
-                            // we transfer values from the old item to the new one
-                            if (oldData->Selected)
-                                SetSel(TRUE, newData);
-                            newData->SizeValid = oldData->SizeValid;
-                            if (newData->SizeValid)
-                                newData->Size = oldData->Size;
-                            newData->CutToClip = oldData->CutToClip;
-                            newData->IconOverlayIndex = oldData->IconOverlayIndex;
-                        }
-                        i++;
-                        break;
-                    }
-                }
-                else // new < old
-                {
-                    if (focusFirstNewItem) // found a new item
-                    {
-                        strcpy(NextFocusName, newData->Name);
-                        firstNewItemIsDir = 1 /* is directory */;
-                        focusFirstNewItem = FALSE;
-                    }
-                }
+            CFileData* newData = &Dirs->At(i);
+            if (newData->NameLen == 2 && newData->Name[0] == '.' && newData->Name[1] == '.')
                 i++;
-            }
-            if (i >= Dirs->Count)
-                break; // end of searching for selected items
         }
-    }
-    if (focusFirstNewItem && i == Dirs->Count - 1) // found a new item
-    {
-        strcpy(NextFocusName, Dirs->At(i).Name);
-        firstNewItemIsDir = 1 /* is directory */;
-        focusFirstNewItem = FALSE;
-    }
-
-    i = 0;
-    for (j = 0; j < oldFiles->Count; j++) // after directories also files
-    {
-        CFileData* oldData = &oldFiles->At(j);
-        if (focusFirstNewItem || oldData->Selected || oldData->CutToClip ||
-            oldData->IconOverlayIndex != ICONOVERLAYINDEX_NOTUSED)
+        j = 0;
+        if (j < oldDirs->Count) // we skip the ".." (up-dir symbol) in the old data
         {
-            while (i < Files->Count)
+            CFileData* oldData = &oldDirs->At(j);
+            if (oldData->NameLen == 2 && oldData->Name[0] == '.' && oldData->Name[1] == '.')
+                j++;
+        }
+        for (; j < oldDirs->Count; j++) // first directories
+        {
+            CFileData* oldData = &oldDirs->At(j);
+            if (focusFirstNewItem || oldData->Selected || oldData->SizeValid || oldData->CutToClip ||
+                oldData->IconOverlayIndex != ICONOVERLAYINDEX_NOTUSED)
             {
-                CFileData* newData = &Files->At(i);
-                if (!LessNameExtIgnCase(*newData, *oldData, FALSE)) // new >= old
+                while (i < Dirs->Count)
                 {
-                    if (LessNameExtIgnCase(*oldData, *newData, FALSE))
-                        break; // new > old -> new != old
-                    else       // new == old (ign. case)
+                    CFileData* newData = &Dirs->At(i);
+                    if (!LessNameExtIgnCase(*newData, *oldData, FALSE)) // new >= old
                     {
-                        // look for an exact match between otherwise identical names
-                        int ii = i;
-                        BOOL exactMatch = FALSE; // TRUE if the old and new name match case sensitive
-                        while (ii < Files->Count)
+                        if (LessNameExtIgnCase(*oldData, *newData, FALSE))
+                            break; // new > old -> new != old
+                        else       // new == old
                         {
-                            CFileData* newData2 = &Files->At(ii);
-                            if (!LessNameExt(*newData2, *oldData, FALSE)) // new >= old
+                            // we look for an exact match between otherwise identical names
+                            int ii = i;
+                            BOOL exactMatch = FALSE; // TRUE if the old and new name match case sensitive
+                            while (ii < Dirs->Count)
                             {
-                                if (!LessNameExt(*oldData, *newData2, FALSE)) // old == new (exact) - we prefer exact match over case insensitive match
+                                CFileData* newData2 = &Dirs->At(ii);
+                                if (!LessNameExt(*newData2, *oldData, FALSE)) // new >= old
                                 {
-                                    exactMatch = TRUE;
-                                    if (ii > i) // we skipped at least one item (it was smaller than the searched old item)
+                                    if (!LessNameExt(*oldData, *newData2, FALSE)) // old == new (exact) - we prefer exact match over case insensitive match
                                     {
-                                        if (focusFirstNewItem) // found a new item
+                                        exactMatch = TRUE;
+                                        if (ii > i) // we skipped at least one item (it was smaller than the searched old item)
                                         {
-                                            if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+                                            if (focusFirstNewItem) // found a new item
                                             {
                                                 strcpy(NextFocusName, newData->Name);
-                                                firstNewItemIsDir = 0 /* is file */;
+                                                firstNewItemIsDir = 1 /* is directory */;
+                                                focusFirstNewItem = FALSE;
                                             }
-                                            focusFirstNewItem = FALSE;
+                                            i = ii;
+                                            newData = newData2;
                                         }
-                                        i = ii;
-                                        newData = newData2;
                                     }
+                                    break; // in any case, we end the search for exact match
                                 }
-                                break; // in any case, we end the search for exact match
+                                ii++;
                             }
-                            ii++;
-                        }
 
-                        if (!caseSensitive || exactMatch)
-                        {
-                            // we transfer values from the old item to the new one
-                            if (oldData->Selected)
-                                SetSel(TRUE, newData);
-                            newData->CutToClip = oldData->CutToClip;
-                            newData->IconOverlayIndex = oldData->IconOverlayIndex;
+                            if (!caseSensitive || exactMatch)
+                            {
+                                // we transfer values from the old item to the new one
+                                if (oldData->Selected)
+                                    SetSel(TRUE, newData);
+                                newData->SizeValid = oldData->SizeValid;
+                                if (newData->SizeValid)
+                                    newData->Size = oldData->Size;
+                                newData->CutToClip = oldData->CutToClip;
+                                newData->IconOverlayIndex = oldData->IconOverlayIndex;
+                            }
+                            i++;
+                            break;
                         }
-                        i++;
-                        break;
                     }
-                }
-                else // new < old
-                {
-                    if (focusFirstNewItem) // found a new item
+                    else // new < old
                     {
-                        if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+                        if (focusFirstNewItem) // found a new item
                         {
                             strcpy(NextFocusName, newData->Name);
-                            firstNewItemIsDir = 0 /* is file */;
+                            firstNewItemIsDir = 1 /* is directory */;
+                            focusFirstNewItem = FALSE;
                         }
-                        focusFirstNewItem = FALSE;
                     }
+                    i++;
                 }
-                i++;
+                if (i >= Dirs->Count)
+                    break; // end of searching for selected items
             }
-            if (i >= Files->Count)
-                break; // end of searching for selected items
         }
-    }
-    if (focusFirstNewItem && i == Files->Count - 1) // found a new item
-    {
-        if (!Is(ptDisk) || (Files->At(i).Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) //  on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+        if (focusFirstNewItem && i == Dirs->Count - 1) // found a new item
         {
-            strcpy(NextFocusName, Files->At(i).Name);
-            firstNewItemIsDir = 0 /* is file */;
+            strcpy(NextFocusName, Dirs->At(i).Name);
+            firstNewItemIsDir = 1 /* is directory */;
+            focusFirstNewItem = FALSE;
         }
-        focusFirstNewItem = FALSE;
-    }
+
+        i = 0;
+        for (j = 0; j < oldFiles->Count; j++) // after directories also files
+        {
+            CFileData* oldData = &oldFiles->At(j);
+            if (focusFirstNewItem || oldData->Selected || oldData->CutToClip ||
+                oldData->IconOverlayIndex != ICONOVERLAYINDEX_NOTUSED)
+            {
+                while (i < Files->Count)
+                {
+                    CFileData* newData = &Files->At(i);
+                    if (!LessNameExtIgnCase(*newData, *oldData, FALSE)) // new >= old
+                    {
+                        if (LessNameExtIgnCase(*oldData, *newData, FALSE))
+                            break; // new > old -> new != old
+                        else       // new == old (ign. case)
+                        {
+                            // look for an exact match between otherwise identical names
+                            int ii = i;
+                            BOOL exactMatch = FALSE; // TRUE if the old and new name match case sensitive
+                            while (ii < Files->Count)
+                            {
+                                CFileData* newData2 = &Files->At(ii);
+                                if (!LessNameExt(*newData2, *oldData, FALSE)) // new >= old
+                                {
+                                    if (!LessNameExt(*oldData, *newData2, FALSE)) // old == new (exact) - we prefer exact match over case insensitive match
+                                    {
+                                        exactMatch = TRUE;
+                                        if (ii > i) // we skipped at least one item (it was smaller than the searched old item)
+                                        {
+                                            if (focusFirstNewItem) // found a new item
+                                            {
+                                                if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+                                                {
+                                                    strcpy(NextFocusName, newData->Name);
+                                                    firstNewItemIsDir = 0 /* is file */;
+                                                }
+                                                focusFirstNewItem = FALSE;
+                                            }
+                                            i = ii;
+                                            newData = newData2;
+                                        }
+                                    }
+                                    break; // in any case, we end the search for exact match
+                                }
+                                ii++;
+                            }
+
+                            if (!caseSensitive || exactMatch)
+                            {
+                                // we transfer values from the old item to the new one
+                                if (oldData->Selected)
+                                    SetSel(TRUE, newData);
+                                newData->CutToClip = oldData->CutToClip;
+                                newData->IconOverlayIndex = oldData->IconOverlayIndex;
+                            }
+                            i++;
+                            break;
+                        }
+                    }
+                    else // new < old
+                    {
+                        if (focusFirstNewItem) // found a new item
+                        {
+                            if (!Is(ptDisk) || (newData->Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) // on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+                            {
+                                strcpy(NextFocusName, newData->Name);
+                                firstNewItemIsDir = 0 /* is file */;
+                            }
+                            focusFirstNewItem = FALSE;
+                        }
+                    }
+                    i++;
+                }
+                if (i >= Files->Count)
+                    break; // end of searching for selected items
+            }
+        }
+        if (focusFirstNewItem && i == Files->Count - 1) // found a new item
+        {
+            if (!Is(ptDisk) || (Files->At(i).Attr & FILE_ATTRIBUTE_TEMPORARY) == 0) //  on disk, we ignore tmp files (they disappear immediately), see https://forum.altap.cz/viewtopic.php?t=2496
+            {
+                strcpy(NextFocusName, Files->At(i).Name);
+                firstNewItemIsDir = 0 /* is file */;
+            }
+            focusFirstNewItem = FALSE;
+        }
+
+    } // ordinary listings use the basename merge; Branch rows are restored below
 
     // return to the user-selected sorting
     if (changeSortType)
@@ -3227,8 +3120,8 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
     }
 
     // we find the index of the focus item
-    BOOL foundFocus = FALSE;
-    if (NextFocusName[0] != 0)
+    BOOL foundFocus = IsBranchView();
+    if (!IsBranchView() && NextFocusName[0] != 0)
     {
         MainWindow->CancelPanelsUI();       // cancel QuickSearch and QuickEdit
         int l = (int)strlen(NextFocusName); // trim trailing spaces
@@ -3374,9 +3267,45 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
             focusIndex = max(0, count - 1);
     }
 
+    if (IsBranchView())
+    {
+        SelectedCount = 0;
+        for (int bi = 0; bi < Files->Count; ++bi)
+        {
+            CFileData& file = Files->At(bi);
+            const char* identity = GetItemCacheKeyPtr(file);
+            auto saved = branchSelection.empty() ? branchSelection.end() : branchSelection.find(identity);
+            file.Selected = saved != branchSelection.end() && saved->second.Selected;
+            if (saved == branchSelection.end() && BranchView->RestoreState != NULL)
+            {
+                file.Selected = !branchRestoreSelected.empty() && branchRestoreSelected.find(identity) != branchRestoreSelected.end();
+            }
+            file.CutToClip = saved != branchSelection.end() && saved->second.Cut;
+            if (saved != branchSelection.end()) file.IconOverlayIndex = saved->second.Overlay;
+            if (file.Selected) ++SelectedCount;
+            if (identity == branchFocus)
+            {
+                focusIndex = Dirs->Count + bi;
+                BranchView->PendingFocus.clear();
+            }
+        }
+        if (BranchView->RestoreState != NULL)
+        {
+            topIndex = BranchView->RestoreState->TopIndex;
+            xOffset = BranchView->RestoreState->XOffset;
+            if (!BranchView->Status.Running)
+            {
+                BranchView->RestoreState.reset();
+                BranchView->RestoreSelected.clear();
+            }
+        }
+        focusIndex = (std::min)(focusIndex, (std::max)(0, Files->Count + Dirs->Count - 1));
+        NextFocusName[0] = 0;
+    }
     // release the backup of the old listing
     ReleaseListingBody(oldPanelType, oldArchiveDir, oldPluginFSDir, oldPluginData,
                        oldFiles, oldDirs, TRUE);
+    PruneBranchViewMetadata();
 
     // hide the cursor in quick-search mode before drawing
     if (QuickSearchMode)
@@ -3431,29 +3360,19 @@ void CFilesWindow::SetQuickSearchCaretPos()
     }
     else
         file = &Files->At(FocusedIndex - Dirs->Count);
-    char formatedFileName[MAX_PATH];
+    CPathBuffer formattedBuffer;
+    char* formatedFileName = formattedBuffer.Data();
     AlterFileName(formatedFileName, file->Name, -1,
                   Configuration.FileNameFormat, 0,
                   FocusedIndex < Dirs->Count);
 
-    int qsLen = (int)strlen(QuickSearch);
-    int preLen = isDir && !Configuration.SortDirsByExt ? file->NameLen : (int)(file->Ext - file->Name);
-    char* ss;
-    BOOL ext = FALSE;
-    int offset = 0;
-    if ((!isDir || Configuration.SortDirsByExt) && GetViewMode() == vmDetailed &&
-        IsExtensionInSeparateColumn() && file->Ext[0] != 0 && file->Ext > file->Name + 1 && // exception for names like ".htaccess", they are shown in the Name column even though they are extensions
-        qsLen >= preLen)
-    {
-        ss = formatedFileName + preLen;
-        qsLen -= preLen;
-        offset = Columns[0].Width + 4 - (3 + GetIconSize(ICONSIZE_16));
-        ext = TRUE;
-    }
-    else
-    {
-        ss = formatedFileName;
-    }
+    std::wstring name = FileDataNameToWide(*file);
+    const bool separateExtension = (!isDir || Configuration.SortDirsByExt) &&
+                                   GetViewMode() == vmDetailed && IsExtensionInSeparateColumn() && file->Ext[0] != 0;
+    Salamander::Panel::QuickSearchCaretTextRange range =
+        Salamander::Panel::GetQuickSearchCaretTextRange(name, QuickSearchW.length(), separateExtension);
+    BOOL ext = separateExtension && range.Start != 0;
+    int offset = ext ? Columns[0].Width + 4 - (3 + GetIconSize(ICONSIZE_16)) : 0;
 
     HDC hDC = ListBox->HPrivateDC;
     HFONT hOldFont;
@@ -3462,17 +3381,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
     else
         hOldFont = (HFONT)SelectObject(hDC, GetPanelFont());
 
-    if (UseWideQuickSearch())
-    {
-        if (QuickSearchW.empty())
-            QuickSearchW = QuickSearchTextToWide(QuickSearch);
-        std::wstring nameW = FileDataNameToWide(*file);
-        Salamander::Panel::QuickSearchCaretTextRange range =
-            Salamander::Panel::GetQuickSearchCaretTextRange(nameW, QuickSearchW.length(), ext != FALSE);
-        GetTextExtentPoint32W(hDC, QuickSearchW.c_str() + range.Start, (int)range.Length, &s);
-    }
-    else
-        GetTextExtentPoint32(hDC, ss, qsLen, &s);
+    GetTextExtentPoint32W(hDC, QuickSearchW.c_str() + range.Start, (int)range.Length, &s);
 
     RECT r;
     if (ListBox->GetItemRect(FocusedIndex, &r))

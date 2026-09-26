@@ -6,6 +6,8 @@
 
 #include "cfgdlg.h"
 #include "worker.h"
+#include "workerpath.h"
+#include "operationrecycle.h"
 #include "common/widepath.h"
 
 #include <Aclapi.h>
@@ -2833,17 +2835,15 @@ DWORD CompressFile(char* fileName, DWORD attrs)
 
     // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
-    const char* fileNameCrFile = fileName;
-    char fileNameCrFileCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
+    std::wstring fileNameCrFile = WorkerOperationPathW(fileName);
 
     BOOL attrsChange = FALSE;
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
     }
-    HANDLE file = HANDLES_Q(CreateFile(fileNameCrFile, FILE_READ_DATA | FILE_WRITE_DATA,
+    HANDLE file = HANDLES_Q(CreateFileW(fileNameCrFile.c_str(), FILE_READ_DATA | FILE_WRITE_DATA,
                                        FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS,
                                        NULL));
@@ -2859,7 +2859,7 @@ DWORD CompressFile(char* fileName, DWORD attrs)
         HANDLES(CloseHandle(file));
     }
     if (attrsChange)
-        SetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
     return ret;
 }
 
@@ -2871,18 +2871,16 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
 
     // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
-    const char* fileNameCrFile = fileName;
-    char fileNameCrFileCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
+    std::wstring fileNameCrFile = WorkerOperationPathW(fileName);
 
     BOOL attrsChange = FALSE;
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
     }
 
-    HANDLE file = HANDLES_Q(CreateFile(fileNameCrFile, FILE_READ_DATA | FILE_WRITE_DATA,
+    HANDLE file = HANDLES_Q(CreateFileW(fileNameCrFile.c_str(), FILE_READ_DATA | FILE_WRITE_DATA,
                                        FILE_SHARE_READ | FILE_SHARE_WRITE,
                                        NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS,
                                        NULL));
@@ -2898,7 +2896,7 @@ DWORD UncompressFile(char* fileName, DWORD attrs)
         HANDLES(CloseHandle(file));
     }
     if (attrsChange)
-        SetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
     return ret;
 }
 
@@ -2912,9 +2910,7 @@ DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalA
 
     // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
-    const char* fileNameCrFile = fileName;
-    char fileNameCrFileCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
+    std::wstring fileNameCrFile = WorkerOperationPathW(fileName);
 
     // if the file has the SYSTEM attribute, the EncryptFile API function reports "access denied"; handle it:
     if ((attrs & FILE_ATTRIBUTE_SYSTEM) && (finalAttrs & FILE_ATTRIBUTE_SYSTEM))
@@ -2960,12 +2956,12 @@ DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalA
     if (attrs & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY))
     {
         attrsChange = TRUE;
-        SetFileAttributes(fileNameCrFile, attrs & ~(FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY));
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~(FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY));
     }
     if (preserveDate)
     {
         HANDLE file;
-        file = HANDLES_Q(CreateFile(fileNameCrFile, GENERIC_READ,
+        file = HANDLES_Q(CreateFileW(fileNameCrFile.c_str(), GENERIC_READ,
                                     FILE_SHARE_READ | FILE_SHARE_WRITE,
                                     NULL, OPEN_EXISTING,
                                     (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0,
@@ -2976,10 +2972,10 @@ DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalA
             GetFileTime(file, &ftCreated, NULL /*&ftAccessed*/, &ftModified);
             HANDLES(CloseHandle(file));
 
-            if (!EncryptFile(fileNameCrFile))
+            if (!EncryptFileW(fileNameCrFile.c_str()))
                 retEnc = GetLastError();
 
-            file = HANDLES_Q(CreateFile(fileNameCrFile, GENERIC_WRITE,
+            file = HANDLES_Q(CreateFileW(fileNameCrFile.c_str(), GENERIC_WRITE,
                                         FILE_SHARE_READ | FILE_SHARE_WRITE,
                                         NULL, OPEN_EXISTING,
                                         (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0,
@@ -2995,11 +2991,11 @@ DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalA
     }
     else
     {
-        if (!EncryptFile(fileNameCrFile))
+        if (!EncryptFileW(fileNameCrFile.c_str()))
             retEnc = GetLastError();
     }
     if (attrsChange)
-        SetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
     return retEnc;
 }
 
@@ -3011,20 +3007,18 @@ DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
 
     // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
     // trims the spaces/dots and works with a different path
-    const char* fileNameCrFile = fileName;
-    char fileNameCrFileCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
+    std::wstring fileNameCrFile = WorkerOperationPathW(fileName);
 
     BOOL attrsChange = FALSE;
     if (attrs & FILE_ATTRIBUTE_READONLY)
     {
         attrsChange = TRUE;
-        SetFileAttributes(fileNameCrFile, attrs & ~FILE_ATTRIBUTE_READONLY);
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs & ~FILE_ATTRIBUTE_READONLY);
     }
     if (preserveDate)
     {
         HANDLE file;
-        file = HANDLES_Q(CreateFile(fileNameCrFile, GENERIC_READ,
+        file = HANDLES_Q(CreateFileW(fileNameCrFile.c_str(), GENERIC_READ,
                                     FILE_SHARE_READ | FILE_SHARE_WRITE,
                                     NULL, OPEN_EXISTING,
                                     (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0,
@@ -3035,10 +3029,10 @@ DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
             GetFileTime(file, &ftCreated, NULL /*&ftAccessed*/, &ftModified);
             HANDLES(CloseHandle(file));
 
-            if (!DecryptFile(fileNameCrFile, 0))
+            if (!DecryptFileW(fileNameCrFile.c_str(), 0))
                 ret = GetLastError();
 
-            file = HANDLES_Q(CreateFile(fileNameCrFile, GENERIC_WRITE,
+            file = HANDLES_Q(CreateFileW(fileNameCrFile.c_str(), GENERIC_WRITE,
                                         FILE_SHARE_READ | FILE_SHARE_WRITE,
                                         NULL, OPEN_EXISTING,
                                         (attrs & FILE_ATTRIBUTE_DIRECTORY) ? FILE_FLAG_BACKUP_SEMANTICS : 0,
@@ -3054,11 +3048,11 @@ DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate)
     }
     else
     {
-        if (!DecryptFile(fileNameCrFile, 0))
+        if (!DecryptFileW(fileNameCrFile.c_str(), 0))
             ret = GetLastError();
     }
     if (attrsChange)
-        SetFileAttributes(fileNameCrFile, attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
+        SetFileAttributesW(fileNameCrFile.c_str(), attrs); // revert to the original attributes (on error the attributes would remain nonsensically changed)
     return ret;
 }
 
@@ -3084,15 +3078,9 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
 
     if (DynNtQueryInformationFile != NULL) // "always true"
     {
-        // if the path ends with a space or dot, we must append '\\', otherwise CreateFile
-        // trims the spaces/dots and works with a different path
-        const char* fileNameCrFile = fileName;
-        char fileNameCrFileCopy[3 * MAX_PATH];
-        MakeCopyWithBackslashIfNeeded(fileNameCrFile, fileNameCrFileCopy);
-
-        HANDLE file = HANDLES_Q(CreateFile(fileNameCrFile, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                           NULL, OPEN_EXISTING,
-                                           isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL));
+        HANDLE file = HANDLES_Q(CreateFileW(WorkerOperationPathW(fileName, NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                              NULL, OPEN_EXISTING,
+                                              isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL));
         if (file == INVALID_HANDLE_VALUE)
         {
             if (winError != NULL)
@@ -3245,28 +3233,11 @@ BOOL DeleteAllADS(HANDLE file, const char* fileName)
         PFILE_STREAM_INFORMATION psi = (PFILE_STREAM_INFORMATION)buffer;
         if (ioStatus.Information > 0) // verify that we received any data at all
         {
-            WCHAR adsFullName[2 * MAX_PATH];
-            adsFullName[0] = 0;
-            WCHAR* adsPart = NULL;
-            int adsPartSize = 0;
+            const std::wstring baseName = WorkerOperationPathW(fileName);
             while (1)
             {
                 if (psi->NameLength != 7 * 2 || _memicmp(psi->Name, L"::$DATA", 7 * 2)) // ignore default stream
                 {
-                    if (adsFullName[0] == 0) // convert the file name only when needed for the first time to save CPU time
-                    {
-                        if (ConvertA2U(fileName, -1, adsFullName, 2 * MAX_PATH) == 0)
-                            return FALSE; // "always false"
-                        adsPart = adsFullName + wcslen(adsFullName);
-                        adsPartSize = (int)((adsFullName + 2 * MAX_PATH) - adsPart);
-                        if (adsPartSize > 0)
-                        {
-                            *adsPart++ = L':';
-                            adsPartSize--;
-                        }
-                        else
-                            return FALSE; // "always false"
-                    }
                     WCHAR* start = (WCHAR*)psi->Name;
                     WCHAR* nameEnd = (WCHAR*)((char*)psi->Name + psi->NameLength);
                     if (start < nameEnd && *start == L':')
@@ -3274,19 +3245,13 @@ BOOL DeleteAllADS(HANDLE file, const char* fileName)
                     WCHAR* end = start;
                     while (end < nameEnd && *end != L':')
                         end++;
-                    if (end - start >= adsPartSize)
-                    {
-                        TRACE_I("DeleteAllADS(" << fileName << "): too long ADS name!");
-                        return FALSE;
-                    }
                     if (end > start)
                     {
-                        memcpy(adsPart, start, (end - start) * sizeof(WCHAR));
-                        adsPart[end - start] = 0;
-                        if (!DeleteFileW(adsFullName))
+                        const std::wstring adsFullName = baseName + L":" + std::wstring(start, end);
+                        if (!DeleteFileW(adsFullName.c_str()))
                         {
                             DWORD err = GetLastError();
-                            TRACE_IW(L"DeleteAllADS(" << adsFullName << L"): DeleteFile has failed: " << GetErrorTextW(err));
+                            TRACE_IW(L"DeleteAllADS(" << adsFullName.c_str() << L"): DeleteFile has failed: " << GetErrorTextW(err));
                             return FALSE;
                         }
                     }
@@ -3544,22 +3509,10 @@ COPY_ADS_AGAIN:
                           &lowMemory, &adsWinError, 0, NULL, NULL) &&
         !lowMemory && streamNames != NULL)
     {                                  // we have the list of ADS, let's try to copy them to the target file/directory
-        wchar_t srcName[2 * MAX_PATH]; // MAX_PATH for the file name as well as the ADS name (no idea what the actual maximum lengths are)
-        wchar_t tgtName[2 * MAX_PATH];
-        char longSourceName[MAX_PATH + 100];
-        char longTargetName[MAX_PATH + 100];
-        DoLongName(longSourceName, sourceName, MAX_PATH + 100);
-        DoLongName(longTargetName, targetName, MAX_PATH + 100);
-        if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longSourceName, -1, srcName, 2 * MAX_PATH))
-            srcName[0] = 0;
-        if (!MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, longTargetName, -1, tgtName, 2 * MAX_PATH))
-            tgtName[0] = 0;
-        wchar_t* srcEnd = srcName + lstrlenW(srcName);
-        if (srcEnd > srcName && *(srcEnd - 1) == L'\\')
-            *--srcEnd = 0;
-        wchar_t* tgtEnd = tgtName + lstrlenW(tgtName);
-        if (tgtEnd > tgtName && *(tgtEnd - 1) == L'\\')
-            *--tgtEnd = 0;
+        std::wstring sourceBase = WorkerOperationPathW(sourceName);
+        std::wstring targetBase = WorkerOperationPathW(targetName);
+        if (!sourceBase.empty() && sourceBase.back() == L'\\') sourceBase.pop_back();
+        if (!targetBase.empty() && targetBase.back() == L'\\') targetBase.pop_back();
 
         int bufferSize = script->RemovableSrcDisk || script->RemovableTgtDisk ? REMOVABLE_DISK_COPY_BUFFER : OPERATION_BUFFER;
 
@@ -3569,8 +3522,10 @@ COPY_ADS_AGAIN:
         int i;
         for (i = 0; i < streamNamesCount; i++)
         {
-            MyStrCpyNW(srcEnd, streamNames[i], (int)(2 * MAX_PATH - (srcEnd - srcName)));
-            MyStrCpyNW(tgtEnd, streamNames[i], (int)(2 * MAX_PATH - (tgtEnd - tgtName)));
+            const std::wstring sourceStream = sourceBase + streamNames[i];
+            const std::wstring targetStream = targetBase + streamNames[i];
+            const wchar_t* srcName = sourceStream.c_str();
+            const wchar_t* tgtName = targetStream.c_str();
 
         COPY_AGAIN_ADS:
 
@@ -4118,21 +4073,21 @@ COPY_ADS_AGAIN:
 HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                        DWORD shareMode, DWORD flagsAndAttributes, BOOL* encryptionNotSupported)
 {
-    HANDLE out = NOHANDLES(CreateFile(fileName, desiredAccess, shareMode, NULL,
+    HANDLE out = NOHANDLES(WorkerOpenFile(fileName, NULL, desiredAccess, shareMode, NULL,
                                       CREATE_NEW, flagsAndAttributes, NULL));
     if (out == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
         if (encryptionNotSupported != NULL && (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
         { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
-            out = NOHANDLES(CreateFile(fileName, desiredAccess, shareMode, NULL,
+            out = NOHANDLES(WorkerOpenFile(fileName, NULL, desiredAccess, shareMode, NULL,
                                        CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL));
             if (out != INVALID_HANDLE_VALUE)
             {
                 *encryptionNotSupported = TRUE;
                 NOHANDLES(CloseHandle(out));
                 out = INVALID_HANDLE_VALUE;
-                if (!DeleteFile(fileName)) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                if (!DeleteFileW(WorkerOperationPathW(fileName).c_str())) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
                     TRACE_I("Unable to delete testing target file: " << fileName);
             }
         }
@@ -4177,19 +4132,19 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                             }
                             if (tmpName[0] != 0) // if we successfully "tidied" the conflicting file, try creating
                             {                    // the target file again, then restore the original name
-                                out = NOHANDLES(CreateFile(fileName, desiredAccess, shareMode, NULL,
+                                out = NOHANDLES(WorkerOpenFile(fileName, NULL, desiredAccess, shareMode, NULL,
                                                            CREATE_NEW, flagsAndAttributes, NULL));
                                 if (out == INVALID_HANDLE_VALUE && encryptionNotSupported != NULL &&
                                     (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
                                 { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
-                                    out = NOHANDLES(CreateFile(fileName, desiredAccess, shareMode, NULL,
+                                    out = NOHANDLES(WorkerOpenFile(fileName, NULL, desiredAccess, shareMode, NULL,
                                                                CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL));
                                     if (out != INVALID_HANDLE_VALUE)
                                     {
                                         *encryptionNotSupported = TRUE;
                                         NOHANDLES(CloseHandle(out));
                                         out = INVALID_HANDLE_VALUE;
-                                        if (!DeleteFile(fileName)) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                                        if (!DeleteFileW(WorkerOperationPathW(fileName).c_str())) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
                                             TRACE_E("Unable to delete testing target file: " << fileName);
                                     }
                                 }
@@ -4201,7 +4156,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                                     {
                                         NOHANDLES(CloseHandle(out));
                                         out = INVALID_HANDLE_VALUE;
-                                        DeleteFile(fileName);
+                                        DeleteFileW(WorkerOperationPathW(fileName).c_str());
                                         if (!SalMoveFile(tmpName, origFullName))
                                             TRACE_E("Fatal unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
                                     }
@@ -4256,10 +4211,11 @@ BOOL SyncOrAsyncDeviceIoControl(CAsyncCopyParams* asyncPar, HANDLE hDevice, DWOR
 void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOOL openAlsoForRead,
                                   BOOL* encryptionNotSupported, CAsyncCopyParams* asyncPar)
 {
+    const std::wstring nameW = WorkerOperationPathW(name);
     if (*out != INVALID_HANDLE_VALUE)
     {
         DWORD err = NO_ERROR;
-        DWORD curAttr = SalGetFileAttributes(name);
+        DWORD curAttr = GetFileAttributesW(nameW.c_str());
         if ((curAttr == INVALID_FILE_ATTRIBUTES ||
              (attr & FILE_ATTRIBUTE_COMPRESSED) != (curAttr & FILE_ATTRIBUTE_COMPRESSED)) &&
             (attr & FILE_ATTRIBUTE_COMPRESSED) == 0)
@@ -4279,7 +4235,7 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
             HANDLES(CloseHandle(*out)); // close the file; otherwise we cannot change its encrypted attribute
             if (attr & FILE_ATTRIBUTE_ENCRYPTED)
             {
-                if (!EncryptFile(name))
+                if (!EncryptFileW(nameW.c_str()))
                 {
                     err = GetLastError();
                     if (encryptionNotSupported != NULL)
@@ -4288,23 +4244,23 @@ void SetCompressAndEncryptedAttrs(const char* name, DWORD attr, HANDLE* out, BOO
             }
             else
             {
-                if (!DecryptFile(name, 0))
+                if (!DecryptFileW(nameW.c_str(), 0))
                     err = GetLastError();
             }
             if (err != NO_ERROR)
                 TRACE_I("SetCompressAndEncryptedAttrs(): Unable to set Encrypted attribute for " << name << "! error=" << GetErrorText(err));
             // reopen the existing file to continue writing
-            *out = HANDLES_Q(CreateFile(name, GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
+            *out = HANDLES_Q(CreateFileW(WorkerOperationPathW(name, nameW.c_str()).c_str(), GENERIC_WRITE | (openAlsoForRead ? GENERIC_READ : 0), 0, NULL, OPEN_ALWAYS,
                                         asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
             if (openAlsoForRead && *out == INVALID_HANDLE_VALUE) // problem: reopening failed, try write-only
             {
-                *out = HANDLES_Q(CreateFile(name, GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
+                *out = HANDLES_Q(CreateFileW(WorkerOperationPathW(name, nameW.c_str()).c_str(), GENERIC_WRITE, 0, NULL, OPEN_ALWAYS,
                                             asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
             }
             if (*out == INVALID_HANDLE_VALUE) // still a problem: cannot reopen; delete it + report an error
             {
                 err = GetLastError();
-                DeleteFile(name);
+                DeleteFileW(nameW.c_str());
                 SetLastError(err);
             }
         }
@@ -4424,7 +4380,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                             SetEndOfFile(out);     // otherwise on a floppy the remaining bytes would be written
                         HANDLES(CloseHandle(out)); // close the invalid handle
                     }
-                    out = HANDLES_Q(CreateFile(op->TargetName, GENERIC_WRITE | GENERIC_READ, 0, NULL,
+                    out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), GENERIC_WRITE | GENERIC_READ, 0, NULL,
                                                OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                     if (out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                     {
@@ -4438,7 +4394,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                         { // restart the whole operation
                             HANDLES(CloseHandle(in));
                             HANDLES(CloseHandle(out));
-                            DeleteFile(op->TargetName);
+                            DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                             copyAgain = TRUE; // goto COPY_AGAIN;
                             return;
                         }
@@ -4529,7 +4485,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
                 if (in != NULL)
                     HANDLES(CloseHandle(in)); // close the invalid handle
-                in = HANDLES_Q(CreateFile(op->SourceName, GENERIC_READ,
+                in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                           OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                 if (in != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
@@ -4544,7 +4500,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                         if (wholeFileAllocated)
                             SetEndOfFile(out); // otherwise on a floppy the remaining bytes would be written
                         HANDLES(CloseHandle(out));
-                        DeleteFile(op->TargetName);
+                        DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                         copyAgain = TRUE; // goto COPY_AGAIN;
                         return;
                     }
@@ -4617,8 +4573,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
                 HANDLES(CloseHandle(out));
                 out = NULL;
-                ClearReadOnlyAttr(op->TargetName); // if it somehow became read-only (should never happen), so we know how to handle it
-                if (DeleteFile(op->TargetName))
+                WorkerClearReadOnlyW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL)); // if it somehow became read-only (should never happen), so we know how to handle it
+                if (DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()))
                 {
                     HANDLES(CloseHandle(in));
                     copyAgain = TRUE; // goto COPY_AGAIN;
@@ -5017,7 +4973,7 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
 {
     if (*In != NULL)
         HANDLES(CloseHandle(*In)); // close the invalid handle
-    *In = HANDLES_Q(CreateFile(Op->SourceName, GENERIC_READ,
+    *In = HANDLES_Q(CreateFileW(WorkerOperationPathW(Op->SourceName, Op->SourceNameWValid ? Op->SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                OPEN_EXISTING, AsyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (*In != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
@@ -5051,7 +5007,7 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
         if (WholeFileAllocated)
             SetEndOfFile(*Out); // otherwise on a floppy the remaining bytes would be written
         HANDLES(CloseHandle(*Out));
-        DeleteFile(Op->TargetName);
+        DeleteFileW(WorkerOperationPathW(Op->TargetName, Op->TargetNameWValid ? Op->TargetNameW.c_str() : NULL).c_str());
         *copyAgain = TRUE; // goto COPY_AGAIN;
         return FALSE;
     }
@@ -5148,7 +5104,7 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
             SetEndOfFile(*Out);     // otherwise on a floppy the remaining bytes would be written
         HANDLES(CloseHandle(*Out)); // close the invalid handle
     }
-    *Out = HANDLES_Q(CreateFile(Op->TargetName, GENERIC_WRITE | GENERIC_READ, 0, NULL,
+    *Out = HANDLES_Q(CreateFileW(WorkerOperationPathW(Op->TargetName, Op->TargetNameWValid ? Op->TargetNameW.c_str() : NULL).c_str(), GENERIC_WRITE | GENERIC_READ, 0, NULL,
                                 OPEN_ALWAYS, AsyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (*Out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
     {
@@ -5176,7 +5132,7 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
         {
             HANDLES(CloseHandle(*In));
             HANDLES(CloseHandle(*Out));
-            DeleteFile(Op->TargetName);
+            DeleteFileW(WorkerOperationPathW(Op->TargetName, Op->TargetNameWValid ? Op->TargetNameW.c_str() : NULL).c_str());
             *copyAgain = TRUE; // goto COPY_AGAIN;
             return FALSE;
         }
@@ -5593,8 +5549,8 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
                 {
                     HANDLES(CloseHandle(out));
                     out = NULL;
-                    ClearReadOnlyAttr(op->TargetName); // in case it was created as read-only (should never happen) so we can handle it
-                    if (DeleteFile(op->TargetName))
+                    WorkerClearReadOnlyW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL)); // in case it was created as read-only (should never happen) so we can handle it
+                    if (DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()))
                     {
                         HANDLES(CloseHandle(in));
                         copyAgain = TRUE; // goto COPY_AGAIN;
@@ -5741,12 +5697,8 @@ COPY_AGAIN:
     {
         if (!invalidSrcName && !asyncPar->Failed())
         {
-            in = op->SourceNameWValid ?
-                     HANDLES_Q(CreateFileW(op->SourceNameW.c_str(), GENERIC_READ,
-                                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                           OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL)) :
-                     HANDLES_Q(CreateFile(op->SourceName, GENERIC_READ,
-                                          FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+            in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(),
+                                          GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                           OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         }
         else
@@ -5800,7 +5752,7 @@ COPY_AGAIN:
                     if (out != INVALID_HANDLE_VALUE && (fileAttrs & FILE_ATTRIBUTE_ENCRYPTED))
                     { // verify that the Encrypted attribute is really set (on FAT it is simply ignored, the system does not return an error (for CreateFile specifically))
                         DWORD attrs;
-                        attrs = SalGetFileAttributes(op->TargetName);
+                        attrs = GetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                         if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_ENCRYPTED) == 0)
                         { // unable to apply the Encrypted attribute, ask the user what to do...
                             if (dlgData.FileOutLossEncrAll)
@@ -5837,7 +5789,7 @@ COPY_AGAIN:
                                 SKIP_ENCNOTSUP:
 
                                     HANDLES(CloseHandle(out));
-                                    DeleteFile(op->TargetName);
+                                    DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                                     goto SKIP_OPEN_OUT;
                                 }
 
@@ -5846,7 +5798,7 @@ COPY_AGAIN:
                                 CANCEL_ENCNOTSUP:
 
                                     HANDLES(CloseHandle(out));
-                                    DeleteFile(op->TargetName);
+                                    DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                                     goto CANCEL_OPEN2;
                                 }
                                 }
@@ -5904,8 +5856,8 @@ COPY_AGAIN:
 
                             HANDLES(CloseHandle(out));
                             out = INVALID_HANDLE_VALUE;
-                            ClearReadOnlyAttr(op->TargetName); // in case it was created as read-only (should never happen) so we can handle it
-                            if (DeleteFile(op->TargetName))
+                            WorkerClearReadOnlyW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL)); // in case it was created as read-only (should never happen) so we can handle it
+                            if (DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()))
                             {
                                 skipAllocWholeFileOnStart = TRUE;
                                 goto OPEN_TGT_FILE;
@@ -5947,7 +5899,7 @@ COPY_AGAIN:
                                 SetEndOfFile(out); // otherwise on a floppy the remaining part of the file would be written
                             HANDLES(CloseHandle(out));
                         }
-                        DeleteFile(op->TargetName);
+                        DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                         return FALSE;
                     }
                     if (skipCopy)
@@ -5965,7 +5917,7 @@ COPY_AGAIN:
                                 SetEndOfFile(out); // otherwise on a floppy the remaining part of the file would be written
                             HANDLES(CloseHandle(out));
                         }
-                        DeleteFile(op->TargetName);
+                        DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                         SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
                         if (skip != NULL)
                             *skip = TRUE;
@@ -6078,7 +6030,7 @@ COPY_AGAIN:
                     DWORD attr = op->Attr & clearReadonlyMask;
                     if (copyADS) // copy ADS streams if needed
                     {
-                        SetFileAttributes(op->TargetName, FILE_ATTRIBUTE_ARCHIVE); // probably unnecessary, it hardly slows copying; reason: the file must not be read-only to work with it
+                        SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), FILE_ATTRIBUTE_ARCHIVE); // probably unnecessary, it hardly slows copying; reason: the file must not be read-only to work with it
                         CQuadWord operDone = operationDone;                        // the file is already copied
                         if (operDone < COPY_MIN_FILE_SIZE)
                             operDone = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
@@ -6090,7 +6042,7 @@ COPY_AGAIN:
                             if (out != NULL)
                                 HANDLES(CloseHandle(out));
                             out = NULL;
-                            if (DeleteFile(op->TargetName) == 0)
+                            if (DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()) == 0)
                             {
                                 DWORD err = GetLastError();
                                 TRACE_E("DoCopyFile(): Unable to remove newly created file: " << op->TargetName << ", error: " << GetErrorText(err));
@@ -6177,7 +6129,7 @@ COPY_AGAIN:
                             {
                             case IDRETRY:
                             {
-                                if (DeleteFile(op->TargetName) == 0)
+                                if (DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()) == 0)
                                 {
                                     DWORD err2 = GetLastError();
                                     TRACE_E("DoCopyFile(): Unable to remove newly created file: " << op->TargetName << ", error: " << GetErrorText(err2));
@@ -6195,13 +6147,13 @@ COPY_AGAIN:
                             }
                         }
 
-                        SetFileAttributes(op->TargetName, script->CopyAttrs ? attr : (attr | FILE_ATTRIBUTE_ARCHIVE));
+                        SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), script->CopyAttrs ? attr : (attr | FILE_ATTRIBUTE_ARCHIVE));
                     }
 
                     if (script->CopyAttrs) // verify whether the source file attributes were preserved
                     {
                         DWORD curAttrs;
-                        curAttrs = SalGetFileAttributes(op->TargetName);
+                        curAttrs = GetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                         if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (attr & DISPLAYED_ATTRIBUTES))
                         {                                                              // attributes probably were not preserved, warn the user
                             WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
@@ -6232,8 +6184,8 @@ COPY_AGAIN:
                             {
                             COPY_ERROR_2:
 
-                                ClearReadOnlyAttr(op->TargetName); // the file must not be read-only if it is to be deleted
-                                DeleteFile(op->TargetName);
+                                WorkerClearReadOnlyW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL)); // the file must not be read-only if it is to be deleted
+                                DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                                 return FALSE;
                             }
                             }
@@ -6351,7 +6303,7 @@ COPY_AGAIN:
                                 GetFileOverwriteInfo(sAttr, _countof(sAttr), in, op->SourceName, &sFileTime, &getTimeFailed);
                                 HANDLES(CloseHandle(in));
                                 in = NULL;
-                                out = HANDLES_Q(CreateFile(op->TargetName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                            OPEN_EXISTING, 0, NULL));
                                 if (out != INVALID_HANDLE_VALUE)
                                 {
@@ -6404,7 +6356,7 @@ COPY_AGAIN:
                                 case IDYES:
                                 default: // for safety (to prevent exiting this block with the 'in' handle closed)
                                 {
-                                    in = HANDLES_Q(CreateFile(op->SourceName, GENERIC_READ,
+                                    in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                                               FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                               OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                     if (in == INVALID_HANDLE_VALUE)
@@ -6436,7 +6388,7 @@ COPY_AGAIN:
                                 }
                             }
 
-                            DWORD attr = SalGetFileAttributes(op->TargetName);
+                            DWORD attr = GetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                             if (dlgData.ConflictDecisionInjected && dlgData.InjectedConflictType == cmctFileExists &&
                                 dlgData.InjectedTargetIdentityValid)
                             {
@@ -6481,12 +6433,12 @@ COPY_AGAIN:
                                     case IDYES:
                                     default: // for safety (to prevent exiting this block with the 'in' handle closed)
                                     {
-                                        in = HANDLES_Q(CreateFile(op->SourceName, GENERIC_READ,
+                                        in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                                                   FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                                   OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                         if (in == INVALID_HANDLE_VALUE)
                                             goto OPEN_IN_ERROR;
-                                        attr = SalGetFileAttributes(op->TargetName); // refresh attributes in case the user changed them
+                                        attr = GetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()); // refresh attributes in case the user changed them
                                         break;
                                     }
 
@@ -6511,7 +6463,7 @@ COPY_AGAIN:
                                         dlgData.ConflictTargetChanged = TRUE;
                                         return TRUE;
                                     }
-                                    BOOL chAttr = ClearReadOnlyAttr(op->TargetName, attr);
+                                    BOOL chAttr = WorkerClearReadOnlyW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL), attr);
 
                                     if (!tgtNameCaseCorrected)
                                     {
@@ -6519,13 +6471,13 @@ COPY_AGAIN:
                                         tgtNameCaseCorrected = TRUE;
                                     }
 
-                                    if (DeleteFile(op->TargetName))
+                                    if (DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()))
                                         goto OPEN_TGT_FILE; // if it is read-only (clearing the attribute may have failed), it can be deleted only on Samba with "delete readonly" enabled
                                     else                    // cannot delete either, end with an error...
                                     {
                                         err = GetLastError();
                                         if (chAttr)
-                                            SetFileAttributes(op->TargetName, attr);
+                                            SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), attr);
                                         errDeletingFile = TRUE;
                                         goto NORMAL_ERROR;
                                     }
@@ -6536,7 +6488,7 @@ COPY_AGAIN:
                                     CQuadWord origFileSize(0, 0); // file size before truncation
                                     if (mustDeleteFileBeforeOverwrite == 0 /* need test */)
                                     {
-                                        out = HANDLES_Q(CreateFile(op->TargetName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                        out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                                    OPEN_EXISTING, 0, NULL));
                                         if (out != INVALID_HANDLE_VALUE)
                                         {
@@ -6558,7 +6510,7 @@ COPY_AGAIN:
                                             return TRUE;
                                         }
                                         chAttr = TRUE;
-                                        SetFileAttributes(op->TargetName, 0);
+                                        SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), 0);
                                     }
                                     // GENERIC_READ for 'out' slows asynchronous copying from disk to network (measured 95 MB/s instead of 111 MB/s on Win7 x64 GLAN)
                                     DWORD access = GENERIC_WRITE | (script->CopyAttrs ? GENERIC_READ : 0);
@@ -6570,7 +6522,7 @@ COPY_AGAIN:
                                         dlgData.ConflictTargetChanged = TRUE;
                                         return TRUE;
                                     }
-                                    out = HANDLES_Q(CreateFile(op->TargetName, access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL));
+                                    out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL));
                                     if (out == INVALID_HANDLE_VALUE && fileAttrs != (asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN))
                                     {
                                         if (!ValidateInjectedTargetIdentity(op, dlgData))
@@ -6579,7 +6531,7 @@ COPY_AGAIN:
                                             return TRUE;
                                         }
                                         // The target disk may reject creation with the requested encryption attributes.
-                                        out = HANDLES_Q(CreateFile(op->TargetName, access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                        out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                     }
                                     if (script->CopyAttrs && out == INVALID_HANDLE_VALUE)
                                     { // if read access to the directory is denied (we added it only for setting the Compressed attribute), try opening the file for write only
@@ -6589,7 +6541,7 @@ COPY_AGAIN:
                                             dlgData.ConflictTargetChanged = TRUE;
                                             return TRUE;
                                         }
-                                        out = HANDLES_Q(CreateFile(op->TargetName, access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL));
+                                        out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, CREATE_ALWAYS, fileAttrs, NULL));
                                         if (out == INVALID_HANDLE_VALUE && fileAttrs != (asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN))
                                         {
                                             if (!ValidateInjectedTargetIdentity(op, dlgData))
@@ -6598,7 +6550,7 @@ COPY_AGAIN:
                                                 return TRUE;
                                             }
                                             // Retry without optional creation attributes, still against the authorized identity.
-                                            out = HANDLES_Q(CreateFile(op->TargetName, access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                            out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, CREATE_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                         }
                                     }
                                     if (out == INVALID_HANDLE_VALUE) // target file cannot be opened for writing, so delete it and create it again
@@ -6617,7 +6569,7 @@ COPY_AGAIN:
                                                 dlgData.ConflictTargetChanged = TRUE;
                                                 return TRUE;
                                             }
-                                            SetFileAttributes(op->TargetName, attr);
+                                            SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), attr);
                                         }
                                         targetCannotOpenForWrite = TRUE;
                                         continue;
@@ -6635,7 +6587,7 @@ COPY_AGAIN:
                                                 dlgData.ConflictTargetChanged = TRUE;
                                                 return TRUE;
                                             }
-                                            SetFileAttributes(op->TargetName, attr);
+                                            SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), attr);
                                         }
                                         targetCannotOpenForWrite = TRUE;
                                         continue;
@@ -6645,7 +6597,7 @@ COPY_AGAIN:
                                     if (mustDeleteFileBeforeOverwrite == 0 /* need test */)
                                     {
                                         HANDLES(CloseHandle(out));
-                                        out = HANDLES_Q(CreateFile(op->TargetName, access, 0, NULL, OPEN_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                        out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), access, 0, NULL, OPEN_ALWAYS, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                                         if (out == INVALID_HANDLE_VALUE) // cannot reopen the target file we just opened, unlikely, try deleting and recreating it
                                         {
                                             targetCannotOpenForWrite = TRUE;
@@ -7094,7 +7046,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                                 {                    // then restore the original name of the "tidied" file/directory
                                     BOOL moveDone = SalMoveFile(sourceNameMvDir, op->TargetName);
                                     if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // the Archive attribute was not set; MoveFile turned it on, clear it again
-                                        SetFileAttributes(op->TargetName, op->Attr);                   // leave without handling or retry, not important (it normally toggles chaotically)
+                                        SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), op->Attr);                   // leave without handling or retry, not important (it normally toggles chaotically)
                                     if (!SalMoveFile(tmpName, origFullName))
                                     { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of op->TargetName (the DOS name)
                                         TRACE_I("DoMoveFile(): Unexpected situation: unable to rename file/dir from tmp-name to original long file name! " << origFullName);
@@ -7128,14 +7080,14 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     sourceNameMvDir == op->SourceName && targetNameMvDir == op->TargetName) // no invalid names allowed here (files only, and their names are validated)
                 {
                     HANDLE in, out;
-                    in = HANDLES_Q(CreateFile(op->SourceName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                    in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                     if (in == INVALID_HANDLE_VALUE)
                     {
                         err = GetLastError();
                         goto NORMAL_ERROR;
                     }
-                    out = HANDLES_Q(CreateFile(op->TargetName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                    out = HANDLES_Q(CreateFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                     if (out == INVALID_HANDLE_VALUE)
                     {
@@ -7236,7 +7188,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                         HANDLES(CloseHandle(out));
                     }
 
-                    DWORD attr = SalGetFileAttributes(op->TargetName);
+                    DWORD attr = GetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
                     if (attr != INVALID_FILE_ATTRIBUTES && (attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
                     {
                         if (!dlgData.OverwriteHiddenAll && dlgData.CnfrmSHFileOver) // ignore script->OverwriteOlder here; user wants to see that this is a SYSTEM or HIDDEN file even with the option enabled
@@ -7273,7 +7225,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             case IDCANCEL:
                                 goto CANCEL_OPEN;
                             }
-                            attr = SalGetFileAttributes(op->TargetName); // may also fail (returns INVALID_FILE_ATTRIBUTES)
+                            attr = GetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()); // may also fail (returns INVALID_FILE_ATTRIBUTES)
                         }
                     }
 
@@ -7282,7 +7234,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                         dlgData.ConflictTargetChanged = TRUE;
                         return TRUE;
                     }
-                    ClearReadOnlyAttr(op->TargetName, attr); // make sure it can be deleted ...
+                    WorkerClearReadOnlyW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL), attr); // make sure it can be deleted ...
                     while (1)
                     {
                         if (!ValidateInjectedTargetIdentity(op, dlgData))
@@ -7290,7 +7242,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             dlgData.ConflictTargetChanged = TRUE;
                             return TRUE;
                         }
-                        if (DeleteFile(op->TargetName))
+                        if (DeleteFileW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str()))
                             break;
                         else
                         {
@@ -7404,10 +7356,10 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                                    dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar);
         if (notError && !skip) // still need to clean up the file from the source
         {
-            ClearReadOnlyAttr(op->SourceName); // ensure it can be deleted
+            WorkerClearReadOnlyW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL)); // ensure it can be deleted
             while (1)
             {
-                if (DeleteFile(op->SourceName))
+                if (DeleteFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str()))
                     break;
                 {
                     DWORD err = GetLastError();
@@ -7445,12 +7397,13 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
 }
 
 BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
-                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData)
+                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData, const wchar_t* exactName)
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
     BOOL invalidName = FileNameIsInvalid(name, TRUE);
 
+    std::wstring nameW = WorkerOperationPathW(name, exactName);
     DWORD err;
     while (1)
     {
@@ -7491,7 +7444,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
                     }
                 }
             }
-            ClearReadOnlyAttr(name, attr); // ensure it can be deleted
+            WorkerClearReadOnlyW(nameW, attr); // ensure it can be deleted
 
             err = ERROR_SUCCESS;
             BOOL useRecycleBin;
@@ -7536,32 +7489,13 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             if (useRecycleBin)
             {
-                char nameList[MAX_PATH + 1];
-                int l = (int)strlen(name) + 1;
-                memmove(nameList, name, l);
-                nameList[l] = 0;
-                if (!PathContainsValidComponents(nameList, FALSE))
-                {
-                    err = ERROR_INVALID_NAME;
-                }
-                else
-                {
-                    CShellExecuteWnd shellExecuteWnd;
-                    SHFILEOPSTRUCT opCode;
-                    memset(&opCode, 0, sizeof(opCode));
-
-                    opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
-
-                    opCode.wFunc = FO_DELETE;
-                    opCode.pFrom = nameList;
-                    opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                    opCode.lpszProgressTitle = "";
-                    err = SHFileOperation(&opCode);
-                }
+                CShellExecuteWnd shellExecuteWnd;
+                const HWND owner = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
+                err = RecycleOperationFileW(owner, WorkerOperationPathW(name, exactName));
             }
             else
             {
-                if (DeleteFile(name) == 0)
+                if (DeleteFileW(nameW.c_str()) == 0)
                     err = GetLastError();
             }
         }
@@ -7614,7 +7548,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
         }
         if (!invalidName)
         {
-            DWORD attr2 = SalGetFileAttributes(name); // get the current attribute state
+            DWORD attr2 = GetFileAttributesW(nameW.c_str()); // get the current attribute state
             if (attr2 != INVALID_FILE_ATTRIBUTES)
                 attr = attr2;
         }
@@ -7623,99 +7557,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
 
 BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
 {
-    if (err != NULL)
-        *err = 0;
-    // if the name ends with a space/dot we must append '\\', otherwise CreateDirectory
-    // quietly trims the trailing spaces/dots and creates a different directory
-    const char* nameCrDir = name;
-    char nameCrDirBuf[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(nameCrDir, nameCrDirBuf);
-
-    std::wstring nameCrDirW;
-    if (nameCrDir != NULL && strlen(nameCrDir) >= MAX_PATH)
-    {
-        nameCrDirW = SalMultiByteToWidePath(nameCrDir, CP_UTF8);
-        if (nameCrDirW.empty() && GetACP() != CP_UTF8)
-            nameCrDirW = SalMultiByteToWidePath(nameCrDir, CP_ACP);
-        if (!nameCrDirW.empty())
-            nameCrDirW = SalPathAddExtendedPrefixW(nameCrDirW.c_str());
-    }
-
-    if (!nameCrDirW.empty() ? CreateDirectoryW(nameCrDirW.c_str(), NULL) : CreateDirectory(nameCrDir, NULL))
-        return TRUE;
-    else
-    {
-        DWORD errLoc = GetLastError();
-        if (name == nameCrDir &&            // a name ending with a space/dot cannot collide with a DOS name
-            (errLoc == ERROR_FILE_EXISTS || // check whether this is only overwriting the file's DOS name
-             errLoc == ERROR_ALREADY_EXISTS))
-        {
-            WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
-            if (find != INVALID_HANDLE_VALUE)
-            {
-                HANDLES(FindClose(find));
-                const char* tgtName = SalPathFindFileName(name);
-                if (StrICmp(tgtName, data.cAlternateFileName) == 0 && // match only for the DOS name
-                    StrICmp(tgtName, data.cFileName) != 0)            // (the full name differs)
-                {
-                    // rename ("tidy up") the file/directory whose DOS name conflicts to a temporary 8.3 name (no extra DOS name needed)
-                    char tmpName[MAX_PATH + 20];
-                    lstrcpyn(tmpName, name, MAX_PATH);
-                    CutDirectory(tmpName);
-                    SalPathAddBackslash(tmpName, MAX_PATH + 20);
-                    char* tmpNamePart = tmpName + strlen(tmpName);
-                    char origFullName[MAX_PATH];
-                    if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
-                    {
-                        strcpy(origFullName, tmpName);
-                        DWORD num = (GetTickCount() / 10) % 0xFFF;
-                        DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
-                        while (1)
-                        {
-                            sprintf(tmpNamePart, "sal%03X", num++);
-                            if (SalMoveFile(origFullName, tmpName))
-                                break;
-                            DWORD e = GetLastError();
-                            if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
-                            {
-                                tmpName[0] = 0;
-                                break;
-                            }
-                        }
-                        if (tmpName[0] != 0) // if we managed to "tidy up" the conflicting file, retry the move
-                        {                    // and then restore the original name of the "tidied" file
-                            BOOL createDirDone = CreateDirectory(name, NULL);
-                            if (!SalMoveFile(tmpName, origFullName))
-                            { // this can apparently happen: inexplicably Windows creates a file named origFullName instead of name (the DOS name)
-                                TRACE_I("Unexpected situation: unable to rename file from tmp-name to original long file name! " << origFullName);
-                                if (createDirDone)
-                                {
-                                    if (RemoveDirectory(name))
-                                        createDirDone = FALSE;
-                                    if (!SalMoveFile(tmpName, origFullName))
-                                        TRACE_E("Fatal unexpected situation: unable to rename file from tmp-name to original long file name! " << origFullName);
-                                }
-                            }
-                            else
-                            {
-                                if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                    SetFileAttributes(origFullName, origFullNameAttr); // leave it without extra handling or retries; not important (normally toggles unpredictably)
-                            }
-
-                            if (createDirDone)
-                                return TRUE;
-                        }
-                    }
-                    else
-                        TRACE_E("Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
-                }
-            }
-        }
-        if (err != NULL)
-            *err = errLoc;
-    }
-    return FALSE;
+    return WorkerCreateDirectory(name, err);
 }
 
 BOOL GetDirTime(const char* dirName, FILETIME* ftModified)
@@ -7808,7 +7650,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                  CQuadWord& totalDone, CQuadWord& operTotal,
                  const char* sourceDir, BOOL adsCopy, COperations* script,
                  void* buffer, BOOL& skip, BOOL& alreadyExisted,
-                 BOOL createAsEncrypted, BOOL ignInvalidName)
+                 BOOL createAsEncrypted, BOOL ignInvalidName, const wchar_t* exactName)
 {
     if (script->CopyAttrs && createAsEncrypted)
         TRACE_E("DoCreateDir(): unexpected parameter value: createAsEncrypted is TRUE when script->CopyAttrs is TRUE!");
@@ -7822,27 +7664,12 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
 
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
-    const char* nameCrDir = name;
-    char nameCrDirCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(nameCrDir, nameCrDirCopy);
-    std::wstring nameCrDirW;
-    if (nameCrDir != NULL && strlen(nameCrDir) >= MAX_PATH)
-    {
-        nameCrDirW = SalMultiByteToWidePath(nameCrDir, CP_UTF8);
-        if (nameCrDirW.empty() && GetACP() != CP_UTF8)
-            nameCrDirW = SalMultiByteToWidePath(nameCrDir, CP_ACP);
-        if (!nameCrDirW.empty())
-            nameCrDirW = SalPathAddExtendedPrefixW(nameCrDirW.c_str());
-    }
-    const char* sourceDirCrDir = sourceDir;
-    char sourceDirCrDirCopy[3 * MAX_PATH];
-    if (sourceDirCrDir != NULL)
-        MakeCopyWithBackslashIfNeeded(sourceDirCrDir, sourceDirCrDirCopy);
+    std::wstring nameCrDirW = WorkerOperationPathW(name, exactName);
 
     while (1)
     {
         DWORD err;
-        if (!invalidName && SalCreateDirectoryEx(name, &err))
+        if (!invalidName && WorkerCreateDirectory(name, &err, exactName))
         {
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)CREATE_DIR_SIZE.Value, TRUE, 0, NULL, MAX_OP_FILESIZE); // directory already created
 
@@ -7855,7 +7682,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                                operDone, operTotal, dlgData, script, &adsSkip, buffer) ||
                     adsSkip) // user cancelled or skipped at least one ADS
                 {
-                    if (RemoveDirectory(nameCrDir) == 0)
+                    if (RemoveDirectoryW(nameCrDirW.c_str()) == 0)
                     {
                         DWORD err2 = GetLastError();
                         TRACE_E("Unable to remove newly created directory: " << name << ", error: " << GetErrorText(err2));
@@ -7876,7 +7703,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                         newAttr |= FILE_ATTRIBUTE_ENCRYPTED;
                     }
                     DWORD changeAttrErr = NO_ERROR;
-                    DWORD currentAttrs = SalGetFileAttributes(name);
+                    DWORD currentAttrs = GetFileAttributesW(nameCrDirW.c_str());
                     if (currentAttrs != INVALID_FILE_ATTRIBUTES)
                     {
                         if ((newAttr & FILE_ATTRIBUTE_COMPRESSED) != (currentAttrs & FILE_ATTRIBUTE_COMPRESSED) &&
@@ -7924,8 +7751,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                                         dlgData.SkipAllDirCrLossEncr = TRUE;
                                     case IDB_SKIP:
                                     {
-                                        ClearReadOnlyAttr(nameCrDir); // remove read-only attribute so the file can be deleted
-                                        RemoveDirectory(nameCrDir);
+                                        WorkerClearReadOnlyW(nameCrDirW); // remove read-only attribute so the file can be deleted
+                                        RemoveDirectoryW(nameCrDirW.c_str());
                                         script->SetTFS(lastTransferredFileSize); // add TFS only after the directory is fully outside; ProgressSize will be synced outside (no point in adjusting it here)
                                         skip = TRUE;
                                         return TRUE;
@@ -7953,15 +7780,12 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                         TRACE_I("DoCreateDir(): Unable to set Encrypted or Compressed attributes for " << name << "! error=" << GetErrorText(changeAttrErr));
                     }
                 }
-                if (!nameCrDirW.empty())
-                    SetFileAttributesW(nameCrDirW.c_str(), newAttr);
-                else
-                    SetFileAttributes(nameCrDir, newAttr);
+                SetFileAttributesW(nameCrDirW.c_str(), newAttr);
 
                 if (script->CopyAttrs) // verify whether the source file attributes were preserved
                 {
                     DWORD curAttrs;
-                    curAttrs = SalGetFileAttributes(name);
+                    curAttrs = GetFileAttributesW(nameCrDirW.c_str());
                     if (curAttrs == INVALID_FILE_ATTRIBUTES || (curAttrs & DISPLAYED_ATTRIBUTES) != (newAttr & DISPLAYED_ATTRIBUTES))
                     {                                                              // attributes probably did not transfer; warn the user
                         WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
@@ -7992,8 +7816,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                         {
                         CANCEL_CRDIR:
 
-                            ClearReadOnlyAttr(nameCrDir); // remove read-only so the file can be deleted
-                            RemoveDirectory(nameCrDir);
+                            WorkerClearReadOnlyW(nameCrDirW); // remove read-only so the file can be deleted
+                            RemoveDirectoryW(nameCrDirW.c_str());
                             return FALSE;
                         }
                         }
@@ -8044,7 +7868,7 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
             if (err == ERROR_ALREADY_EXISTS ||
                 err == ERROR_FILE_EXISTS)
             {
-                DWORD attr2 = SalGetFileAttributes(name);
+                DWORD attr2 = GetFileAttributesW(nameCrDirW.c_str());
                 if (attr2 & FILE_ATTRIBUTE_DIRECTORY) // "directory overwrite"
                 {
                     if (dlgData.CnfrmDirOver && !dlgData.DirOverwriteAll) // should we ask the user about overwriting the directory?
@@ -8990,14 +8814,12 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
                    COperations* script, CQuadWord& totalDone,
                    FILETIME* timeModified, FILETIME* timeCreated, FILETIME* timeAccessed,
                    BOOL& changeCompression, BOOL& changeEncryption, DWORD fileAttr,
-                   CProgressDlgData& dlgData)
+                   CProgressDlgData& dlgData, const wchar_t* exactName)
 {
     // if the path ends with a space/dot, we must append '\\'; otherwise
     // SetFileAttributes (and others) trims the spaces/dots and operates
     // on a different path
-    const char* nameSetAttrs = name;
-    char nameSetAttrsCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(nameSetAttrs, nameSetAttrsCopy);
+    std::wstring nameSetAttrs = WorkerOperationPathW(name, exactName);
 
     while (1)
     {
@@ -9065,7 +8887,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
             SendMessage(hProgressDlg, WM_USER_DIALOG, 5, (LPARAM)data);
             error = ERROR_SUCCESS;
         }
-        if (error == ERROR_SUCCESS && SetFileAttributes(nameSetAttrs, attrs))
+        if (error == ERROR_SUCCESS && SetFileAttributesW(nameSetAttrs.c_str(), attrs))
         {
             BOOL isDir = ((attrs & FILE_ATTRIBUTE_DIRECTORY) != 0);
             // if any of the timestamps need to be set
@@ -9073,8 +8895,8 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
             {
                 HANDLE file;
                 if (attrs & FILE_ATTRIBUTE_READONLY)
-                    SetFileAttributes(nameSetAttrs, attrs & (~FILE_ATTRIBUTE_READONLY));
-                file = HANDLES_Q(CreateFile(nameSetAttrs, GENERIC_READ | GENERIC_WRITE,
+                    SetFileAttributesW(nameSetAttrs.c_str(), attrs & (~FILE_ATTRIBUTE_READONLY));
+                file = HANDLES_Q(CreateFileW(nameSetAttrs.c_str(), GENERIC_READ | GENERIC_WRITE,
                                             FILE_SHARE_READ | FILE_SHARE_WRITE,
                                             NULL, OPEN_EXISTING, isDir ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL));
                 if (file != INVALID_HANDLE_VALUE)
@@ -9090,12 +8912,12 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
                     SetFileTime(file, &ftCreated, &ftAccessed, &ftModified);
                     HANDLES(CloseHandle(file));
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SetFileAttributes(nameSetAttrs, attrs);
+                        SetFileAttributesW(nameSetAttrs.c_str(), attrs);
                 }
                 else
                 {
                     if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SetFileAttributes(nameSetAttrs, attrs);
+                        SetFileAttributesW(nameSetAttrs.c_str(), attrs);
                     goto SHOW_ERROR;
                 }
             }
@@ -10821,7 +10643,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 BOOL skip, alreadyExisted;
                 Error = !DoCreateDir(hProgressDlg, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
                                      totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
-                                     alreadyExisted, crAsEncrypted, ignInvalidName);
+                                     alreadyExisted, crAsEncrypted, ignInvalidName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL);
                 if (!Error)
                 {
                     if (skip) // skip directory creation
@@ -10943,7 +10765,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 if (op->Opcode == ocDeleteFile)
                 {
                     Error = !DoDeleteFile(hProgressDlg, op->SourceName, op->Size,
-                                          script, totalDone, op->Attr, dlgData);
+                                          script, totalDone, op->Attr, dlgData, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL);
                 }
                 else
                 {
@@ -11007,7 +10829,7 @@ unsigned ThreadWorkerBody(void* parameter)
                                        attrsData->ChangeTimeCreated ? &attrsData->TimeCreated : NULL,
                                        attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL,
                                        attrsData->ChangeCompression, attrsData->ChangeEncryption,
-                                       op->Attr, dlgData);
+                                       op->Attr, dlgData, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL);
                 break;
             }
 
@@ -11265,12 +11087,14 @@ BOOL COperationsQueue::AddOperation(HWND dlg, int schedulingPolicy, int operatio
                 hasFifoBarrier = TRUE;
                 break;
             }
-        int reason = runningViewsOverflow && operationOverride != COSO_START_NOW ? CSWR_UNKNOWN_FALLBACK :
-                     StorageOperationGetWaitReason(schedulingPolicy, operationOverride,
+        int reason = StorageOperationGetWaitReason(schedulingPolicy, operationOverride,
                                                    anyOtherActive, hasFifoBarrier, &candidate,
                                                    runningViews, runningCount,
                                                    Configuration.CopyMoveSsdParallelFiles,
                                                    Configuration.CopyMoveNvmeParallelFiles);
+        if (reason == CSWR_NONE && runningViewsOverflow &&
+            schedulingPolicy == COSP_STORAGE_AWARE && operationOverride == COSO_DEFAULT)
+            reason = CSWR_UNKNOWN_FALLBACK;
         *startPaused = reason != CSWR_NONE;
         if (waitReason != NULL)
             *waitReason = reason;
@@ -11344,7 +11168,7 @@ BOOL COperationsQueue::AddOperation(HWND dlg, BOOL startOnIdle, BOOL* startPause
                                     const COperationStorageUse* storageUse)
 {
     return AddOperation(dlg, COSP_STORAGE_AWARE,
-                        startOnIdle ? COSO_WAIT_ALL : COSO_DEFAULT,
+                        CopyMoveGetSchedulingOverride(CMS_SEQUENTIAL, startOnIdle),
                         startPaused, NULL, storageUse);
 }
 
@@ -11352,10 +11176,11 @@ int COperationsQueue::GetWaitReasonForIndex(int index)
 {
     CStorageOpView runningViews[64];
     int runningCount = 0;
-    int anyOtherActive = 0;
+    // Explicit waiting depends only on unfinished predecessors, not operations
+    // started later. Resource scheduling still sees every running operation.
+    int anyEarlierActive = index > 0;
     BOOL runningViewsOverflow = FALSE;
     BOOL hasFifoBarrier = FALSE;
-    const BOOL candidateIsBarrier = StorageOperationIsFifoBarrier(OperPolicies[index], OperOverrides[index]);
     for (int j = 0; j < OperDlgs.Count; j++)
     {
         if (j == index)
@@ -11371,21 +11196,21 @@ int COperationsQueue::GetWaitReasonForIndex(int index)
         }
         else if (OperPaused[j] == 0)
             runningViewsOverflow = TRUE;
-        if (OperPaused[j] != 1 || (candidateIsBarrier && j < index))
-            anyOtherActive = 1;
     }
-    if (runningViewsOverflow)
-        return CSWR_UNKNOWN_FALLBACK;
 
     CStorageOpView candidate;
     candidate.Claims = OperStorage[index].Claims;
     candidate.Count = OperStorage[index].ClaimCount;
     candidate.StreamDemand = OperStorage[index].StreamDemand;
-    return StorageOperationGetWaitReason(OperPolicies[index], OperOverrides[index],
-                                         anyOtherActive, hasFifoBarrier, &candidate,
-                                         runningViews, runningCount,
-                                         Configuration.CopyMoveSsdParallelFiles,
-                                         Configuration.CopyMoveNvmeParallelFiles);
+    int reason = StorageOperationGetWaitReason(OperPolicies[index], OperOverrides[index],
+                                               anyEarlierActive, hasFifoBarrier, &candidate,
+                                               runningViews, runningCount,
+                                               Configuration.CopyMoveSsdParallelFiles,
+                                               Configuration.CopyMoveNvmeParallelFiles);
+    if (reason == CSWR_NONE && runningViewsOverflow &&
+        OperPolicies[index] == COSP_STORAGE_AWARE && OperOverrides[index] == COSO_DEFAULT)
+        reason = CSWR_UNKNOWN_FALLBACK;
+    return reason;
 }
 
 void COperationsQueue::TryResumeCompatible(HWND* foregroundWnd)

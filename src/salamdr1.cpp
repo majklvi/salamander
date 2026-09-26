@@ -53,6 +53,7 @@ extern "C"
 #include "usermenu.h"
 #include "execute.h"
 #include "drivelst.h"
+#include "drivefreespace.h"
 
 #pragma comment(linker, "/ENTRY:MyEntryPoint") // chceme vlastni vstupni bod do aplikace
 
@@ -1547,24 +1548,33 @@ char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll
         *skip = FALSE;
     int l1 = (int)strlen(path); // je vzdy na stacku ...
     int l2, len = l1;
+    const int pathWideLength = (int)SalMultiByteToWidePath(path, IsValidPathUtf8Text(path) ? CP_UTF8 : CP_ACP).size();
+    int wideLength = pathWideLength;
     if (name != NULL)
     {
         l2 = (int)strlen(name);
         len += l2;
-        if (path[l1 - 1] != '\\')
+        wideLength += (int)SalMultiByteToWidePath(name, IsValidPathUtf8Text(name) ? CP_UTF8 : CP_ACP).size();
+        if (l1 != 0 && path[l1 - 1] != '\\')
+        {
             len++;
-        if (len >= 32767 && dosName != NULL)
+            wideLength++;
+        }
+        if (wideLength >= 32767 && dosName != NULL)
         {
             int l3 = (int)strlen(dosName);
-            if (len - l2 + l3 < 32767)
+            const int dosWideLength = pathWideLength + (l1 != 0 && path[l1 - 1] != '\\' ? 1 : 0) +
+                                      (int)SalMultiByteToWidePath(dosName, IsValidPathUtf8Text(dosName) ? CP_UTF8 : CP_ACP).size();
+            if (dosWideLength < 32767)
             {
                 len = len - l2 + l3;
+                wideLength = dosWideLength;
                 name = dosName;
                 l2 = l3;
             }
         }
     }
-    if (len >= 32767)
+    if (wideLength >= 32767)
     {
         char text[2 * MAX_PATH + 100];
         _snprintf_s(text, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), name, path);
@@ -1623,7 +1633,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     if (name != NULL)
     {
         memmove(txt, path, l1);
-        if (path[l1 - 1] != '\\')
+        if (l1 != 0 && path[l1 - 1] != '\\')
             txt[l1++] = '\\';
         memmove(txt + l1, name, l2 + 1);
     }
@@ -5480,14 +5490,18 @@ FIND_NEW_SLG_FILE:
     }
 
     //--- vytvoreni hlavniho okna
+#ifndef _UNICODE
+    if (CMainWindow::RegisterUniversalClassW(CS_DBLCLKS | CS_OWNDC,
+#else
     if (CMainWindow::RegisterUniversalClass(CS_DBLCLKS | CS_OWNDC,
+#endif
                                             0,
                                             0,
                                             NULL, // HIcon
                                             LoadCursor(NULL, IDC_ARROW),
                                             NULL /*(HBRUSH)(COLOR_WINDOW + 1)*/, // HBrush
                                             NULL,
-                                            CFILESBOX_CLASSNAME,
+                                            CFILESBOX_CLASSNAMEW,
                                             NULL) &&
 #ifndef _UNICODE
         CMainWindow::RegisterUniversalClassW(CS_DBLCLKS,
@@ -5792,7 +5806,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     BOOL skipMenuBar;
                     MSG msg;
                     BOOL haveMSG = FALSE; // FALSE pokud se ma volat GetMessage() v podmince cyklu
-                    while (haveMSG || GetMessage(&msg, NULL, 0, 0))
+                    while (haveMSG || GetMessageW(&msg, NULL, 0, 0))
                     {
                         haveMSG = FALSE;
                         if (msg.message != WM_USER_SHOWWINDOW && msg.message != WM_USER_WAKEUP_FROM_IDLE && /*msg.message != WM_USER_SETPATHS &&*/
@@ -5813,11 +5827,30 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         if (Configuration.QuickSearchEnterAlt && msg.message == WM_SYSCHAR)
                             skipMenuBar = TRUE;
 
+                        // The queue stays Unicode. The legacy menu mnemonic lookup
+                        // consumes one ACP byte, so adapt only its private message.
+                        MSG menuMsg = msg;
+                        if (!skipMenuBar && msg.message == WM_SYSCHAR)
+                        {
+                            wchar_t character = (wchar_t)msg.wParam;
+                            char ansi[4];
+                            BOOL usedDefault = FALSE;
+                            const UINT codePage = GetACP();
+                            int length = msg.wParam <= 0xFFFF ?
+                                WideCharToMultiByte(codePage, codePage == CP_UTF8 ? WC_ERR_INVALID_CHARS : WC_NO_BEST_FIT_CHARS,
+                                                    &character, 1, ansi, _countof(ansi), NULL,
+                                                    codePage == CP_UTF8 ? NULL : &usedDefault) : 0;
+                            if (length == 1 && !usedDefault)
+                                menuMsg.wParam = (unsigned char)ansi[0];
+                            else
+                                skipMenuBar = TRUE;
+                        }
+
                         // zajistime zaslani zprav do naseho menu (obchazime tim potrebu hooku pro klavesnici)
                         if (MainWindow == NULL || MainWindow->MenuBar == NULL || !MainWindow->CaptionIsActive ||
                             MainWindow->QuickRenameWindowActive() ||
                             skipMenuBar || GetCapture() != NULL || // je-li captured mouse - mohli bychom zpusobit vizualni problemy
-                            !MainWindow->MenuBar->IsMenuBarMessage(&msg))
+                            !MainWindow->MenuBar->IsMenuBarMessage(&menuMsg))
                         {
                             CWindowsObject* wnd = WindowsManager.GetWindowPtr(GetActiveWindow());
 
@@ -5840,15 +5873,15 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             }
 
                             if ((wnd == NULL || !wnd->Is(otDialog) ||
-                                 !IsDialogMessage(wnd->HWindow, &msg)) &&
+                                 !IsDialogMessageW(wnd->HWindow, &msg)) &&
                                 (MainWindow == NULL ||
                                  !MainWindow->CaptionIsActive && !detachedTabCaptionActive || // in non-modal plug-in windows, do not translate accelerators (F7 in "FTP Logs" is undesirable)
                                  MainWindow->QuickRenameWindowActive() ||
-                                 !TranslateAccelerator(acceleratorTarget, AccelTable1, &msg) &&
-                                     (MainWindow->EditMode || !TranslateAccelerator(acceleratorTarget, AccelTable2, &msg))))
+                                 !TranslateAcceleratorW(acceleratorTarget, AccelTable1, &msg) &&
+                                     (MainWindow->EditMode || !TranslateAcceleratorW(acceleratorTarget, AccelTable2, &msg))))
                             {
                                 TranslateMessage(&msg);
-                                DispatchMessage(&msg);
+                                DispatchMessageW(&msg);
                             }
                         }
 
@@ -5858,7 +5891,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         }
 
                     TEST_IDLE:
-                        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+                        if (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE))
                         {
                             if (msg.message == WM_QUIT)
                                 break;      // ekvivalent situace, kdy GetMessage() vraci FALSE
@@ -6131,6 +6164,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     TRACE_I("WindowsManager: " << WindowsManager.maxWndCount << " windows, " << WindowsManager.search << " searches, " << WindowsManager.cache << " cached searches.");
 #endif
     //---
+    DriveFreeSpaceShutdown(); // cancel bounded probes before releasing host resources
     DestroySafeWaitWindow(TRUE); // povel "terminate" safe-wait-message threadu
     Sleep(1000);                 // nechame vsem threadum viewru cas, aby se ukoncili
     NBWNetAC3Thread.Close(TRUE); // bezici thread nechame zabit (presun do AuxThreads), dalsi akce zablokujeme
@@ -6204,6 +6238,10 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdLine, int cmdShow
     __try
     {
 #endif // CALLSTK_DISABLE
+
+        int probeExitCode = 0;
+        if (DriveFreeSpaceHelperDispatch(probeExitCode))
+            return probeExitCode;
 
         InitializeProcessDPIAwareness();
 

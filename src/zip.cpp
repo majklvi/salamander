@@ -11,6 +11,7 @@
 #include "plugins.h"
 #include "filesbox.h"
 #include "fileswnd.h"
+#include "plugins/shared/spl_diskselection.h"
 #include "stswnd.h"
 #include "editwnd.h"
 #include "zip.h"
@@ -26,6 +27,7 @@
 #include "pack.h"
 
 #include <string>
+#include <new>
 extern "C"
 {
 #include "shexreg.h"
@@ -713,6 +715,156 @@ BOOL CSalamanderGeneral::UnregisterServiceOwned(const char* serviceId,
     return UnregisterServiceInternal(serviceId, serviceInterface, providerOwner, TRUE);
 }
 
+namespace
+{
+class CPanelItemPathsService : public CSalamanderPanelItemPathsAbstract
+{
+    static const CFileData* FindCurrentItem(CFilesArray* rows, const CFileData* item)
+    {
+        if (rows == NULL || rows->Count <= 0 || rows->GetData() == NULL)
+            return NULL;
+        // CFilesArray stores live CFileData objects contiguously. Integer address
+        // arithmetic is defined even for a foreign pointer; never subtract or
+        // dereference caller pointers before proving exact element membership.
+        const UINT_PTR first = reinterpret_cast<UINT_PTR>(rows->GetData());
+        const UINT_PTR address = reinterpret_cast<UINT_PTR>(item);
+        if (address < first)
+            return NULL;
+        const UINT_PTR offset = address - first;
+        if (offset % sizeof(CFileData) != 0 ||
+            offset / sizeof(CFileData) >= static_cast<UINT_PTR>(rows->Count))
+            return NULL;
+        return &rows->At(static_cast<int>(offset / sizeof(CFileData)));
+    }
+
+public:
+    virtual BOOL WINAPI GetItemFullPath(int panel, const CFileData* item,
+                                        wchar_t* path, int capacity)
+    {
+        if (path != NULL && capacity > 0) path[0] = 0;
+        if (MainThreadID != GetCurrentThreadId())
+        {
+            SetLastError(ERROR_INVALID_THREAD_ID);
+            return FALSE;
+        }
+        if (path == NULL || capacity <= 0 || item == NULL || MainWindow == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        CFilesWindow* window = MainWindow->GetPanel(panel);
+        if (window == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        if (!window->Is(ptDisk))
+        {
+            SetLastError(ERROR_NOT_SUPPORTED);
+            return FALSE;
+        }
+        // Compare addresses before touching caller-supplied item data. A pointer
+        // from another panel or an obsolete listing must not become a guessed path.
+        const CFileData* current = FindCurrentItem(window->Dirs, item);
+        if (current == NULL)
+            current = FindCurrentItem(window->Files, item);
+        if (current == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        try
+        {
+            const std::wstring fullPath = window->GetItemFullPathW(*current);
+            if (fullPath.empty())
+            {
+                SetLastError(ERROR_INVALID_DATA);
+                return FALSE;
+            }
+            if (fullPath.size() >= static_cast<size_t>(capacity))
+            {
+                SetLastError(ERROR_INSUFFICIENT_BUFFER);
+                return FALSE;
+            }
+            memcpy(path, fullPath.c_str(), (fullPath.size() + 1) * sizeof(wchar_t));
+            SetLastError(ERROR_SUCCESS);
+            return TRUE;
+        }
+        catch (const std::bad_alloc&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return FALSE;
+        }
+    }
+};
+
+class CDiskSelectionService : public CSalamanderDiskSelectionAbstract
+{
+public:
+    virtual BOOL WINAPI Capture(int panel, DWORD mode, CSalamanderDiskSelectionSnapshotAbstract** result)
+    {
+        using namespace SalamanderDiskSelection;
+        if (result != NULL) *result = NULL;
+        if (MainThreadID != GetCurrentThreadId()) return Detail::Fail(ERROR_INVALID_THREAD_ID);
+        if (result == NULL || MainWindow == NULL || mode > SALDISKSELECTION_ALL_ITEMS)
+            return Detail::Fail(ERROR_INVALID_PARAMETER);
+        CFilesWindow* window = MainWindow->GetPanel(panel);
+        if (window == NULL) return Detail::Fail(ERROR_INVALID_PARAMETER);
+        if (!window->Is(ptDisk)) return Detail::Fail(ERROR_NOT_SUPPORTED);
+        try
+        {
+            std::unique_ptr<Detail::OwnedSnapshot> snapshot(Detail::Allocate());
+            if (!snapshot) return Detail::Fail(ERROR_NOT_ENOUGH_MEMORY);
+            snapshot->Root = window->GetPathW() != NULL && window->GetPathW()[0] != 0 ?
+                std::wstring(window->GetPathW()) : WideFromPath(window->GetPath());
+            if (snapshot->Root.empty()) return Detail::Fail(ERROR_INVALID_DATA);
+            const int dirs = window->Dirs->Count, files = window->Files->Count;
+            if (dirs < 0 || files < 0 || dirs > INT_MAX - files) return Detail::Fail(ERROR_INVALID_DATA);
+            const int count = dirs + files, focused = window->GetCaretIndex();
+            bool anySelected = false;
+            if (mode == SALDISKSELECTION_SELECTED_OR_FOCUSED)
+                for (int i = 0; i < count; ++i)
+                {
+                    const CFileData& item = i < dirs ? window->Dirs->At(i) : window->Files->At(i - dirs);
+                    if (item.Selected && !Detail::UpDirectory(item, i < dirs)) { anySelected = true; break; }
+                }
+            for (int i = 0; i < count; ++i)
+            {
+                const CFileData& item = i < dirs ? window->Dirs->At(i) : window->Files->At(i - dirs);
+                const BOOL isDir = i < dirs;
+                if (Detail::UpDirectory(item, isDir) || !Detail::Include(mode, anySelected, item, i == focused)) continue;
+                const std::wstring full = window->GetItemFullPathW(item);
+                const std::wstring directory = window->GetItemDirectoryW(item);
+                const std::wstring relative = window->GetItemRelativePathW(item);
+                if (full.empty() || directory.empty() || relative.empty() ||
+                    full.back() == L'\\' || full.back() == L'/') return Detail::Fail(ERROR_INVALID_DATA);
+                snapshot->Append(item, isDir, i == focused, i, full, directory, relative);
+            }
+            snapshot->Seal();
+            *result = snapshot.release();
+            SetLastError(ERROR_SUCCESS);
+            return TRUE;
+        }
+        catch (const std::bad_alloc&)
+        {
+            return Detail::Fail(ERROR_NOT_ENOUGH_MEMORY);
+        }
+    }
+};
+
+CSalamanderDiskSelectionAbstract* GetDiskSelectionService()
+{
+    static CDiskSelectionService service;
+    return &service;
+}
+
+CSalamanderPanelItemPathsAbstract* GetPanelItemPathsService()
+{
+    static CPanelItemPathsService service;
+    return &service;
+}
+}
+
 BOOL CSalamanderGeneral::QueryService(const CSalamanderServiceQuery* query, CSalamanderServiceResult* result)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::QueryService(,)");
@@ -724,6 +876,43 @@ BOOL CSalamanderGeneral::QueryService(const CSalamanderServiceQuery* query, CSal
     }
     if (query == NULL || query->ServiceId == NULL)
         return FALSE;
+
+    // Built-in, immutable service: never registered by or owned by a plug-in.
+    if (strcmp(query->ServiceId, SALAMANDER_SERVICE_VIEWER_ENUMERATION) == 0 &&
+        query->MinimumVersion <= SALAMANDER_VIEWER_ENUMERATION_VERSION_1_0)
+    {
+        if (result != NULL)
+        {
+            result->Interface = GetViewerEnumerationService();
+            result->Version = SALAMANDER_VIEWER_ENUMERATION_VERSION_1_0;
+            result->ProviderName = "Samandarin";
+        }
+        return TRUE;
+    }
+
+    if (strcmp(query->ServiceId, SALAMANDER_SERVICE_PANEL_ITEM_PATHS) == 0 &&
+        query->MinimumVersion <= SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0)
+    {
+        if (result != NULL)
+        {
+            result->Interface = GetPanelItemPathsService();
+            result->Version = SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0;
+            result->ProviderName = "Samandarin";
+        }
+        return TRUE;
+    }
+
+    if (strcmp(query->ServiceId, SALAMANDER_SERVICE_DISK_SELECTION) == 0 &&
+        query->MinimumVersion <= SALAMANDER_DISK_SELECTION_VERSION_1_0)
+    {
+        if (result != NULL)
+        {
+            result->Interface = GetDiskSelectionService();
+            result->Version = SALAMANDER_DISK_SELECTION_VERSION_1_0;
+            result->ProviderName = "Samandarin";
+        }
+        return TRUE;
+    }
 
     EnterCriticalSection(&SalamanderServiceRegistryLock);
     for (int i = 0; i < SalamanderServiceRegistryCount; ++i)

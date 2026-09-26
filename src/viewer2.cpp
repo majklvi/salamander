@@ -3,11 +3,13 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "viewerpath.h"
 
 #include <string>
 #include <usp10.h>
 
 #include "viewer.h"
+#include "viewerhex.h"
 #include "common/widepath.h"
 #include "codetbl.h"
 #include "codetbl_utils.h"
@@ -32,10 +34,7 @@ HANDLE ViewerContinue = NULL;
 
 static std::wstring ViewerPathToWide(const char* path)
 {
-    std::wstring wide = SalMultiByteToWidePath(path, CP_UTF8);
-    if (wide.empty() && GetACP() != CP_UTF8)
-        wide = SalMultiByteToWidePath(path, CP_ACP);
-    return wide;
+    return Salamander::ViewerPaths::Decode(path);
 }
 
 static HANDLE OpenViewerFileForRead(const std::wstring& fileNameW, const char* fileName)
@@ -76,8 +75,7 @@ unsigned ThreadViewerMessageLoopBody(void* parameter)
     //  TRACE_I("MoresStanislav: ThreadViewerMessageLoopBody 1");
     CTVData* data = (CTVData*)parameter;
     CViewerWindow* view = data->View;
-    char name[SAL_MAX_PATH];
-    lstrcpyn(name, data->Name, SAL_MAX_PATH);
+    std::wstring name = Salamander::ViewerPaths::FullPath(ViewerPathToWide(data->Name).c_str());
     char captionBuf[SAL_MAX_PATH];
     const char* caption = NULL;
     BOOL wholeCaption = FALSE;
@@ -160,8 +158,8 @@ unsigned ThreadViewerMessageLoopBody(void* parameter)
     if (ok) // if the window was created, run the application loop
     {
         CALL_STACK_MESSAGE1("ThreadViewerMessageLoopBody::message_loop");
-        if (SalGetFullName(name, NULL, NULL, NULL, NULL, SAL_MAX_PATH))
-            view->OpenFile(name, caption, wholeCaption);
+        if (!name.empty())
+            view->OpenFileW(name.c_str(), caption, wholeCaption);
 
         MSG msg;
         HWND viewHWindow = view->HWindow; // because WM_QUIT leaves the window object unallocated
@@ -624,12 +622,10 @@ CViewerWindow::Prepare(HANDLE* hFile, __int64 offset, __int64 bytes, BOOL& fatal
 
 void CViewerWindow::CodeCharacters(unsigned char* start, unsigned char* end)
 {
-    if (UseCodeTable)
-    {
-        unsigned char* s = start - 1;
-        while (++s < end)
-            *s = CodeTable[*s];
-    }
+    // Preserve the file bytes before applying the text conversion. Numeric hex
+    // output and binary search must never depend on the selected Convert table.
+    CaptureViewerBytes(RawBuffer + (start - Buffer), start, (size_t)(end - start),
+                       UseCodeTable ? CodeTable : NULL);
 }
 
 BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
@@ -677,7 +673,9 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
         if (Loaded > 0)
         {
             int space = VIEW_BUFFER_SIZE - read;
-            memmove(Buffer + read, Buffer, (int)((space < Loaded) ? (Loaded = space) : Loaded));
+            if (space < Loaded)
+                Loaded = space;
+            MoveViewerBytes(RawBuffer, Buffer, read, 0, (size_t)Loaded);
             Seek -= read;
         }
         DWORD readed;
@@ -824,7 +822,7 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
             int space = VIEW_BUFFER_SIZE - read;
             if (space < Loaded)
             {
-                memmove(Buffer, Buffer + (Loaded - space), space);
+                MoveViewerBytes(RawBuffer, Buffer, 0, (size_t)(Loaded - space), space);
                 Loaded = (readed = space);
                 Seek = seekEnd - Loaded;
             }
@@ -955,8 +953,8 @@ void CViewerWindow::OpenFile(const char* file, const char* caption, BOOL wholeCa
     CALL_STACK_MESSAGE3("CViewerWindow::OpenFile(%s, %s)", file, caption);
     CancelLogViewRetry();
     StopLogViewWatcher();
-    char fileName[SAL_MAX_PATH];
-    lstrcpyn(fileName, file, SAL_MAX_PATH);
+    std::string fileNameCopy = file != NULL ? file : "";
+    const char* fileName = fileNameCopy.c_str();
 
     if (Caption != NULL)
     {
@@ -1010,7 +1008,7 @@ void CViewerWindow::OpenFile(const char* file, const char* caption, BOOL wholeCa
 
 void CViewerWindow::OpenFileW(const wchar_t* file, const char* caption, BOOL wholeCaption)
 {
-    std::string fileA = SalWideToMultiBytePath(file, GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
+    std::string fileA = SalWideToMultiBytePath(file, CP_UTF8);
     OpenFile(fileA.c_str(), caption, wholeCaption);
     FileNameW = file != NULL ? file : L"";
     if (LogViewMode)
@@ -2626,7 +2624,7 @@ void CViewerWindow::SetScrollBar()
     }
 }
 
-BOOL CViewerWindow::GetFindText(char* buf, int& len)
+BOOL CViewerWindow::GetFindText(char* buf, int& len, BOOL hexMode)
 {
     CALL_STACK_MESSAGE1("CViewerWindow::GetFindText()");
     len = 0;
@@ -2639,7 +2637,7 @@ BOOL CViewerWindow::GetFindText(char* buf, int& len)
     // if (endSel == -1) endSel = 0; // cannot occur (both can be -1 only together, and we never reach this)
     BOOL fatalErr = FALSE;
 
-    if (HasDecodedTextMode())
+    if (HasDecodedTextMode() && !hexMode)
     {
         startSel = max(startSel, TextStartOffset());
         endSel = max(endSel, startSel);
@@ -2671,7 +2669,7 @@ BOOL CViewerWindow::GetFindText(char* buf, int& len)
             break;
         if (l == 0)
             return FALSE;
-        memcpy(s, Buffer + (off - Seek), l);
+        memcpy(s, (hexMode ? RawBuffer : Buffer) + (off - Seek), l);
         s += l;
         off += l;
     }

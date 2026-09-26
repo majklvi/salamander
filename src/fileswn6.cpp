@@ -12,6 +12,8 @@
 #include "fileswnd.h"
 #include "dialogs.h"
 #include "worker.h"
+#include "workerpath.h"
+#include "branch_view_text.h"
 #include "cache.h"
 #include "pack.h"
 #include "shellib.h"
@@ -22,10 +24,9 @@ namespace
 {
 std::wstring SalMultiByteToWidePathUtf8OrAcp(const char* path)
 {
-    std::wstring wide = SalMultiByteToWidePath(path, CP_UTF8);
-    if (wide.empty() && GetACP() != CP_UTF8)
-        wide = SalMultiByteToWidePath(path, CP_ACP);
-    return wide;
+    // flags=0 replaces invalid UTF-8 rather than failing, so test strictly before
+    // selecting the legacy ACP fallback used by ordinary non-UTF-8 panels.
+    return SalMultiByteToWidePath(path, IsValidPathUtf8Text(path) ? CP_UTF8 : CP_ACP);
 }
 
 std::wstring SalPathAddExtendedPrefixIfNeededW(const std::wstring& path)
@@ -94,6 +95,27 @@ void CFilesWindow::Activate(BOOL shares)
     CALL_STACK_MESSAGE_NONE
     //  TRACE_I("CFilesWindow::Activate");
     LastInactiveRefreshStart = LastInactiveRefreshEnd; // activation cancels information about the last refresh in the inactive window
+    if (IsBranchView())
+    {
+        // A recursive listing is maintained by subtree notifications. Merely
+        // activating the window must not probe a slow root, reread free space,
+        // or start another full scan. A deferred real notification still uses
+        // the automatic scheduler, which preserves Stop Scan until manual refresh.
+        if (InactiveRefreshTimerSet)
+        {
+            KillTimer(HWindow, IDT_INACTIVEREFRESH);
+            InactiveRefreshTimerSet = FALSE;
+            PostMessage(HWindow, WM_USER_INACTREFRESH_DIR, FALSE, InactRefreshLParam);
+        }
+        if (InactWinOptimizedReading)
+        {
+            // No listing/cache data changes here. Resume the reader by signal
+            // instead of waiting for a shell icon/thumbnail provider to finish.
+            InactWinOptimizedReading = FALSE;
+            WakeupIconCacheThread();
+        }
+        return;
+    }
     BOOL needToRefreshIcons = InactWinOptimizedReading;
     if (Is(ptDisk) || Is(ptZIPArchive)) // disks and archives
     {
@@ -662,14 +684,18 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     }
 
     CActionType type = (copy ? atCopy : atMove);
-    char sourcePath[2 * MAX_PATH];     // + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
-    char lastSourcePath[2 * MAX_PATH]; // + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer sourcePathStorage(4 * SAL_MAX_PATH);
+    CPathBuffer lastSourcePathStorage(4 * SAL_MAX_PATH);
+    char* sourcePath = sourcePathStorage.Data();
+    char* lastSourcePath = lastSourcePathStorage.Data();
     lastSourcePath[0] = 0;
     BOOL sourceSupADS = FALSE;
-    char targetPath[2 * MAX_PATH + 200]; // +200 is a reserve (Windows create paths longer than MAX_PATH)
-    char mapNameBuf[2 * MAX_PATH];       // + MAX_PATH  is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer targetPathStorage(4 * SAL_MAX_PATH);
+    CPathBuffer mapNameStorage(4 * SAL_MAX_PATH);
+    char* targetPath = targetPathStorage.Data();
+    char* mapNameBuf = mapNameStorage.Data();
     strcpy(targetPath, targetDir);
-    SalPathAddBackslash(targetPath, 2 * MAX_PATH);
+    SalPathAddBackslash(targetPath, targetPathStorage.Capacity());
     BOOL targetIsFAT32 /*, targetSupEFS*/;
     BOOL targetSupADS = IsPathOnVolumeSupADS(targetPath, &targetIsFAT32);
     script->TargetPathSupADS = targetSupADS;
@@ -693,8 +719,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     int i;
     for (i = 0; i < data->Count; i++)
     {
-        char* fileName = data->At(i)->FileName;
+        const std::string sourceUtf8 = data->At(i)->FileNameW != NULL ?
+            SalWideToMultiBytePath(data->At(i)->FileNameW, CP_UTF8) : std::string(data->At(i)->FileName);
+        char* fileName = const_cast<char*>(sourceUtf8.c_str());
         char* mapName = data->At(i)->MapName;
+        std::string unicodeCopyName;
         const wchar_t* fileNameW = data->At(i)->FileNameW;
         const wchar_t* fileBaseNameW = fileNameW != NULL ? SalPathFindLastComponentW(fileNameW) : NULL;
 
@@ -725,8 +754,36 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(lastSourcePath, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST);
                     lastSourcePath[s - fileName] = 0;
                 }
+                if (IsTheSamePath(sourcePath, targetPath) && makeCopyOfName && strlen(s + 1) >= MAX_PATH)
+                {
+                    // The legacy "Copy of" formatter counts bytes and can split a
+                    // Unicode basename. Generate only this long-name case in UTF-16.
+                    const std::wstring original = fileBaseNameW != NULL ? fileBaseNameW : SalMultiByteToWidePathUtf8OrAcp(s + 1);
+                    const size_t dot = (attrs & FILE_ATTRIBUTE_DIRECTORY) ? std::wstring::npos : original.find_last_of(L'.');
+                    const std::wstring extension = dot != std::wstring::npos && dot != 0 ? original.substr(dot) : L"";
+                    const std::wstring stem = extension.empty() ? original : original.substr(0, dot);
+                    const std::wstring copyText = SalMultiByteToWidePath(LoadStr(IDS_NEWNAME_COPY), CP_ACP);
+                    for (unsigned int attempt = 1;; ++attempt)
+                    {
+                        const std::wstring suffix = L" - " + copyText + (attempt > 1 ? L" (" + std::to_wstring(attempt) + L")" : L"");
+                        if (suffix.size() + extension.size() >= 255) return FALSE;
+                        std::wstring candidate = stem.substr(0, 255 - suffix.size() - extension.size());
+                        if (!candidate.empty() && candidate.back() >= 0xd800 && candidate.back() <= 0xdbff) candidate.pop_back();
+                        candidate += suffix + extension;
+                        std::wstring fullCandidate = SalMultiByteToWidePathUtf8OrAcp(targetPath);
+                        SalPathAppendW(fullCandidate, candidate.c_str());
+                        unicodeCopyName = SalWideToMultiBytePath(candidate.c_str(), CP_UTF8);
+                        if (!ContainsString(usedNames, unicodeCopyName.c_str()) &&
+                            GetFileAttributesW(SalPathAddExtendedPrefixW(fullCandidate.c_str()).c_str()) == INVALID_FILE_ATTRIBUTES)
+                        {
+                            AddStringToNames(usedNames, unicodeCopyName.c_str());
+                            mapName = const_cast<char*>(unicodeCopyName.c_str());
+                            break;
+                        }
+                    }
+                }
                 if (IsTheSamePath(sourcePath, targetPath) && // "Copy of..." is done only if paths match
-                    makeCopyOfName)                          // check if we will need a "Copy of..." name
+                    makeCopyOfName && unicodeCopyName.empty())                          // check if we will need a "Copy of..." name
                 {
                     strcpy(targetName, s + 1); // copy the proposed full target name into targetPath
                     BOOL isKnown;
@@ -1124,13 +1181,13 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
                                                ? Configuration.CopyMoveLastTransferMode
                                                : Configuration.CopyMoveScheduling;
             script->CopyMoveConflictMode = CMCM_CURRENT; // internal/archive moves keep legacy conflict handling
-            script->OperationSchedulingPolicy = Configuration.CopyMoveOperationPolicy == COSP_ASK
-                                                    ? COSP_STORAGE_AWARE
-                                                    : Configuration.CopyMoveOperationPolicy;
-            script->OperationSchedulingOverride = COSO_DEFAULT;
+            script->OperationSchedulingPolicy = COSP_STORAGE_AWARE;
             if (script->CopyMoveTransferMode != CMS_SEQUENTIAL &&
                 script->CopyMoveTransferMode != CMS_STORAGE_AWARE)
                 script->CopyMoveTransferMode = CMS_STORAGE_AWARE;
+            // Drops have no wait checkbox: user-controlled transfers start now.
+            script->OperationSchedulingOverride = CopyMoveGetSchedulingOverride(
+                script->CopyMoveTransferMode, FALSE);
             if (sourceDir[0] != 0)
                 script->AddStoragePath(sourceDir, copy ? SACCESS_READ : SACCESS_READWRITE);
             script->AddStoragePath(targetPath, SACCESS_WRITE);
@@ -1229,7 +1286,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                                    char* targetPath, char* mask, int selCount,
                                    int* selection, CFileData* oneFile,
                                    CAttrsData* attrsData, CChangeCaseData* chCaseData,
-                                   BOOL onlySize, CCriteriaData* filterCriteria)
+                                   BOOL onlySize, CCriteriaData* filterCriteria, BOOL keepBranchPaths)
 {
     CALL_STACK_MESSAGE5("CFilesWindow::BuildScriptMain(, %d, %s, %s, %d, , , , , ,)",
                         type, targetPath, mask, selCount);
@@ -1346,7 +1403,8 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
 
     GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
 
-    char sourcePath[2 * MAX_PATH + 10]; // +extra space for mask ("\\*"), + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer sourcePathStorage(4 * SAL_MAX_PATH);
+    char* sourcePath = sourcePathStorage.Data();
     strcpy(sourcePath, GetPath());
 
     BOOL sourceSupADS = FALSE;
@@ -1397,7 +1455,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
 
     char* useName = (oneFile != NULL ? oneFile->Name : NULL);
     char* useDOSName = (oneFile != NULL ? oneFile->DosName : NULL);
-    if (type == atDelete && selCount <= 1 && oneFile != NULL && oneFile->DosName != NULL)
+    if (!IsBranchView() && type == atDelete && selCount <= 1 && oneFile != NULL && oneFile->DosName != NULL)
     {
         char* s = sourcePath + strlen(sourcePath);
         char* end = s;
@@ -1443,6 +1501,34 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                 oneFile = (selection[i] < Dirs->Count) ? &Dirs->At(selection[i]) : &Files->At(selection[i] - Dirs->Count);
                 useName = oneFile->Name;
                 useDOSName = oneFile->DosName;
+            }
+            std::string branchName;
+            if (IsBranchView())
+            {
+                const std::wstring directory = GetItemDirectoryW(*oneFile);
+                const std::string parent = SalWideToMultiBytePath(directory.c_str(), CP_UTF8);
+                if (parent.empty() || !sourcePathStorage.Ensure((int)parent.size() + 16))
+                    return FALSE;
+                sourcePath = sourcePathStorage.Data();
+                memcpy(sourcePath, parent.c_str(), parent.size() + 1);
+                const std::wstring fullPath = GetItemFullPathW(*oneFile);
+                branchName = SalWideToMultiBytePath(SalPathFindFileNameW(fullPath.c_str()), CP_UTF8);
+                useName = (char*)branchName.c_str();
+                useDOSName = NULL;
+                if (type == atCopy || type == atMove)
+                {
+                    sourceSupADS = (filterCriteria == NULL || !filterCriteria->IgnoreADS) &&
+                                   IsPathOnVolumeSupADS(sourcePath, NULL);
+                    srcAndTgtPathsFlags &= ~(OPFL_SRCPATH_IS_NET | OPFL_SRCPATH_IS_FAST);
+                    srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(sourcePath, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST);
+                    script->SourcePathIsNetwork |= (srcAndTgtPathsFlags & OPFL_SRCPATH_IS_NET) != 0;
+                    script->AddStoragePath(sourcePath, type == atMove ? SACCESS_READWRITE : SACCESS_READ);
+                    if (type == atMove && !HasTheSameRootPathAndVolume(sourcePath, targetPath))
+                    {
+                        script->SameRootButDiffVolume = TRUE;
+                        script->ShowStatus = TRUE;
+                    }
+                }
             }
             i++;
             // oneFile points to the selected or caret item in the filebox
@@ -1522,14 +1608,82 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             {
                 if (filterCriteria == NULL || filterCriteria->AgreeMasksAndAdvanced(oneFile))
                 {
-                    if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, targetPath,
-                                         targetPathState, targetSupADS, targetIsFAT32, mask,
+                    std::string branchTarget;
+                    std::vector<int> branchCreatedDirectories;
+                    const CQuadWord branchSizeBefore = script->TotalFileSize;
+                    char* itemTargetPath = targetPath;
+                    if (IsBranchView() && keepBranchPaths && (type == atCopy || type == atMove))
+                    {
+                        std::wstring relative = GetItemRelativePathW(*oneFile);
+                        std::wstring sourceDirectory = GetPathW();
+                        std::wstring targetDirectory = SalMultiByteToWidePathUtf8OrAcp(targetPath);
+                        size_t begin = 0;
+                        size_t slash;
+                        while ((slash = relative.find(L'\\', begin)) != std::wstring::npos)
+                        {
+                            const std::wstring component = relative.substr(begin, slash - begin);
+                            if (component.empty() || component == L"." || component == L"..")
+                                return FALSE;
+                            SalPathAppendW(sourceDirectory, component.c_str());
+                            SalPathAppendW(targetDirectory, component.c_str());
+                            const std::wstring targetApi = SalPathAddExtendedPrefixW(targetDirectory.c_str());
+                            if (GetFileAttributesW(targetApi.c_str()) == INVALID_FILE_ATTRIBUTES)
+                            {
+                                COperation create;
+                                create.Opcode = ocCreateDir;
+                                create.Size = CREATE_DIR_SIZE;
+                                create.Attr = FILE_ATTRIBUTE_DIRECTORY;
+                                create.SourceName = DupStr(SalWideToMultiBytePath(sourceDirectory.c_str(), CP_UTF8).c_str());
+                                create.TargetName = DupStr(SalWideToMultiBytePath(targetDirectory.c_str(), CP_UTF8).c_str());
+                                create.SetSourceNameW(SalPathAddExtendedPrefixW(sourceDirectory.c_str()).c_str());
+                                create.SetTargetNameW(targetApi.c_str());
+                                if (create.SourceName == NULL || create.TargetName == NULL)
+                                {
+                                    free(create.SourceName);
+                                    free(create.TargetName);
+                                    return FALSE;
+                                }
+                                int createIndex = script->Add(create);
+                                if (!script->IsGood())
+                                {
+                                    script->ResetState();
+                                    free(create.SourceName);
+                                    free(create.TargetName);
+                                    return FALSE;
+                                }
+                                branchCreatedDirectories.push_back(createIndex);
+                            }
+                            begin = slash + 1;
+                        }
+                        branchTarget = SalWideToMultiBytePath(targetDirectory.c_str(), CP_UTF8);
+                        itemTargetPath = (char*)branchTarget.c_str();
+                    }
+                    if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, itemTargetPath,
+                                         keepBranchPaths ? GetTargetPathState(tpsUnknown, itemTargetPath) : targetPathState,
+                                         targetSupADS, targetIsFAT32, mask,
                                          useName, useDOSName, oneFile->Size, attrsData, NULL,
                                          oneFile->Attr, chCaseData, onlySize, NULL,
                                          srcAndTgtPathsFlags, oneFile->UseWideName() ? oneFile->NameW : NULL))
                     {
                         SetCurrentDirectoryToSystem();
                         return FALSE;
+                    }
+                    // Every created ancestor encloses this file so Skip never proceeds into a missing parent.
+                    for (std::vector<int>::reverse_iterator directory = branchCreatedDirectories.rbegin();
+                         directory != branchCreatedDirectories.rend(); ++directory)
+                    {
+                        COperation label;
+                        label.Opcode = ocLabelForSkipOfCreateDir;
+                        label.Attr = *directory;
+                        const CQuadWord size = script->TotalFileSize - branchSizeBefore;
+                        label.SourceName = (char*)(DWORD_PTR)size.LoDWord;
+                        label.TargetName = (char*)(DWORD_PTR)size.HiDWord;
+                        script->Add(label);
+                        if (!script->IsGood())
+                        {
+                            script->ResetState();
+                            return FALSE;
+                        }
                     }
                 }
             }
@@ -2664,7 +2818,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             free(op.SourceName);
             return (msgRes == DIALOG_YES /* Skip */ || msgRes == DIALOG_NO /* Skip All */);
         }
-        char finalName[2 * MAX_PATH + 200]; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
+        CPathBuffer finalName(4 * SAL_MAX_PATH);
         if (mapName == NULL)
         {
             // Petr: a bit of a hack: the *.* mask doesn't create a copy of the source name, which is a problem when copying
@@ -2672,7 +2826,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             // by changing the mask to NULL = a simple textual copy of the name
             char* opMask = mask != NULL && strcmp(mask, "*.*") == 0 ? NULL : mask;
             if ((op.TargetName = BuildName(targetPath,
-                                           MaskName(finalName, 2 * MAX_PATH + 200, fileName, opMask),
+                                           MaskName(finalName.Data(), finalName.Capacity(), fileName, opMask),
                                            NULL, &skip, &ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
             {
                 free(op.SourceName);
@@ -2884,7 +3038,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         HANDLE in;
                         if (!invalidSrcName)
                         {
-                            in = HANDLES_Q(CreateFile(op.SourceName, GENERIC_READ,
+                            in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op.SourceName, op.SourceNameWValid ? op.SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                                       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                         }
@@ -3001,6 +3155,15 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             return skip;
         }
+        std::wstring sourceW;
+        if (fileNameW != NULL && *fileNameW != 0)
+        {
+            sourceW = GetPathW() != NULL && GetPathW()[0] != 0 && IsTheSamePath(sourcePath, GetPath()) ? std::wstring(GetPathW()) : SalMultiByteToWidePathUtf8OrAcp(sourcePath);
+            SalPathAppendW(sourceW, fileNameW);
+        }
+        else
+            sourceW = SalMultiByteToWidePathUtf8OrAcp(op.SourceName);
+        op.SetSourceNameW(SalPathAddExtendedPrefixW(sourceW.c_str()).c_str());
         op.TargetName = NULL;
         script->Add(op);
         if (!script->IsGood())
@@ -3022,27 +3185,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 script->BytesPerCluster = d1 * d2;
         }
 
-        char name[2 * MAX_PATH]; // + MAX_PATH is a reserve (Windows makes paths longer than MAX_PATH)
-        int l = (int)strlen(sourcePath);
-        memmove(name, sourcePath, l);
-        if (name[l - 1] != '\\')
-            name[l++] = '\\';
-        memmove(name + l, fileName, 1 + strlen(fileName)); // name is always < MAX_PATH
+        std::wstring nameW = SalMultiByteToWidePathUtf8OrAcp(sourcePath);
+        const std::wstring baseW = fileNameW != NULL ? std::wstring(fileNameW) : SalMultiByteToWidePathUtf8OrAcp(fileName);
+        SalPathAppendW(nameW, baseW.c_str());
+        const std::string name = SalWideToMultiBytePath(nameW.c_str(), CP_UTF8);
+        nameW = SalPathAddExtendedPrefixW(nameW.c_str());
         CQuadWord s;
         DWORD err = NO_ERROR;
         if (FileBasedCompression && !onlySize &&                                         // if compression is even possible
             (sourceFileAttr & (FILE_ATTRIBUTE_COMPRESSED | FILE_ATTRIBUTE_SPARSE_FILE))) // if the file is compressed or sparse (sparse file)
         {
-            s.LoDWord = GetCompressedFileSize(name, &s.HiDWord);
+            s.LoDWord = GetCompressedFileSizeW(nameW.c_str(), &s.HiDWord);
             err = GetLastError();
-            if (err == ERROR_FILE_NOT_FOUND && fileDOSName != NULL && strcmp(fileName, fileDOSName) != 0)
-            {                                                            // workaround for computing the size of a file that must be accessed via DOS-name when we cannot do it via the UNICODE name (the multibyte version of the name converted back to UNICODE doesn't match the original file name)
-                memmove(name + l, fileDOSName, 1 + strlen(fileDOSName)); // name is always < MAX_PATH
-                s.LoDWord = GetCompressedFileSize(name, &s.HiDWord);
-                err = GetLastError();
-                if (s.LoDWord == 0xFFFFFFFF && err != NO_ERROR)
-                    memmove(name + l, fileName, 1 + strlen(fileName)); // (name is always < MAX_PATH - in case of an error, the report will use the full name instead of the DOS name
-            }
         }
         else
         {
@@ -3052,8 +3206,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             if (!script->SkipAllCountSizeErrors)
             {
-                sprintf(message, LoadStr(IDS_GETCOMPRFILESIZEERROR), name, GetErrorText(err));
-                script->SkipAllCountSizeErrors = SalMessageBox(HWindow, message, LoadStr(IDS_ERRORTITLE),
+                const std::string errorMessage = Salamander::BranchViewText::FormatCompressedSizeError(
+                    LoadStr(IDS_GETCOMPRFILESIZEERROR), name.c_str(), GetErrorText(err));
+                script->SkipAllCountSizeErrors = SalMessageBox(HWindow, errorMessage.c_str(), LoadStr(IDS_ERRORTITLE),
                                                                MB_YESNO | MB_ICONEXCLAMATION) == IDYES;
                 UpdateWindow(MainWindow->HWindow);
             }
@@ -3130,7 +3285,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             return skip;
         }
-        op.TargetName = (char*)(DWORD_PTR)((SalGetFileAttributes(op.SourceName) & attrsData->AttrAnd) | attrsData->AttrOr);
+        std::wstring sourceW;
+        if (fileNameW != NULL && *fileNameW != 0)
+        {
+            sourceW = GetPathW() != NULL && GetPathW()[0] != 0 && IsTheSamePath(sourcePath, GetPath()) ? std::wstring(GetPathW()) : SalMultiByteToWidePathUtf8OrAcp(sourcePath);
+            SalPathAppendW(sourceW, fileNameW);
+        }
+        else
+            sourceW = SalMultiByteToWidePathUtf8OrAcp(op.SourceName);
+        sourceW = SalPathAddExtendedPrefixW(sourceW.c_str());
+        op.SetSourceNameW(sourceW.c_str());
+        op.TargetName = (char*)(DWORD_PTR)((GetFileAttributesW(sourceW.c_str()) & attrsData->AttrAnd) | attrsData->AttrOr);
         script->Add(op);
         if (!script->IsGood())
         {
