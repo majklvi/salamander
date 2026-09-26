@@ -46,23 +46,27 @@ struct Row {
         Data.Name = Name.c_str(); Data.NameLen=(int)Name.size(); Data.NameW = Wide.c_str();
     }
 };
-struct RowArray {
+static size_t ArrayAtCalls = 0, ArrayDataCalls = 0;
+struct CFilesArray {
     std::vector<std::unique_ptr<Row>> Rows;
+    std::vector<CFileData> Data;
     int Count = 0;
-    CFileData& At(int i) { return Rows.at(i)->Data; }
-    void Clear() { Rows.clear(); Count = 0; }
+    CFilesArray() { Data.reserve(64); }
+    CFileData& At(int i) { ++ArrayAtCalls; return Data.at(i); }
+    CFileData* GetData() { ++ArrayDataCalls; return Data.data(); }
+    void Clear() { Rows.clear(); Data.clear(); Count = 0; }
 };
 struct CFilesWindow {
-    RowArray Directories, FileRows;
-    RowArray* Dirs = &Directories;
-    RowArray* Files = &FileRows;
+    CFilesArray Directories, FileRows;
+    CFilesArray* Dirs = &Directories;
+    CFilesArray* Files = &FileRows;
     const CFileData* Focus = nullptr;
     std::string Root = "C:\\root";
     bool Disk = true, FailPath = false;
     BOOL Is(int type) { return Disk && type == ptDisk; }
     Row* Find(const CFileData* file) {
         for (auto array : {Dirs, Files})
-            for (auto& row : array->Rows) if (&row->Data == file) return row.get();
+            for (int i=0; i<array->Count; ++i) if (&array->Data[i] == file) return array->Rows[i].get();
         return nullptr;
     }
     std::wstring GetItemFullPathW(const CFileData& file) {
@@ -70,9 +74,10 @@ struct CFilesWindow {
     }
     const CFileData* Add(std::wstring name, std::wstring full, bool selected=false,
                          bool directory=false, std::string mirror={}) {
-        RowArray* array = directory ? Dirs : Files;
+        CFilesArray* array = directory ? Dirs : Files;
         array->Rows.emplace_back(new Row(std::move(name),std::move(full),selected,directory,std::move(mirror)));
-        ++array->Count; return &array->Rows.back()->Data;
+        array->Data.push_back(array->Rows.back()->Data);
+        ++array->Count; return &array->Data.back();
     }
     void Clear() { Dirs->Clear(); Files->Clear(); Focus=nullptr; Disk=true; FailPath=false; }
 };
@@ -119,7 +124,7 @@ struct CSalamanderGeneralAbstract {
         for (; *index < window->Dirs->Count+window->Files->Count;) {
             int i=(*index)++;
             Row* row=i<window->Dirs->Count ? window->Dirs->Rows[i].get() : window->Files->Rows[i-window->Dirs->Count].get();
-            if (!selected || row->Selected) { *isDir=row->Directory; return &row->Data; }
+            if (!selected || row->Selected) { *isDir=row->Directory; return i<window->Dirs->Count ? &window->Dirs->At(i) : &window->Files->At(i-window->Dirs->Count); }
         }
         return nullptr;
     }

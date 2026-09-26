@@ -23,6 +23,7 @@
 CPanelTmpEnumData::CPanelTmpEnumData()
 {
     SourcePanel = NULL;
+    ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
     Indexes = NULL;
     CurrentIndex = 0;
     IndexesCount = 0;
@@ -1657,17 +1658,71 @@ const char* WINAPI PanelEnumDiskSelection(HWND parent, int enumFiles, const char
     {
         if (data->CurrentIndex >= data->IndexesCount)
             return NULL;
-        const int index = data->Indexes[data->CurrentIndex++];
+        const int selectionIndex = data->CurrentIndex++;
+        const int index = data->Indexes[selectionIndex];
         if (index < data->Dirs->Count || index >= data->Dirs->Count + data->Files->Count)
         {
-            if (errorOccured != NULL) *errorOccured = SALENUM_ERROR;
+            if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
             return NULL;
         }
         const CFileData& file = data->Files->At(index - data->Dirs->Count);
-        data->BranchEnumName = SalWideToMultiBytePath(data->SourcePanel->GetItemRelativePathW(file).c_str(), CP_UTF8);
+        CQuadWord fileSize = file.Size;
+        try
+        {
+            const std::wstring relativePath = data->SourcePanel->GetItemRelativePathW(file);
+            data->BranchEnumName = SalWideToMultiBytePath(relativePath.c_str(), CP_UTF8);
+            if (relativePath.empty() || data->BranchEnumName.empty())
+            {
+                if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+                SetLastError(ERROR_INVALID_DATA);
+                return NULL;
+            }
+            if (enumFiles == 3 && (file.Attr & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            {
+                if (data->BranchEnumLinkSizeValid.size() != static_cast<size_t>(data->IndexesCount))
+                {
+                    data->BranchEnumLinkSizes.resize(data->IndexesCount);
+                    data->BranchEnumLinkSizeValid.assign(data->IndexesCount, FALSE);
+                }
+                if (data->BranchEnumLinkSizeValid[selectionIndex])
+                    fileSize = data->BranchEnumLinkSizes[selectionIndex];
+                else
+                {
+                    const std::wstring fullPath = data->SourcePanel->GetItemFullPathW(file);
+                    const std::string encodedPath = SalWideToMultiBytePath(fullPath.c_str(), CP_UTF8);
+                    if (fullPath.empty() || encodedPath.empty())
+                    {
+                        if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+                        SetLastError(ERROR_INVALID_DATA);
+                        return NULL;
+                    }
+                    BOOL cancel = FALSE;
+                    CQuadWord targetSize;
+                    if (GetLinkTgtFileSize(parent, encodedPath.c_str(), NULL, &targetSize,
+                                          &cancel, &data->ErrGetFileSizeOfLnkTgtIgnAll))
+                        fileSize = targetSize;
+                    else if (cancel)
+                    {
+                        if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+                        return NULL;
+                    }
+                    // A move packer may enumerate again after deleting its
+                    // sources. Retain the resolved (or ignored) size on reset,
+                    // just as ordinary enumeration retains DiskDirectoryTree.
+                    data->BranchEnumLinkSizes[selectionIndex] = fileSize;
+                    data->BranchEnumLinkSizeValid[selectionIndex] = TRUE;
+                }
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return NULL;
+        }
         if (dosName != NULL) *dosName = NULL;
         if (isDir != NULL) *isDir = FALSE;
-        if (size != NULL) *size = file.Size;
+        if (size != NULL) *size = fileSize;
         if (attr != NULL) *attr = file.Attr;
         if (lastWrite != NULL) *lastWrite = file.LastWrite;
         return data->BranchEnumName.c_str();

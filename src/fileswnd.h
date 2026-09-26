@@ -1889,6 +1889,9 @@ struct CPanelTmpEnumData
 {
     CFilesWindow* SourcePanel;
     std::string BranchEnumName;
+    BOOL ErrGetFileSizeOfLnkTgtIgnAll;
+    std::vector<CQuadWord> BranchEnumLinkSizes;
+    std::vector<BYTE> BranchEnumLinkSizeValid;
     int* Indexes;
     int CurrentIndex;
     int IndexesCount;

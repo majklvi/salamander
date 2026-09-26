@@ -5,6 +5,10 @@ implemented in the host's disk panel, so a file retains its actual location for
 viewing, editing, selection and file operations. It does not create a virtual
 folder or move any files.
 
+The [plug-in path contract and consumer audit](branch-view-plugin-paths.md)
+explains which operations use the shared host resolver, how archive packing
+preserves relative paths, and which legacy plug-in commands still need migration.
+
 ## Using the view
 
 - Open a local folder, mapped network drive or UNC folder and press **Ctrl+B**,
@@ -201,7 +205,7 @@ exercise the built application. Passing one does not imply the others passed.
 
 | Layer | Verified scope |
 | --- | --- |
-| `filecomp_panel_paths_tests.py` | PASS: 30 checks over the actual Compare command, helpers and host resolver; duplicate basenames, selected/focused and cross-panel choices from either side, Unicode/UNC/long paths, display-mirror collisions, old-host fallback, failed resolution and output capacities. The previous command fails 23 of 26 applicable checks. |
+| `filecomp_panel_paths_tests.py` | PASS: 55 checks per configuration over the actual Compare command, helpers and host resolver; duplicate basenames, selected/focused and cross-panel choices from either side, Unicode/UNC/long paths, display-mirror collisions, old-host fallback, failed resolution, output capacities and constant-time row membership. The original previous-command run failed 23 of 26 applicable checks. |
 | Native `branch_view_tests` | PASS: 605 files, zero failures; nested trees, duplicate basenames, Czech/CJK/emoji components, a 254-UTF-16-unit filename, UTF-8 paths over 260 bytes, full paths over 260 UTF-16 units, hidden-folder filtering, batching, replacement scan, cancellation, immediate scanner-owner destruction, UNC prefix construction, component-aware root checks, and a real directory-link cycle skipped. |
 | `branch_view_contract_tests.py` | Lifecycle ordering, operation-suspend guards, coalesced asynchronous refresh, exact selection identity, recursive watcher registration, mode restoration, history ownership, duplicate/closed tabs, Path column layout, saved selection, and stale Explorer-property results. |
 | Native action tests | PASS: viewer enumeration 11 checks, operation/shell/recycle 33, worker paths 9, file launching 12, copy/ADS paths 11. Launch tests use real processes; recycle tests use only disposable fixtures. |

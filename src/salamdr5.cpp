@@ -1476,19 +1476,56 @@ BOOL SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err)
 
 BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)
 {
-    HANDLE hFile = HANDLES_Q(CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                        NULL, OPEN_EXISTING, 0, NULL));
-    if (hFile != INVALID_HANDLE_VALUE)
+    auto fail = [&](DWORD error) {
+        if (err != NULL) *err = error;
+        size.Set(0, 0);
+        SetLastError(error);
+        return FALSE;
+    };
+    if (fileName == NULL || *fileName == 0)
+        return fail(ERROR_INVALID_PARAMETER);
+    try
     {
-        DWORD dummyErr;
-        BOOL ret = SalGetFileSize(hFile, size, err != NULL ? *err : dummyErr);
+        // Panel and plug-in paths can be UTF-8; older callers still use ACP.
+        // Validate before decoding: permissive UTF-8 conversion can substitute
+        // characters instead of falling back to the original Windows code page.
+        std::wstring path = SalMultiByteToWidePath(fileName,
+            IsValidPathUtf8Text(fileName) ? CP_UTF8 : CP_ACP);
+        if (path.empty())
+            return fail(ERROR_INVALID_NAME);
+        if (path.size() >= MAX_PATH && !SalIsExtendedLengthPathW(path.c_str()))
+        {
+            // An extended prefix requires an absolute path. Resolve relative
+            // paths on the heap and retain already-extended paths verbatim.
+            DWORD capacity = GetFullPathNameW(path.c_str(), 0, NULL, NULL);
+            if (capacity == 0)
+                return fail(GetLastError());
+            if (capacity > SAL_MAX_PATH)
+                return fail(ERROR_FILENAME_EXCED_RANGE);
+            std::vector<wchar_t> absolutePath(capacity, L'\0');
+            DWORD length = GetFullPathNameW(path.c_str(), capacity, absolutePath.data(), NULL);
+            if (length == 0)
+                return fail(GetLastError());
+            if (length >= capacity)
+                return fail(ERROR_INSUFFICIENT_BUFFER);
+            path = SalPathAddExtendedPrefixW(absolutePath.data());
+        }
+        HANDLE hFile = HANDLES_Q(CreateFileW(path.c_str(), 0,
+            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+            NULL, OPEN_EXISTING, 0, NULL));
+        if (hFile == INVALID_HANDLE_VALUE)
+            return fail(GetLastError());
+        DWORD error = ERROR_SUCCESS;
+        BOOL ret = SalGetFileSize(hFile, size, error);
         HANDLES(CloseHandle(hFile));
+        if (err != NULL) *err = error;
+        SetLastError(error);
         return ret;
     }
-    if (err != NULL)
-        *err = GetLastError();
-    size.Set(0, 0);
-    return FALSE;
+    catch (const std::bad_alloc&)
+    {
+        return fail(ERROR_NOT_ENOUGH_MEMORY);
+    }
 }
 
 static BOOL IsValidAttrPathUtf8Text(const char* text, int textLen)
