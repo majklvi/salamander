@@ -766,7 +766,8 @@ CREATE_FILE:
         {
             TRACE_E(LOW_MEMORY);
             CloseHandle(hFile);
-            return FALSE;
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return INVALID_HANDLE_VALUE;
         }
         file->HFile = hFile;
         file->HParentWnd = hParent;
@@ -931,7 +932,7 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
             DWORD lastError;
             DWORD dlgRet;
             if (silentMask != NULL && (*silentMask & SILENT_SKIP_FILE_READ) && ButtonsContainsSkip(flags))
-                dlgRet |= DIALOG_SKIP;
+                dlgRet = DIALOG_SKIP;
             else
             {
                 lastError = GetLastError();
@@ -950,7 +951,7 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
                 }
 
                 file->HFile = HANDLES_Q(CreateFile(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
-                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
+                                                   OPEN_EXISTING, file->dwFlagsAndAttributes, NULL));
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                 SEEK:
@@ -1016,7 +1017,7 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
             DWORD lastError = GetLastError();
             DWORD dlgRet;
             if (silentMask != NULL && (*silentMask & SILENT_SKIP_FILE_WRITE) && ButtonsContainsSkip(flags))
-                dlgRet |= DIALOG_SKIP;
+                dlgRet = DIALOG_SKIP;
             else
             {
                 dlgRet = DialogError((hParent == HWND_STORED) ? file->HParentWnd : hParent, (flags & BUTTONS_MASK),
@@ -1034,7 +1035,7 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
                 }
 
                 file->HFile = HANDLES_Q(CreateFile(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
-                                                   file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
+                                                   OPEN_EXISTING, file->dwFlagsAndAttributes, NULL));
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                     //SEEK:
