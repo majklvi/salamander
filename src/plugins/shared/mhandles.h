@@ -27,6 +27,7 @@
 inline void __HandlesEmptyFunction() {}
 
 #define HANDLES_CAN_USE_TRACE() __HandlesEmptyFunction()
+#define HANDLES_FINALIZE_FOR_PROCESS_EXIT() __HandlesEmptyFunction()
 #define HANDLES(function) ::function
 #define HANDLES_Q(function) ::function
 #define HANDLES_COUNTS_TO_TRACE() __HandlesEmptyFunction()
@@ -38,6 +39,7 @@ inline void __HandlesEmptyFunction() {}
 #else // MHANDLES_ENABLE
 
 #define HANDLES_CAN_USE_TRACE() __Handles.SetCanUseTrace()
+#define HANDLES_FINALIZE_FOR_PROCESS_EXIT() __Handles.FinalizeForProcessExit()
 #define HANDLES(function) __Handles.SetInfo(__FILE__, __LINE__).##function
 #define HANDLES_Q(function) __Handles.SetInfo(__FILE__, __LINE__, __otQuiet).##function
 #define HANDLES_COUNTS_TO_TRACE() __Handles.InformationsToTrace(FALSE)
@@ -251,6 +253,8 @@ protected:
 public:
     C_HandlesDataArray();
     ~C_HandlesDataArray();
+    void ReleaseStorage();
+    bool HasStorage() const { return Data != NULL; }
 
     int Add(const C__HandlesData& member);
     void Delete(int index);
@@ -294,11 +298,15 @@ protected:
     C__HandlesOutputType OutputType;  // typ vystupu hlasek
     CRITICAL_SECTION CriticalSection; // pro synchronizaci multi-threadu
     BOOL CanUseTrace;                 // TRUE az po inicializaci "dbg.h" modulu, az bude mozne pouzivat TRACE_ makra
+    BOOL Finalized;
 
 public:
     C__Handles();
 
     ~C__Handles();
+
+    // Only after all callers have drained, while host diagnostics are alive.
+    void FinalizeForProcessExit();
 
     C__Handles& SetInfo(const char* file, int line,
                         C__HandlesOutputType outputType = __otMessages);
