@@ -29,6 +29,33 @@
 #include "shiconov.h"
 #include "common/widepath.h"
 
+// Ordinary-panel subset adapted from PR #769, branch_view.cpp at donor
+// 47661e92d4b3cbe5bb593ae3d75a3f1f698ef413. No Branch state is imported.
+// Narrow mirrors use UTF-8 first with ACP fallback; exact wide data wins.
+std::wstring CFilesWindow::GetItemDirectoryW(const CFileData& /*file*/) const
+{
+    return GetPathW() != NULL && GetPathW()[0] != 0 ? std::wstring(GetPathW()) : SalMultiByteToWidePath(GetPath(), IsValidPathUtf8Text(GetPath()) ? CP_UTF8 : CP_ACP);
+}
+
+std::wstring CFilesWindow::GetItemFullPathW(const CFileData& file) const
+{
+    const std::wstring name = file.UseWideName() ? file.NameW : SalMultiByteToWidePath(file.Name, IsValidPathUtf8Text(file.Name) ? CP_UTF8 : CP_ACP);
+    std::wstring path = GetItemDirectoryW(file);
+    SalPathAppendW(path, name.c_str());
+    return path;
+}
+
+std::wstring CFilesWindow::GetItemIdentityW(const CFileData& file) const
+{
+    return GetItemFullPathW(file);
+}
+
+std::wstring CFilesWindow::GetItemRelativePathW(const CFileData& file) const
+{
+    return file.UseWideName() ? file.NameW : SalMultiByteToWidePath(file.Name, IsValidPathUtf8Text(file.Name) ? CP_UTF8 : CP_ACP);
+}
+
+
 namespace
 {
 std::wstring TreeViewTextToWide(const char* text)
@@ -2311,7 +2338,7 @@ unsigned IconThreadThreadFBody(void* parameter)
                                             // The icon was extracted while the panel was still using an old DPI.
                                             // Do not let a delayed 24px read populate a freshly rebuilt 16px cache
                                             // after moving from a high-DPI monitor to a 100% monitor.
-                                            HANDLES(DestroyIcon(shi.hIcon));
+                                            ::NOHANDLES(DestroyIcon(shi.hIcon));
                                             shi.hIcon = NULL;
                                             failed = TRUE;
                                         }

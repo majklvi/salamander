@@ -713,6 +713,97 @@ BOOL CSalamanderGeneral::UnregisterServiceOwned(const char* serviceId,
     return UnregisterServiceInternal(serviceId, serviceInterface, providerOwner, TRUE);
 }
 
+// Host-owned resolver adapted from PR #769 at pinned donor 47661e92.
+namespace
+{
+class CPanelItemPathsService : public CSalamanderPanelItemPathsAbstract
+{
+    static const CFileData* FindCurrentItem(CFilesArray* rows, const CFileData* item)
+    {
+        if (rows == NULL || rows->Count <= 0 || rows->GetData() == NULL)
+            return NULL;
+        // CFilesArray stores live CFileData objects contiguously. Integer address
+        // arithmetic is defined even for a foreign pointer; never subtract or
+        // dereference caller pointers before proving exact element membership.
+        const UINT_PTR first = reinterpret_cast<UINT_PTR>(rows->GetData());
+        const UINT_PTR address = reinterpret_cast<UINT_PTR>(item);
+        if (address < first)
+            return NULL;
+        const UINT_PTR offset = address - first;
+        if (offset % sizeof(CFileData) != 0 ||
+            offset / sizeof(CFileData) >= static_cast<UINT_PTR>(rows->Count))
+            return NULL;
+        return &rows->At(static_cast<int>(offset / sizeof(CFileData)));
+    }
+
+public:
+    virtual BOOL WINAPI GetItemFullPath(int panel, const CFileData* item,
+                                        wchar_t* path, int capacity)
+    {
+        if (path != NULL && capacity > 0) path[0] = 0;
+        if (MainThreadID != GetCurrentThreadId())
+        {
+            SetLastError(ERROR_INVALID_THREAD_ID);
+            return FALSE;
+        }
+        if (path == NULL || capacity <= 0 || item == NULL || MainWindow == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        CFilesWindow* window = MainWindow->GetPanel(panel);
+        if (window == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        if (!window->Is(ptDisk))
+        {
+            SetLastError(ERROR_NOT_SUPPORTED);
+            return FALSE;
+        }
+        // Compare addresses before touching caller-supplied item data. A pointer
+        // from another panel or an obsolete listing must not become a guessed path.
+        const CFileData* current = FindCurrentItem(window->Dirs, item);
+        if (current == NULL)
+            current = FindCurrentItem(window->Files, item);
+        if (current == NULL)
+        {
+            SetLastError(ERROR_INVALID_PARAMETER);
+            return FALSE;
+        }
+        try
+        {
+            const std::wstring fullPath = window->GetItemFullPathW(*current);
+            if (fullPath.empty())
+            {
+                SetLastError(ERROR_INVALID_DATA);
+                return FALSE;
+            }
+            if (fullPath.size() >= static_cast<size_t>(capacity))
+            {
+                SetLastError(ERROR_INSUFFICIENT_BUFFER);
+                return FALSE;
+            }
+            memcpy(path, fullPath.c_str(), (fullPath.size() + 1) * sizeof(wchar_t));
+            SetLastError(ERROR_SUCCESS);
+            return TRUE;
+        }
+        catch (const std::bad_alloc&)
+        {
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return FALSE;
+        }
+    }
+};
+
+CSalamanderPanelItemPathsAbstract* GetPanelItemPathsService()
+{
+    static CPanelItemPathsService service;
+    return &service;
+}
+}
+
 BOOL CSalamanderGeneral::QueryService(const CSalamanderServiceQuery* query, CSalamanderServiceResult* result)
 {
     CALL_STACK_MESSAGE1("CSalamanderGeneral::QueryService(,)");
@@ -724,6 +815,19 @@ BOOL CSalamanderGeneral::QueryService(const CSalamanderServiceQuery* query, CSal
     }
     if (query == NULL || query->ServiceId == NULL)
         return FALSE;
+
+    // Immutable built-in service, with no plugin provider lease.
+    if (strcmp(query->ServiceId, SALAMANDER_SERVICE_PANEL_ITEM_PATHS) == 0 &&
+        query->MinimumVersion <= SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0)
+    {
+        if (result != NULL)
+        {
+            result->Interface = GetPanelItemPathsService();
+            result->Version = SALAMANDER_PANEL_ITEM_PATHS_VERSION_1_0;
+            result->ProviderName = "Samandarin";
+        }
+        return TRUE;
+    }
 
     EnterCriticalSection(&SalamanderServiceRegistryLock);
     for (int i = 0; i < SalamanderServiceRegistryCount; ++i)
