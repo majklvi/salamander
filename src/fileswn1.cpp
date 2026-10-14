@@ -1821,9 +1821,11 @@ unsigned IconThreadThreadFBody(void* parameter)
                 SHFILEINFO shi; // for historical reasons (SHGetFileInfo) shi.hIcon is used for all icon types
 
                 // prepare the full path for files/directories being loaded (only when window->Is(ptDisk))
-                char path[MAX_PATH + 10];
+                CPathBuffer iconPathBuffer(4 * SAL_MAX_PATH + 16);
+                char* path = iconPathBuffer.Data();
                 path[0] = 0;
-                WCHAR wPath[MAX_PATH + 10];
+                CWidePathBuffer iconWidePathBuffer(SAL_MAX_PATH + 16);
+                WCHAR* wPath = iconWidePathBuffer.Data();
                 wPath[0] = 0;
                 char* name = path;
                 WCHAR* wName = wPath;
@@ -1837,10 +1839,16 @@ unsigned IconThreadThreadFBody(void* parameter)
                         path[l++] = '\\';
                     name = path + l; // pointer to the location of the name in the full path
                     *name = 0;
-                    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, path, l, wPath, MAX_PATH + 10);
-                    wName = wPath + l;
+                    // The panel path is UTF-8 when representable; older callers can
+                    // still supply ACP. A byte offset is not a wide-character offset.
+                    int wideLength = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, l,
+                                                        wPath, iconWidePathBuffer.Capacity() - 1);
+                    if (wideLength == 0)
+                        wideLength = MultiByteToWideChar(CP_ACP, 0, path, l,
+                                                        wPath, iconWidePathBuffer.Capacity() - 1);
+                    wName = wPath + wideLength;
                     *wName = 0;
-                    pathIsInvalid = !PathContainsValidComponents(path, FALSE);
+                    pathIsInvalid = wideLength == 0 || !PathContainsValidComponents(path, FALSE);
                     if (pathIsInvalid)
                         TRACE_I("Path contains invalid components, shell cannot read icons from such paths! Path: " << path);
                     isGoogleDrivePath = ShellIconOverlays.IsGoogleDrivePath(path);
