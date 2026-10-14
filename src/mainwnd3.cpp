@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+void ReleaseDPIAwareWindowIcons(HWND hWindow);
+
 #include <algorithm>
 #include <new>
 #include <string>
@@ -4594,7 +4596,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             ClosePanelTab(leftPanel, false);
             return -1;
         }
-        UpdatePanelTabVisibility(cpsLeft);
         SetActivePanel(leftPanel);
         //      ReleaseMenuNew();
         CFilesWindow* rightPanel = AddPanelTab(cpsRight);
@@ -4615,9 +4616,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             ClosePanelTab(rightPanel, false);
             return -1;
         }
-        UpdatePanelTabVisibility(cpsRight);
         LeftPanel = leftPanel;
         RightPanel = rightPanel;
+        // AddPanelTab creates inactive tabs; publish visibility only after both
+        // initial panels have become the current panels for their sides.
+        UpdatePanelTabVisibility(cpsLeft);
+        UpdatePanelTabVisibility(cpsRight);
 
         EditWindow = new CEditWindow;
         if (EditWindow == NULL || !EditWindow->IsGood())
@@ -11891,6 +11895,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         }
 
         UnregisterSessionNotification(HWindow);
+        // CWindow detaches at WM_DESTROY, so its owner never sees WM_NCDESTROY.
+        ReleaseDPIAwareWindowIcons(HWindow);
         KillTimer(HWindow, IDT_RESTOREWINDOWPLACEMENT);
 
         // notify the task list that we are exiting
