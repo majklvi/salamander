@@ -255,7 +255,7 @@ bool Stable(const BY_HANDLE_FILE_INFORMATION& info, const Entry& expected)
         ((uint64_t(info.nFileSizeHigh) << 32) | info.nFileSizeLow) == expected.size;
 }
 bool Content(const std::wstring& left, const std::wstring& right, const Row& row,
-             std::atomic<bool>& cancel, bool& equal, DWORD& error)
+             std::atomic<bool>& cancel, Progress& progress, bool& equal, DWORD& error)
 {
     Handle a(CreateFileW(ApiPath(left).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
                          OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, nullptr));
@@ -274,6 +274,7 @@ bool Content(const std::wstring& left, const std::wstring& right, const Row& row
         DWORD na = 0, nb = 0;
         if (!ReadFile(a.value, ab.data(), DWORD(ab.size()), &na, nullptr) ||
             !ReadFile(b.value, bb.data(), DWORD(bb.size()), &nb, nullptr)) { error = GetLastError(); return false; }
+        progress.readBytes.fetch_add(uint64_t(na) + nb, std::memory_order_relaxed);
         if (na != nb || !std::equal(ab.begin(), ab.begin() + na, bb.begin())) { equal = false; break; }
         if (!na) break;
     }
@@ -421,7 +422,7 @@ Result Compare(const std::wstring& inputLeft, const std::wstring& inputRight, co
             ea->size == eb->size && (o.ignoreDate || row.state == State::Equal))
         {
             bool equal = true; DWORD error = 0;
-            if (!Content(Join(left, ea->path), Join(right, eb->path), row, cancel, equal, error))
+            if (!Content(Join(left, ea->path), Join(right, eb->path), row, cancel, progress, equal, error))
             { row.state = State::Blocked; row.action = Action::Blocked; row.error = error; row.reason = error == ERROR_FILE_INVALID ? Reason::Changed : Reason::ScanError; }
             else { row = Classify(ea, eb, o, equal); row.reason = Reason::Content; }
         }

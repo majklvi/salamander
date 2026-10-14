@@ -202,7 +202,7 @@ Konkrétní omezení SDK a integrační body doplňuje [technický průzkum zák
 
 ## Akceptační scénáře před vydáním
 
-Scénáře níže jsou plán budoucího ověření. Při přípravě této dokumentace nebyly provedeny jako testy existujícího pluginu.
+Scénáře níže tvoří širší testovací plán včetně budoucích zápisů. Provedené případy první etapy (místní cesty, náhled a Stop/Close) a jejich omezení zaznamenává [protokol implementace](directory-sync-plugin-implementation.md); zbývající případy nelze považovat za ověřené.
 
 | Oblast | Minimální příklady a očekávání |
 | --- | --- |
@@ -243,7 +243,7 @@ Rozhodovací tabulky ověřit jednotkově nad syntetickými stromy. Kopírován�
 | V2 | Vliv filtrů zobrazení a označení na provedení v TC | Ověřen souhrn i skutečné kopie při filtru a ručním vynechání. Návrh provádět jen viditelné zařazené akce, přehledně uvést skryté. |
 | V3 | Obsah závěrečného dialogu TC a jeho výchozí volby v našem rozsahu | Provedeny kopie a schválené testovací mazání. Cancel při potvrzení přepisu ponechal cíl. Doplněno skutečné přerušení 2GiB přenosu: po OK (Stop) prázdný cíl, další položka se nekopírovala. Řízená změna posledního bytu při Verify vyvolala CRC error / The two files are DIFFERENT!; po Abort chybná kopie zůstala, další položka se nepřenesla. Ignore/Ignore all, přerušení přepisu a globální úklid neověřeny; globální úklid do v1 nenavržen. |
 | V4 | Sémantika výběru obou panelů a masek složek | Doplněn pravostranný i smíšený výběr, přímé děti vybrané složky bez Subdirs, ukotvené masky a **. Zbývá přesná specifikace parseru a její testy; nikoli úplné převzetí hledacích funkcí TC. |
-| V5 | Dlouhé Unicode kořeny v SDK 0.16 | Uživatel rozhodl používat stávající SDK a nezměněný Samandarin-0.16. Plugin zkopíruje GetPanelPath/NameW, provede explicitní převody a použije široká WinAPI. Omezení bajtové hranice a dlouhých kořenů se ověří během vývoje, zdokumentují a při zjištěné chybě bezpečně nahlásí. Rozšíření SDK je odložené. |
+| V5 | Dlouhé Unicode kořeny v SDK 0.16 | Stávající SDK, bez rozšíření. Místní Unicode/emoji snapshot a kořeny 269/270 UTF-8 B při 129/130 UTF-16 jednotkách prošly; kořeny 278/279 UTF-16 fungují při ručním zadání v pluginu. Navigace hostitele do 278jednotkového kořene padá i bez pluginu; nelze tvrdit bezpečné nahlášení všech omezení ani úplnou podporu přes SDK. Důkazy, nativní matice a místní Stop/Close jsou v protokolu implementace. UNC/SMB a další délky zůstávají neověřené. |
 | V6 | Bezpečné nahrazení, obnova, identity a metadata na Windows/SMB | Návrh posloupnosti a chybových stavů zdokumentován. NTFS sonda prokázala nežádoucí zachování starých ADS při ReplaceFileW, nutnost finálního nastavení času, nezávislost kopie hardlinku a jednu dlouhou Unicode API cestu. Bezpečný commit, závody, ACL a SMB musí prokázat integrační testy před povolením destruktivních zápisů. |
 
 V1–V4 byly rozšířeny druhou sadou přes Computer Use v TC 11.58. [Protokol](directory-sync-plugin-tc-observations.md) odlišuje pozorování, nápovědu a zbývající případy. [Audit SDK a WinAPI](directory-sync-plugin-sdk.md) obsahuje V5/V6 včetně konkrétní sondy a návrhu operací. Uživatel zvolil pokračování bez SMB testovací složky; žádný místní výsledek neprokazuje SMB. Nejasnosti nemají být potichu doplněny domněnkou v kódu.

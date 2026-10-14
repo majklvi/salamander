@@ -105,7 +105,9 @@ void Status(Preview& p)
     if (p.running)
     {
         wchar_t text[256]{};
-        swprintf_s(text, Text(IDS_SCAN).c_str(), p.progress.scanned.load(), p.progress.compared.load());
+        uint64_t bytes = p.progress.readBytes.load(std::memory_order_relaxed);
+        if (bytes) swprintf_s(text, Text(IDS_READING).c_str(), bytes, p.progress.scanned.load(), p.progress.compared.load());
+        else swprintf_s(text, Text(IDS_SCAN).c_str(), p.progress.scanned.load(), p.progress.compared.load());
         SetDlgItemTextW(p.window, IDC_STATUS, text); return;
     }
     if (p.failed || p.result.cancelled)
@@ -169,7 +171,7 @@ void Start(Preview& p)
     p.options.emptyDirectories = Checked(p.window, IDC_EMPTY);
     p.options.onlySelected = Checked(p.window, IDC_SELECTED);
     InvalidatePlan(p);
-    p.cancel = false; p.progress.scanned = 0; p.progress.compared = 0;
+    p.cancel = false; p.progress.scanned = 0; p.progress.compared = 0; p.progress.readBytes = 0;
     p.running = true; Busy(p, true);
     try
     {

@@ -33,6 +33,7 @@
 #define IDS_SUMMARY 208
 #define IDS_SELECT_ROW 209
 #define IDS_HELP 210
+#define IDS_READING 211
 #define IDS_COLUMNS 220
 #define IDS_STATE 240
 #define IDS_ACTION 260

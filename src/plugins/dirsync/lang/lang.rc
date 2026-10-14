@@ -47,6 +47,7 @@ BEGIN
     IDS_MENU "Directory synchronization preview..."
     IDS_INPUT_ERROR "Both panels must contain Windows folders with complete paths and decodable selected names. The current SDK cannot provide a usable input for these panels."
     IDS_SCAN "Scanning: %llu entries; compared: %llu"
+    IDS_READING "Comparing content: %llu bytes read (both sides); scanned: %llu; completed pairs: %llu"
     IDS_DONE "Complete: %llu rows; visible: %llu; hidden: %llu; blocked/conflicts: %llu"
     IDS_CANCELLED "Cancelled. Partial results contain no actionable proposals."
     IDS_FAILED "Comparison failed. Results have been discarded."

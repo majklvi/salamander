@@ -135,6 +135,8 @@ Kontrakt adaptéru pluginu nad stávajícím SDK:
 
 **Stav V5:** směr je rozhodnutý, kompatibilita a rozsah omezení se prokážou během vývoje. Matice zahrnuje ASCII, Unicode názvy a adresáře, UTF-8 >260 B při UTF-16 <260 jednotkách, UTF-16 >260 a následně UNC. Test musí zaznamenat buď správné zpracování, nebo explicitně hlášené omezení bez zápisu na chybnou cestu. Nížejší úspěch dlouhé cesty ve WinAPI neprokazuje průchod této cesty přes Salamander. Žádné hlavičky SDK ani zdroje hostitele nebyly změněny.
 
+**Místní runtime doplnění 15. října:** [protokol první etapy](directory-sync-plugin-implementation.md) nyní rozlišuje skutečný SDK snapshot od ručního zadání v pluginu. Unicode/emoji kořeny i kořeny 129/130 UTF-16 jednotek s 269/270 UTF-8 bajty prošly přes oba panely a obsahové porovnání. Kořeny 278/279 UTF-16 jednotek prošly přímým zadáním v náhledu; navigace hostitele do 278jednotkového kořene však vyvolala `0xc0000409` v `ucrtbase.dll`. Kontrolní instance téhož Release hostitele bez SPL zopakovala stejný pád. Nejde tedy o dosažené bezpečné hlášení všech omezení ani o prokázanou podporu těchto kořenů přes SDK; oprava hostitele zůstává mimo současný rozsah. SMB/UNC runtime nebylo použito.
+
 ## V6: ověřené API vlastnosti a místní sonda
 
 Prostředí: Windows 10.0.26200.0, svazek C: NTFS. Samostatná diagnostická sonda mimo repozitář: `C:\Samandarin\tc-sync-probe-20261014-r2\probe-winapi.ps1`. Volá přímo `CopyFileExW` a `ReplaceFileW` přes P/Invoke; neobsahuje plugin ani synchronizační engine. Úspěšný výstup je v `winapi-e82ce1bf599f46c294089a3483bc6286\result.json` pod stejným testovacím kořenem.

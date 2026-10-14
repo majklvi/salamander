@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <winioctl.h>
+#include <thread>
 using namespace dirsync;
 namespace
 {
@@ -116,6 +117,17 @@ struct Fixture
         bool ok=DeviceIoControl(handle,FSCTL_SET_REPARSE_POINT,buffer.data(),DWORD(buffer.size()),nullptr,0,&returned,nullptr)!=FALSE;
         CloseHandle(handle); Check(ok,"junction fixture creation");
     }
+    void Sparse(const std::wstring& path)
+    {
+        HANDLE file=CreateFileW(ApiPath(path).c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);
+        Check(file!=INVALID_HANDLE_VALUE,"sparse fixture handle"); files.push_back(path);
+        DWORD returned=0; LARGE_INTEGER end{}; end.QuadPart=64LL*1024*1024*1024;
+        FILETIME ft{0,0};
+        bool ok=DeviceIoControl(file,FSCTL_SET_SPARSE,nullptr,0,nullptr,0,&returned,nullptr)!=FALSE;
+        // Never allocate the logical 64 GiB if sparse setup fails.
+        if(ok) ok=SetFilePointerEx(file,end,nullptr,FILE_BEGIN) && SetEndOfFile(file) && SetFileTime(file,nullptr,nullptr,&ft);
+        CloseHandle(file); Check(ok,"sparse fixture size and time");
+    }
     ~Fixture()
     {
         for (auto& f: files) DeleteFileW(ApiPath(f).c_str());
@@ -197,14 +209,63 @@ void Filesystem()
     bool seen=false;
     for(const auto& row:r.rows) if(row.path.find(L"žluťoučký.txt")!=std::wstring::npos) { seen=true; Check(row.state==State::Equal,"long Unicode read"); }
     Check(seen,"long path enumerated");
+    r=Compare(a,b,o,cancel,progress);
+    Check(r.rows.size()==1 && r.rows[0].state==State::Equal,"long Unicode roots read directly");
+    std::wstring shortA=f.left+L"\\"+std::wstring(85,L'漢'), shortB=f.right+L"\\"+std::wstring(85,L'漢');
+    f.Dir(shortA); f.Dir(shortB);
+    f.Write(shortA+L"\\ascii.txt","Unicode parent"); f.Write(shortB+L"\\ascii.txt","Unicode parent");
+    Check(shortA.size()<260 && WideCharToMultiByte(CP_UTF8,0,shortA.c_str(),-1,nullptr,0,nullptr,nullptr)>260,"UTF8-only long root fixture");
+    r=Compare(shortA,shortB,o,cancel,progress);
+    Check(r.rows.size()==1 && r.rows[0].state==State::Equal,"UTF8-only long roots read");
+    f.Write(f.left+L"\\emoji 😀.txt","emoji"); f.Write(f.right+L"\\emoji 😀.txt","emoji");
+    o.onlySelected=true; o.selection={{L"emoji 😀.txt",false}};
+    r=Compare(f.left,f.right,o,cancel,progress);
+    Check(r.rows.size()==1 && r.rows[0].path==L"emoji 😀.txt" && r.rows[0].state==State::Equal,"wide non-BMP selection");
+    for (const std::wstring& name : {std::wstring(240,L'a')+L".txt",std::wstring(240,L'漢')+L".txt"})
+    {
+        f.Write(f.left+L"\\"+name,"long name"); f.Write(f.right+L"\\"+name,"long name");
+        o.selection={{name,false}};
+        r=Compare(f.left,f.right,o,cancel,progress);
+        Check(r.rows.size()==1 && r.rows[0].path==name && r.rows[0].state==State::Equal,"long filename selected and read exactly");
+    }
     std::wstring decoded;
     Check(DecodePath(u8"C:\\žluťoučký\\漢字",decoded) && decoded==L"C:\\žluťoučký\\漢字","SDK UTF8 decoding");
     Check(!NormalizeRoot(L"relative\\path",decoded),"relative root rejected");
     Check(!NormalizeRoot(L"\\\\.\\PhysicalDrive0",decoded),"device root rejected");
 }
+void Cancellation()
+{
+    Fixture f; f.Sparse(f.left+L"\\a-large.bin"); f.Sparse(f.right+L"\\a-large.bin");
+    f.Write(f.left+L"\\z-after.txt","later"); f.Write(f.right+L"\\z-after.txt","later");
+    Options o; o.content=true; Result result; Progress progress;
+    std::atomic<bool> cancel{false}, finished{false};
+    std::exception_ptr failure;
+    std::thread worker([&] { try { result=Compare(f.left,f.right,o,cancel,progress); } catch (...) { failure=std::current_exception(); } finished=true; });
+    bool reading=false; ULONGLONG deadline=GetTickCount64()+5000;
+    // Observe successful reads without probing share modes: a competing open could
+    // itself make the engine fail before reading and would make this test flaky.
+    while(!finished && GetTickCount64()<deadline)
+    {
+        if(progress.readBytes.load()>0) { reading=true; break; }
+        Sleep(1);
+    }
+    ULONGLONG start=GetTickCount64(); cancel=true; CancelSynchronousIo(worker.native_handle()); worker.join();
+    if(failure) std::rethrow_exception(failure);
+    Check(reading,"cancel during active content read");
+    Check(GetTickCount64()-start<3000,"local content cancellation is prompt");
+    Check(result.cancelled && !Find(result,L"z-after.txt"),"cancel stops before later pair");
+    Check(std::all_of(result.rows.begin(),result.rows.end(),[](const Row& row) { return row.action==Action::Blocked; }),"cancel has no actionable partial rows");
+    HANDLE reopened=CreateFileW(ApiPath(f.left+L"\\a-large.bin").c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+    bool released=reopened!=INVALID_HANDLE_VALUE; if(released) CloseHandle(reopened);
+    Check(released,"cancel releases content handles");
+    o.mask=L"z-after.txt"; cancel=false; progress.scanned=0; progress.compared=0; progress.readBytes=0;
+    result=Compare(f.left,f.right,o,cancel,progress);
+    Check(!result.cancelled && result.rows.size()==1 && result.rows[0].state==State::Equal,"restart after cancellation");
+    Check(progress.readBytes==10,"restart content progress counts both sides independently");
+}
 }
 int main()
 {
-    try { Matrix(); Masks(); Filesystem(); std::cout<<assertions<<" assertions passed\n"; return 0; }
+    try { Matrix(); Masks(); Filesystem(); Cancellation(); std::cout<<assertions<<" assertions passed\n"; return 0; }
     catch(const std::exception& error) { std::cerr<<"FAILED: "<<error.what()<<"\n"; return 1; }
 }

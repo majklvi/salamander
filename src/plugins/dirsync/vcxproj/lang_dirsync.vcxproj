@@ -116,7 +116,10 @@
     <Import Project="..\..\shared\vcxproj\lang_base.props"></Import>
     <Import Project="..\..\shared\vcxproj\lang_debug.props"></Import>
   </ImportGroup>
-  <PropertyGroup Label="UserMacros"></PropertyGroup>
+  <PropertyGroup Label="UserMacros">
+    <!-- Apply after shared lang_debug.props, which enables incremental linking. -->
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <LanguageStandard>stdcpplatest</LanguageStandard>

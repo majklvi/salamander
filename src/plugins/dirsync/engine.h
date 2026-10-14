@@ -44,7 +44,7 @@ struct Row
     DWORD error = 0;
 };
 struct Result { std::vector<Row> rows; bool cancelled = false; };
-struct Progress { std::atomic<uint64_t> scanned{0}, compared{0}; };
+struct Progress { std::atomic<uint64_t> scanned{0}, compared{0}, readBytes{0}; };
 bool DecodePath(const char* input, std::wstring& output);
 bool NormalizeRoot(const std::wstring& input, std::wstring& output);
 std::wstring ApiPath(const std::wstring& path);

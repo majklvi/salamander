@@ -10,7 +10,4 @@
       <Value>$(ShortProjectName)</Value>
     </BuildMacro>
   </ItemGroup>
-  <PropertyGroup>
-    <LinkIncremental>false</LinkIncremental>
-  </PropertyGroup>
 </Project>
