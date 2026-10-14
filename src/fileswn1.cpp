@@ -29,6 +29,33 @@
 #include "shiconov.h"
 #include "common/widepath.h"
 
+// Ordinary-panel subset adapted from PR #769, branch_view.cpp at donor
+// 47661e92d4b3cbe5bb593ae3d75a3f1f698ef413. No Branch state is imported.
+// Narrow mirrors use UTF-8 first with ACP fallback; exact wide data wins.
+std::wstring CFilesWindow::GetItemDirectoryW(const CFileData& /*file*/) const
+{
+    return GetPathW() != NULL && GetPathW()[0] != 0 ? std::wstring(GetPathW()) : SalMultiByteToWidePath(GetPath(), IsValidPathUtf8Text(GetPath()) ? CP_UTF8 : CP_ACP);
+}
+
+std::wstring CFilesWindow::GetItemFullPathW(const CFileData& file) const
+{
+    const std::wstring name = file.UseWideName() ? file.NameW : SalMultiByteToWidePath(file.Name, IsValidPathUtf8Text(file.Name) ? CP_UTF8 : CP_ACP);
+    std::wstring path = GetItemDirectoryW(file);
+    SalPathAppendW(path, name.c_str());
+    return path;
+}
+
+std::wstring CFilesWindow::GetItemIdentityW(const CFileData& file) const
+{
+    return GetItemFullPathW(file);
+}
+
+std::wstring CFilesWindow::GetItemRelativePathW(const CFileData& file) const
+{
+    return file.UseWideName() ? file.NameW : SalMultiByteToWidePath(file.Name, IsValidPathUtf8Text(file.Name) ? CP_UTF8 : CP_ACP);
+}
+
+
 namespace
 {
 std::wstring TreeViewTextToWide(const char* text)
@@ -1794,9 +1821,11 @@ unsigned IconThreadThreadFBody(void* parameter)
                 SHFILEINFO shi; // for historical reasons (SHGetFileInfo) shi.hIcon is used for all icon types
 
                 // prepare the full path for files/directories being loaded (only when window->Is(ptDisk))
-                char path[MAX_PATH + 10];
+                CPathBuffer iconPathBuffer(4 * SAL_MAX_PATH + 16);
+                char* path = iconPathBuffer.Data();
                 path[0] = 0;
-                WCHAR wPath[MAX_PATH + 10];
+                CWidePathBuffer iconWidePathBuffer(SAL_MAX_PATH + 16);
+                WCHAR* wPath = iconWidePathBuffer.Data();
                 wPath[0] = 0;
                 char* name = path;
                 WCHAR* wName = wPath;
@@ -1810,10 +1839,16 @@ unsigned IconThreadThreadFBody(void* parameter)
                         path[l++] = '\\';
                     name = path + l; // pointer to the location of the name in the full path
                     *name = 0;
-                    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, path, l, wPath, MAX_PATH + 10);
-                    wName = wPath + l;
+                    // The panel path is UTF-8 when representable; older callers can
+                    // still supply ACP. A byte offset is not a wide-character offset.
+                    int wideLength = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, l,
+                                                        wPath, iconWidePathBuffer.Capacity() - 1);
+                    if (wideLength == 0)
+                        wideLength = MultiByteToWideChar(CP_ACP, 0, path, l,
+                                                        wPath, iconWidePathBuffer.Capacity() - 1);
+                    wName = wPath + wideLength;
                     *wName = 0;
-                    pathIsInvalid = !PathContainsValidComponents(path, FALSE);
+                    pathIsInvalid = wideLength == 0 || !PathContainsValidComponents(path, FALSE);
                     if (pathIsInvalid)
                         TRACE_I("Path contains invalid components, shell cannot read icons from such paths! Path: " << path);
                     isGoogleDrivePath = ShellIconOverlays.IsGoogleDrivePath(path);
@@ -2311,7 +2346,7 @@ unsigned IconThreadThreadFBody(void* parameter)
                                             // The icon was extracted while the panel was still using an old DPI.
                                             // Do not let a delayed 24px read populate a freshly rebuilt 16px cache
                                             // after moving from a high-DPI monitor to a 100% monitor.
-                                            HANDLES(DestroyIcon(shi.hIcon));
+                                            ::NOHANDLES(DestroyIcon(shi.hIcon));
                                             shi.hIcon = NULL;
                                             failed = TRUE;
                                         }

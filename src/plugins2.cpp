@@ -1149,7 +1149,7 @@ CPlugins::CreateIconsList(BOOL gray, HWND dpiWindow)
                     iconList = p->PluginIcons;
                 HICON hIcon = iconList->GetIcon(p->PluginIconIndex, TRUE);
                 HICON sizedIcon = hIcon != NULL ?
-                                      (HICON)CopyImage(hIcon, IMAGE_ICON, iconSize, iconSize, 0) :
+                                      (HICON)HANDLES_Q(CopyImage(hIcon, IMAGE_ICON, iconSize, iconSize, 0)) :
                                       NULL;
                 ImageList_AddIcon(hIL, sizedIcon != NULL ? sizedIcon : hIcon);
                 if (sizedIcon != NULL)
@@ -2023,6 +2023,17 @@ BOOL CPlugins::UnloadAll(
     HWND parent, CSalamanderShutdownProgressAbstract* progress)
 {
     CALL_STACK_MESSAGE1("CPlugins::UnloadAll()");
+    // A busy Samandarin initializer must cancel before another plug-in can
+    // stop the shared CLR or release host resources it still needs.
+    if (UnloadingPluginsForMainWindowClose)
+    {
+        for (int index = 0; index < Data.Count; ++index)
+            if (Data[index]->GetLoaded() && !Data[index]->PrepareNativeProcessExit(FALSE))
+            {
+                TRACE_E("Samandarin native initialization is still active; close deferred before unloading plugins.");
+                return FALSE;
+            }
+    }
     BOOL ret = TRUE;
     int loadedCount = 0;
     for (int index = 0; index < Data.Count; ++index)
