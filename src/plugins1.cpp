@@ -3148,6 +3148,17 @@ static BOOL IsSamandarinPlugin(const char* dllName)
     return fileName != NULL && StrNICmp(fileName, "samandarin", 10) == 0;
 }
 
+BOOL CPluginData::PrepareNativeProcessExit(BOOL finalize)
+{
+    if (!UnloadingPluginsForMainWindowClose || DLL == NULL || !IsSamandarinPlugin(DLLName))
+        return TRUE;
+    typedef BOOL(WINAPI* FPrepareForProcessExit)(DWORD, BOOL);
+    FPrepareForProcessExit prepare = reinterpret_cast<FPrepareForProcessExit>(
+        GetProcAddress(DLL, "Samandarin_PrepareForProcessExit"));
+    // Older binaries keep the existing process-close behavior.
+    return prepare == NULL || prepare(2000, finalize);
+}
+
 BOOL CPluginData::Unload(HWND parent, BOOL ask)
 {
     CALL_STACK_MESSAGE5("CPluginData::Unload(0x%p, %d) (%s v. %s)", parent, ask, DLLName, Version);
@@ -3230,6 +3241,18 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
             if (!skipUnload && PluginIface.NotEmpty())
             {
                 // the plugin may unload: let it delete any remaining temp files from the disk cache
+                // New Samandarin builds can drain native initialization without
+                // invoking the managed callbacks skipped on process close.
+                // A timeout leaves interfaces/module ownership intact.
+                if (skipSamandarinShutdown)
+                {
+                    if (!PrepareNativeProcessExit(TRUE))
+                    {
+                        TRACE_E("Samandarin native initialization is still active; close deferred.");
+                        ThumbnailMasksDisabled = FALSE;
+                        return FALSE;
+                    }
+                }
                 CPluginInterfaceAbstract* unloadedPlugin = PluginIface.GetInterface();
                 DeleteManager.PluginMayBeUnloaded(parent, this);
 

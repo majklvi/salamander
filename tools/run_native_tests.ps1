@@ -359,6 +359,69 @@ try {
             )
         },
         @{
+            Name = 'safe_file_paths_tests'
+            ClassName = 'native-generated'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot 'src\tests\safe_file_paths_tests.py'),
+                '--configuration', $Configuration
+            )
+        },
+        @{
+            Name = 'panel_item_paths_tests'
+            ClassName = 'native-generated'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot 'src\tests\panel_item_paths_tests.py'),
+                '--configuration', $Configuration
+            )
+        },
+        @{
+            Name = 'disk_selection_snapshot_tests'
+            ClassName = 'native-generated'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot 'src\tests\disk_selection_snapshot_tests.py'),
+                '--configuration', $Configuration
+            )
+        },
+        @{
+            Name = 'filecomp_panel_paths_tests'
+            ClassName = 'native-generated'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot 'src\tests\filecomp_panel_paths_tests.py'),
+                '--configuration', $Configuration
+            )
+        },
+        @{
+            Name = 'icon_reader_path_scratch_tests'
+            ClassName = 'native-generated'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot 'src\tests\icon_reader_path_scratch_tests.py'),
+                '--configuration', $Configuration
+            )
+        },
+        @{
+            Name = 'filecomp_dialog_lifetime_tests'
+            ClassName = 'native-generated'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot 'src\tests\filecomp_dialog_lifetime_tests.py'),
+                '--configuration', $Configuration
+            )
+        },
+        @{
+            Name = 'zip_listing_lifetime_tests'
+            ClassName = 'native-generated'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot 'src\tests\zip_listing_lifetime_tests.py'),
+                '--configuration', $Configuration
+            )
+        },
+        @{
             Name = 'copy_move_scheduling_contract_tests'
             Arguments = @(
                 '-B',
@@ -370,7 +433,8 @@ try {
         Write-Host "Running $($contractTest.Name)..."
         $contractResult = Invoke-TestProcess -FilePath $python `
             -Arguments $contractTest.Arguments -WorkingDirectory $repositoryRoot
-        Add-TestResult -ClassName 'source-contract' -Name $contractTest.Name `
+        $testClass = if ($contractTest.ContainsKey('ClassName')) { $contractTest.ClassName } else { 'source-contract' }
+        Add-TestResult -ClassName $testClass -Name $contractTest.Name `
             -ProcessResult $contractResult
     }
 
