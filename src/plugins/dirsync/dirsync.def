@@ -1,0 +1,4 @@
+LIBRARY dirsync.spl
+EXPORTS
+    SalamanderPluginEntry
+    SalamanderPluginGetReqVer

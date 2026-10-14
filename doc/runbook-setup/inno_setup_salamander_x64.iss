@@ -487,6 +487,8 @@ Name: "{app}\plugins\serviceexplorer"
 Name: "{app}\plugins\serviceexplorer\lang"
 Name: "{app}\plugins\splitcbn"
 Name: "{app}\plugins\splitcbn\lang"
+Name: "{app}\plugins\dirsync"
+Name: "{app}\plugins\dirsync\lang"
 Name: "{app}\plugins\tar"
 Name: "{app}\plugins\tar\lang"
 Name: "{app}\plugins\textviewer"
@@ -752,6 +754,8 @@ Source: "{#PayloadDir}\plugins\serviceexplorer\lang\*.slg"; DestDir: "{app}\plug
 Source: "{#PayloadDir}\plugins\serviceexplorer\serviceexplorer.spl"; DestDir: "{app}\plugins\serviceexplorer"; Flags: ignoreversion; Check: IsPluginSelected('serviceexplorer')
 Source: "{#PayloadDir}\plugins\splitcbn\lang\*.slg"; DestDir: "{app}\plugins\splitcbn\lang"; Flags: ignoreversion; Check: IsPluginSelected('splitcbn')
 Source: "{#PayloadDir}\plugins\splitcbn\splitcbn.spl"; DestDir: "{app}\plugins\splitcbn"; Flags: ignoreversion; Check: IsPluginSelected('splitcbn')
+Source: "{#PayloadDir}\plugins\dirsync\lang\*.slg"; DestDir: "{app}\plugins\dirsync\lang"; Flags: ignoreversion; Check: IsPluginSelected('dirsync')
+Source: "{#PayloadDir}\plugins\dirsync\dirsync.spl"; DestDir: "{app}\plugins\dirsync"; Flags: ignoreversion; Check: IsPluginSelected('dirsync')
 Source: "{#PayloadDir}\plugins\tar\lang\*.slg"; DestDir: "{app}\plugins\tar\lang"; Flags: ignoreversion; Check: IsPluginSelected('tar')
 Source: "{#PayloadDir}\plugins\tar\tar.spl"; DestDir: "{app}\plugins\tar"; Flags: ignoreversion; Check: IsPluginSelected('tar')
 Source: "{#PayloadDir}\plugins\textviewer\DEPENDENCIES.md"; DestDir: "{app}\plugins\textviewer"; Flags: ignoreversion; Check: IsPluginSelected('textviewer')
@@ -1904,6 +1908,7 @@ begin
   AddPlugin('samandarin', 'Samandarin Update Notifier', '0.10 (x64)', 'standard,advanced,expert');
   AddPlugin('serviceexplorer', 'Service Explorer', '0.15 (x64)', 'advanced,expert');
   AddPlugin('splitcbn', 'Split & Combine', '1.12 (x64)', 'base,standard,advanced,expert');
+  AddPlugin('dirsync', 'Directory Synchronization (preview)', '0.1 (x64)', 'advanced,expert');
   AddPlugin('tar', 'TAR', '3.35 (x64)', 'base,standard,advanced,expert');
   AddPlugin('unarj', 'UnARJ', '1.23 (x64)', 'base,standard,advanced,expert');
   AddPlugin('uncab', 'UnCAB', '1.29 (x64)', 'base,standard,advanced,expert');

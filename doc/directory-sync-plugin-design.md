@@ -1,10 +1,12 @@
 # Synchronizační plugin pro Samandarin
 
-Stav: návrh k projednání před implementací. Rešerše k 14. říjnu 2026.
+Stav k 15. říjnu 2026: D1–D5 a doplňující pravidla schválená. Na pokyn uživatele implementována [první etapa: kostra, sken, porovnání a náhled bez zápisů](directory-sync-plugin-implementation.md) nad nezměněným SDK Samandarin-0.16. V1–V4 dokládá [protokol TC](directory-sync-plugin-tc-observations.md); V5/V6 mají [technický audit](directory-sync-plugin-sdk.md). Zápisový backend zatím není implementován.
 
 Cílem je plugin pro porovnání a synchronizaci dvou adresářových stromů s pracovním postupem známým z Total Commanderu: **Porovnat → prohlédnout a upravit navržené operace → Synchronizovat**. Uživatel musí před zápisem vidět, co se zkopíruje, přepíše nebo odstraní. Tento dokument vymezuje chování předlohy, navržený rozsah pluginu, bezpečnost operací a rozhodnutí potřebná před zahájením vývoje.
 
-Výchozí doporučení je nativní plugin pro místní disky a Windows síťové cesty, s ručním spuštěním a bezstavovým porovnáním. FTP, archivy a synchronizace s historií vyžadují další návrh. Tato omezení první verze jsou návrh k rozhodnutí, nikoli odsouhlasené zúžení zadání.
+**Doplněné schválení z 15. října 2026:** uživatel schválil doporučení 1–4 po ověření V1–V6: toleranci 3 s včetně bez hodinové korekce, provádění pouze viditelných zařazených akcí, sjednocení panelových výběrů s přímými dětmi vybrané složky a základní masky bez regex/uložených hledání či globálního úklidu prázdných složek. U V5 rozhodl jinak: nyní pouze plugin pro současný Samandarin-0.16, **bez rozšíření SDK a bez změny hostitele**. Omezení této hranice přijímá; jejich rozsah se ověří a zdokumentuje během vývoje. Následný pokyn uživatele z 15. října zahájil pouze první etapu bez zápisů.
+
+Uživatel v D1 rozhodl, že první verze bude podporovat pouze místní a SMB složky: místní disky včetně USB, UNC cesty a mapované SMB jednotky. FTP/SFTP, archivy a další pluginové souborové systémy zůstávají mimo první verzi. V D2 zvolil pro první verzi variantu A bez historie: obousměrné porovnání vychází z aktuálního stavu a neodvozuje automatické mazání z chybějícího protějšku. V D3 zvolil variantu A: jednosměrný režim bude pouze asymetrie podle TC; samostatné přesné zrcadlení je odložené. V D4 zvolil variantu A: vlastní složku obnovy pro přepisy i mazání. V D5 schválil variantu A podle projednané tabulky: běžná data a vybraná metadata, podmíněné zachování ADS a výslovné meze pro speciální soubory. Ruční spouštění zůstává doporučeným návrhem.
 
 ## Vývojová větev a základ
 
@@ -53,23 +55,25 @@ Některá vylepšení už předloha má: autor v diskusi k TC 11.02 popisuje dos
 
 ## Navržený rozsah první verze
 
-| Oblast | První verze k odsouhlasení | Pozdější rozšíření |
+| Oblast | První verze a stav rozhodnutí | Pozdější rozšíření |
 | --- | --- | --- |
-| Umístění | Dvě běžné Windows složky, místní disky, USB, UNC a mapované SMB cesty | FTP/SFTP, archivy a jiné pluginové souborové systémy |
+| Umístění | **Schváleno v D1:** dvě místní nebo SMB složky v libovolné kombinaci; místní disky, USB, UNC a mapované SMB jednotky | FTP/SFTP, archivy a jiné pluginové souborové systémy mimo první verzi |
 | Spouštění | Příkaz v nabídce pluginu, cesty z fyzického levého a pravého panelu, ruční změna cest | Více párů v jedné úloze, dávky a plánování |
 | Rozsah stromu | Rekurze, výběr podsložek, zahrnovací a vylučovací masky, prázdné složky | Složitější pravidla podle atributů, věku a velikosti |
 | Porovnání | Velikost a čas; obsahové porovnání; ignorování data | Trvalá cache otisků, specializované textové porovnání |
-| Režimy | Obousměrné kopírování bez historie; asymetrie podle TC | Výslovné přesné zrcadlení, historický režim a přenos smazání |
+| Režimy | **Schváleno v D2 a D3:** obousměrné kopírování bez historie a bez automatického přenosu smazání; jednosměrně pouze asymetrie podle TC. | Historický režim, přenos smazání v obousměrném režimu a samostatné přesné zrcadlení mimo první verzi. |
 | Výsledek | Dvousloupcový seznam, stav a akce, hromadná změna směru, přeskočení, přehled operací | Detekce přejmenování, hierarchické seskupování velkých úloh |
 | Provedení | Průběh, přerušení, opakování chybné položky, souhrn a protokol | Pokračování celé úlohy po restartu aplikace |
+| Obnova souborů | **Schváleno v D4:** vlastní složka obnovy pro přepisy i mazání, mimo oba synchronizované stromy; ruční obnova a úklid | Automatická obnova celého běhu a pravidla automatického promazávání |
+| Metadata a speciální soubory | **Schváleno v D5:** varianta A podle podrobné tabulky níže; čas zápisu a základní atributy, cílová pravidla oprávnění, podmíněný přenos ADS | Samostatná synchronizace dalších metadat, přenos zdrojových oprávnění a širší zachování vlastností filesystému |
 | Nastavení | Pojmenované profily; uložené volby vždy viditelně zobrazené | Import profilů TC, sdílené profily, skupiny |
 | Integrace | Unicode, dlouhé cesty, lokalizace a světlé/tmavé schéma Salamanderu | Samostatné okno mimo proces hostitele |
 
-Mapovaná síťová jednotka je dostupná přes Windows souborové API; není tím přislíben obecný přístup do FTP pluginu. První verze nemá být službou na pozadí ani náhradou zálohovacího systému s historií.
+SMB zahrnuje sdílené složky jiného počítače či NAS, dostupné přes UNC nebo mapovanou jednotku. Zůstávají požadavky na přerušení spojení, oprávnění, dlouhé Unicode cesty a neúplný sken; podpora SMB není příslibem podpory všech síťových protokolů. Schválené jsou D1–D5 a doplňující rozhodnutí výše; ostatní řádky tabulky zůstávají návrhy. Běh jako služba na pozadí se nenavrhuje; historie synchronizace a samostatné přesné zrcadlení jsou podle D2 a D3 mimo první verzi.
 
 ## Navržená pravidla porovnání a plánování
 
-Následující tabulky jsou kontrakt navrhovaného pluginu. Detaily, jejichž přesná shoda s TC ještě není doložena, jsou uvedeny v části Otevřená rozhodnutí a ověření.
+Následující tabulky jsou kontrakt navrhovaného pluginu. Detaily, jejichž přesná shoda s TC ještě není doložena, jsou uvedeny v části Rozhodnutí a zbývající ověření.
 
 ### Oddělení stavu od akce
 
@@ -86,9 +90,9 @@ Každý řádek uchová obě relativní cesty, typ položky, velikosti, časy, m
 | Chyba, nestabilní soubor, nečitelný podstrom | Zablokováno s důvodem |
 | Soubor proti složce nebo nejednoznačné párování názvů | Konflikt; bez automatického odstranění |
 
-Při asymetrii TC se položky přítomné pouze vlevo kopírují doprava a položky přítomné pouze vpravo navrhují k odstranění. Pro existující dvojici návrh zachovává kopírování novějšího levého souboru doprava a žádnou akci u shody. Novější pravý soubor se nepřepisuje automaticky; zobrazí se jako nevybraná odlišná položka s vysvětlením. Tato prezentace je náš návrh; ověřené chování předlohy je absence automatického označení k přepsání. Kombinace asymetrie se stejnými časy či ignorováním data zůstávají k ověření V1. Ruční přepsání musí být viditelné v závěrečném souhrnu.
+Při asymetrii TC se položky přítomné pouze vlevo kopírují doprava a položky přítomné pouze vpravo navrhují k odstranění. Pro existující dvojici návrh zachovává kopírování novějšího levého souboru doprava a žádnou akci u shody. Novější pravý soubor se nepřepisuje automaticky; zobrazí se jako nevybraná odlišná položka s vysvětlením. V TC 11.58 byly při respektování data novější pravé dvojice nevybrané; rozdíl při stejném čase nebo ignorovaném datu zůstal bez automatického směru i v asymetrii. Podrobnou matici a dosud neověřené časové hranice uvádí [protokol V1](directory-sync-plugin-tc-observations.md). Ruční přepsání musí být viditelné v závěrečném souhrnu.
 
-Budoucí přesné zrcadlení by naopak považovalo levou stranu za autoritu i proti novější pravé verzi. Musí mít vlastní název a nesmí být skrytou změnou významu asymetrie. V obousměrném režimu bez historie se automatické mazání nikdy neodvozuje z pouhé absence protějšku.
+Samostatné přesné zrcadlení je podle schváleného D3 mimo první verzi. Případné budoucí rozšíření by považovalo levou stranu za autoritu i proti novější pravé verzi; musí mít vlastní název a nesmí být skrytou změnou významu asymetrie. V obousměrném režimu bez historie se automatické mazání nikdy neodvozuje z pouhé absence protějšku.
 
 ### Metody porovnání
 
@@ -97,19 +101,25 @@ Budoucí přesné zrcadlení by naopak považovalo levou stranu za autoritu i pr
 | Velikost a čas | Shoda metadat znamená pouze shodu podle těchto kritérií. Obsah nemusí být stejný. |
 | Ignorovat datum | U párů rozhoduje velikost; rozdílné páry nedostanou automatický směr podle času. Jednostranné položky si zachovají směr podle přítomnosti. |
 | Podle obsahu a ignorovat datum | Různá velikost je rozdíl, u stejné velikosti rozhoduje binární obsah. Rozdílné páry vyžadují ruční směr. |
-| Podle obsahu a respektovat datum | Zamýšlená kompatibilita s TC musí ještě přesně určit, které páry číst a jak naložit se stejným obsahem při rozdílném čase. Do uzavření této otázky se implementace pravidla nezačne. |
+| Podle obsahu a respektovat datum | V TC 11.58 vede rozdílný čas mimo toleranci k návrhu podle času i při shodném obsahu. Při shodném čase a velikosti obsahové porovnání odhalí rozdíl. Náš kompatibilní návrh má zachovat tyto výsledky; test UI sám nedokládá interní pořadí čtení TC. |
 
 Obsahové porovnání má používat proudové čtení s možností přerušení a skončit při prvním rozdílu. Nevyžaduje načtení celého souboru do paměti. Kontrolní součet pro cache ani následná kontrola zkopírovaného cíle nejsou totéž co samotné porovnání zdrojů.
 
 Časy porovnáváme interně v UTC. Tolerance musí být výslovná a otestovaná podle filesystému, nikoli skrytá konstanta použitá na vše. FAT má dvousekundovou přesnost času zápisu a odlišné zacházení s místním časem oproti NTFS. Posun o hodinu nelze automaticky považovat za neškodný. [Microsoft o časech souborů](https://learn.microsoft.com/en-us/windows/win32/sysinfo/file-times)
 
+Doplňující test TC 11.58 a jeho dodaná nápověda podporují návrh výchozí kompatibilní tolerance **3 s včetně**, viditelné ve volbách. Rozdíl +3.000 s byl shoda, +3.001 s již novější soubor; +3599/+3600/+3601 s nebyly ignorovány. Pro v1 navrhujeme žádnou automatickou hodinovou korekci. To je politika porovnání, nikoli tvrzení o přesnosti NTFS nebo všech SMB serverů. Podrobné meze ověření uvádí [protokol](directory-sync-plugin-tc-observations.md).
+
 ### Filtry a výběr
 
 Rozlišit tři věci: rozsah skenu, zobrazení výsledků a výběr operací. Masky a vybrané podstromy vymezují sken. Přepínače shodné/rozdílné/jednostranné vymezují zobrazení. Akce řádku a jeho zařazení do provedení určují skutečný plán.
 
-Změna cesty, porovnávací metody nebo rozsahu skenu zneplatní výsledek. Vyloučené položky musí být chráněné na obou stranách a nesmějí se stát kandidáty k odstranění jen proto, že nebyly načteny. „Pouze vybrané“ se nabídne jen pro zachytitelný a jednoznačný výběr; pravidlo, zda použít sjednocení výběrů obou panelů, je potřeba rozhodnout.
+Změna cesty, porovnávací metody nebo rozsahu skenu zneplatní výsledek. Vyloučené položky musí být chráněné na obou stranách a nesmějí se stát kandidáty k odstranění jen proto, že nebyly načteny. „Pouze vybrané“ se nabídne jen pro zachytitelný a jednoznačný výběr. TC 11.58 použil sjednocení výběrů včetně neoznačených protějšků; doplněný test potvrzuje výběr jen vpravo i směs souboru a složky. Navrhujeme stejnou sémantiku. U explicitně vybrané složky se zahrnou přímé děti i bez rekurze; rekurze přidá hlubší úrovně. Při tomto režimu jsou kořeny zamčené, jejich změna vyžaduje opuštění omezení původním výběrem.
 
-Přesný vliv zobrazovacích filtrů na provedení má být ověřen proti TC. Návrh rozhraní musí vždy ukazovat celkové počty plánovaných operací i počet skrytých vybraných položek. Žádné mazání nesmí být schválené jen implicitně skrytým řádkem.
+V TC 11.58 skrytí řádků změnilo souhrn před provedením a skutečné kopírování; ručně vynechaná kopie se také neprovedla. Skryté mazání bylo ověřeno v souhrnu, běžné zobrazené mazání bylo provedeno na dvou schválených testovacích položkách. Podrobnosti uvádí [protokol V2/V3](directory-sync-plugin-tc-observations.md). Doporučení je zachovat vazbu zobrazení a provádění pro kompatibilitu a zobrazit odděleně prováděné a filtrované akce. Oddělení datového modelu pohledu a plánu nesmí znamenat neohlášené provádění skrytých položek.
+
+Ověřené příklady masek: `*.txt | selB\` vyloučí všechny stejnojmenné podstromy, `*.txt | \selB\` jen podstrom v kořeni, `\*.txt` jen kořenové soubory, `selA\**\*.txt` přímé i hlubší soubory pod selA. Pro v1 navrhujeme tuto základní cestovou gramatiku a názvové masky, bez regulárních výrazů a uložených hledání TC; přesné escapování a oddělovače je třeba dopracovat a otestovat při tvorbě parseru a nápovědy.
+
+Prázdné složky patří do explicitního plánu. Globální TC volbu Delete all empty directories navrhujeme nepřebírat: podle nápovědy může mazat i složky přítomné vlevo. Její zpřístupnění a globální provedení nebyly ověřeny. Normální asymetrické odstranění složky pouze vpravo bylo ověřeno a společná prázdná složka zůstala zachována.
 
 ## Navržené rozhraní a průběh práce
 
@@ -132,18 +142,46 @@ Tato pravidla jsou součástí návrhu našeho provedení, nikoli tvrzení, že 
 | Záměrně prázdný zdroj | Je platný jen po úspěšném ověření kořene a enumerace. Hromadné odstranění v cíli musí být výslovně vidět v souhrnu. |
 | Zdroj či cíl se změní po porovnání | Před operací ověřit očekávanou existenci, typ, identitu a relevantní metadata. Při odchylce označit zastaralý plán a položku neprovést. Samotná kontrola cesty neřeší všechny závody; provedení musí pracovat s handly a ověřenou identitou. |
 | Chyba či přerušení při přepisu | Nejprve kopírovat do jedinečného dočasného souboru na cílovém filesystému. Původní cíl nahradit až po úspěchu a opětovném ověření. Definovat úklid a chování při plném disku. |
-| Mazání nebo přepis uživatelských dat | Rozhodnout o Koši či verzovacím adresáři. Nedostupná obnova nesmí potichu znamenat trvalé smazání. Verzovací prostor nesmí být součástí synchronizovaného stromu. |
+| Mazání nebo přepis uživatelských dat | Podle D4 uchovat původní soubor ve vlastní složce obnovy mimo oba synchronizované stromy. Neúspěšné uchování zablokuje příslušný přepis či odstranění; nepřecházet na trvalou operaci bez obnovy. |
 | Prázdné složky a filtry | Rozlišit skutečnou prázdnost od vyfiltrovaného obsahu. Složku odstranit jen po ověření skutečné prázdnosti; nikdy rekurzivně nesmazat neznámé či vyloučené děti. |
 | Shodné nebo vnořené kořeny | Porovnat cesty i dostupné identity a odmítnout shodné či překrývající se stromy v obou směrech. Při nevyřešené možné kolizi neprovádět zápisy. Detekce libovolných SMB aliasů není přislíbena; její meze a postup při nejistotě uzavře V6. |
 | Symlinky, junctions a jiné reparse points | V první verzi nenásledovat; zobrazit vynechané položky a důvod. Chránit také odpovídající protějšek před odvozeným mazáním. Kontrola zahrne kořen a rodičovské komponenty i změnu na odkaz mezi skenem a operací. Ve V6 upřesnit dopad na cloudové placeholdery a další reparse typy. |
 | Kolize jmen a typů | Žádné automatické sloučení různých názvů, normalizace Unicode ani soubor proti složce. Case kolize na odlišných filesystémech jsou konflikt. |
-| Metadata mimo základní model | Výslovně rozhodnout o ACL, alternativních datových proudech, hardlinkách, sparse/compressed/encrypted souborech a časech složek. Bez tohoto rozhodnutí neslibovat úplný klon. |
+| Metadata a speciální soubory | Dodržet schválený rozsah D5; technické provedení ověřit ve V6. Nepodporované vlastnosti nesmějí vést k tiché ztrátě dat. Úplný klon filesystému se neslibuje. |
 
 Microsoft dokumentuje, že výsledek enumerace může být zastaralý už před následnou operací a že chyby je nutné rozlišovat přes `GetLastError`. Návrh proto potřebuje vlastní zacházení s neúplným skenem a změnami stavu. [FindFirstFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-findfirstfilew)
 
 Dočasná kopie chrání před nedokončeným přepisem, ale nezajišťuje transakci celého stromu ani obnovu při každém výpadku napájení. Autor FreeFileSync také rozlišuje tuto ochranu od následného ověření obsahu. Historie či Koš zase chrání jiný případ, omylem schválenou změnu. [FreeFileSync o fail-safe copy](https://freefilesync.org/forum/viewtopic.php?t=1495), [FreeFileSync o verzování](https://freefilesync.org/manual.php?topic=versioning)
 
 Názvy a cesty mají zůstat v Unicode, bez průchodu přes ztrátové ACP převody. Dlouhé cesty se musí řešit v celém řetězci včetně UNC, dialogů, protokolu a obnovy; existence široké Win32 funkce sama o sobě nestačí. [Microsoft o dlouhých cestách](https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation)
+
+### Schválená ochrana souborů podle D4
+
+Profil určí vlastní složku obnovy mimo oba synchronizované stromy. Před přepisem se uchová původní cílový soubor na měněné straně; před odstraněním se uchová odstraňovaná položka. Uspořádání oddělí dvojici kořenů, jednotlivé běhy a levou/pravou stranu a zachová relativní cestu i původní název. Uložené kopie se nesmějí navzájem přepsat kvůli kolizi názvů nebo času běhu.
+
+Pokud je složka obnovy nedostupná, nezapisovatelná nebo nemá dost místa, příslušná destruktivní operace se neprovede. Uchování ani následné selhání přepisu nesmějí ztratit původní soubor. Dočasná kopie a ověření stavu před nahrazením cíle zůstávají samostatnými povinnostmi provedení; celý synchronizační běh není atomická transakce.
+
+První verze nabídne otevření složky obnovy a protokol s mapováním původních a uložených cest. Obnova i úklid budou ruční, bez automatického promazávání. Podporovaná metadata a speciální typy souborů určuje schválené D5 také pro uchované kopie. Uložené soubory se nepoužijí jako historický základ porovnávání: rozhodnutí D2 zůstává beze změny.
+
+### Schválené zachování vlastností podle D5
+
+Uživatel schválil pro první verzi variantu A podle projednané tabulky: běžné datové soubory se zachováním vybraných vlastností při přenosu. Varianta B je odložena; přidala by samostatnou synchronizaci dalších rozdílů metadat, přenos zdrojových oprávnění a širší podporu speciálních vlastností filesystému. Ani tato budoucí varianta by sama o sobě nebyla příslibem obrazu disku.
+
+| Oblast | Schválená varianta A |
+| --- | --- |
+| Data, názvy a struktura | Zachovat obsah souborů, názvy a adresářovou strukturu ve vybraném rozsahu. |
+| Časy | Zachovat čas posledního zápisu v přesnosti podporované cílem. Čas vytvoření, posledního přístupu a časy složek nezahrnovat do samostatné synchronizace ani neslibovat jejich přesnou shodu. |
+| Základní atributy | Při přenosu zachovat Jen pro čtení, Skrytý a Systémový. Samotný rozdíl těchto atributů nevyvolá operaci. |
+| Oprávnění | Nekopírovat vlastnictví, audit ani přístupová oprávnění ze zdroje. Nové soubory mají dědit oprávnění cílové složky, přepsané zachovat existující přístupová oprávnění cíle. Selhání požadovaného zachování není úspěšný přepis. |
+| Symbolické odkazy, junctions a cloudové placeholdery | Viditelně vynechat a chránit odpovídající protějšek před odvozeným mazáním; platí kontroly kořene a rodičů ve V6. Běžný soubor zástupce `.lnk` se kopíruje jako soubor. |
+| Hardlinky | Kopírovat jako nezávislé soubory, bez zachování vazby mezi jmény. Přepis nesmí upravit data ani atributy jiných jmen téhož cílového souboru. Pokud to backend neumí zajistit, operaci zablokovat. Obnovovací kopie musí být nezávislá na původních hardlinkách. |
+| Doplňkové datové proudy ADS | Při kopírování přenést proudy zdroje, pokud je umí zachovat cíl i složka obnovy. Staré cílové proudy uchovat v obnovovací kopii, neslučovat je náhodně do nového cíle. Při nepodporované operaci položku zablokovat a protějšek chránit. Samostatné rozdíly ADS nevyvolají synchronizaci; obsahové porovnání označuje shodu hlavního datového proudu. |
+| Šifrování EFS | V první verzi viditelně vynechat operace s EFS na kterékoli dotčené straně, včetně mazání a uchování původního cíle. Nepovolovat tichý přenos do nešifrované podoby. |
+| Komprese a sparse soubory | Zachovat logický obsah, neslibovat stejné úsporné uložení. Předem počítat s potřebným prostorem v cíli i obnově; kopie může zabírat více místa. |
+
+Ochrana D4 se vztahuje na data a podporované vlastnosti podle D5. Varianta A neslibuje automatickou obnovu původního vlastnictví, oprávnění nebo vazeb hardlinků. Ztráta podporovaných dat či atributů nesmí být skrytá za výsledkem Úspěch. Zacházení s atributem Archive při zápisu je technický detail k upřesnění ve V6; nebylo součástí schválené tabulky a nepřidává samostatné porovnávání atributů.
+
+ADS mohou obsahovat další data připojená k souboru. Hardlinky jsou více názvů jednoho souboru, takže pouhý přesun jednoho jména do složky obnovy nevytvoří nezávislou kopii. Tyto vlastnosti jsou důvodem pro výslovná pravidla přenosu a obnovy. [Microsoft o datových proudech](https://learn.microsoft.com/en-us/windows/win32/fileio/file-streams), [Microsoft o hardlinkách](https://learn.microsoft.com/en-us/windows/win32/fileio/hard-links-and-junctions)
 
 ## Technický návrh pro základ 0.16
 
@@ -160,7 +198,7 @@ Navržené vrstvy jsou oddělené, aby šla rozhodovací pravidla testovat bez S
 
 Plán nejprve zajistí potřebné adresáře a bezpečné přenosy, destruktivní úklid následuje až po úspěchu příslušných závislostí. Každá operace musí mít výsledek; chyba nesmí zmizet za celkovým hlášením Úspěch. Po dokončení se dotčené panely obnoví a nový běh začíná novým porovnáním.
 
-Konkrétní omezení SDK a integrační body doplňuje [technický průzkum základu](directory-sync-plugin-sdk.md). Před vytvořením kostry pluginu je nutné uzavřít zejména získání dlouhých Unicode kořenových cest a provedení zápisů. Nesmíme předpokládat dostupnost API z jiných rozpracovaných větví.
+Konkrétní omezení SDK a integrační body doplňuje [technický průzkum základu](directory-sync-plugin-sdk.md). První etapa používá existující panelový export s přijatými omezeními V5. Před přidáním zápisů je nutné prokázat bezpečnost podle V6. Nesmíme předpokládat dostupnost API z jiných rozpracovaných větví.
 
 ## Akceptační scénáře před vydáním
 
@@ -175,7 +213,7 @@ Scénáře níže jsou plán budoucího ověření. Při přípravě této dokum
 | Prázdné složky | Nová prázdná složka, zanořené prázdné složky, složka neprázdná po odfiltrování, obsah přidaný těsně před odstraněním. |
 | Chyby a síť | Odpojení SMB během skenu a přenosu, zamčený soubor, odmítnutý přístup, plný disk, nečitelný podstrom; žádné odvozené mazání z chyb. |
 | Zastaralý plán | Nový či změněný cíl, odstraněný zdroj, záměna adresáře za junction po náhledu; operace nesmí bez povšimnutí zasáhnout jiná data. |
-| Přerušení a obnova | Přerušení před náhradou cíle, nedostupný Koš, chyba verzování, částečný běh a jeho protokol; původní cíl zůstává při nedokončené kopii zachován. |
+| Přerušení a obnova | Přerušení před náhradou cíle, nedostupná/plná složka obnovy, kolize uložených cest a oddělení stran, chyba uchování, částečný běh a ruční obnova podle protokolu; původní cíl zůstává při nedokončené kopii zachován. |
 | Cesty | ASCII, Unicode název i adresář, více Unicode komponent, UTF-8 přes 260 bajtů při kratším UTF-16, UTF-16 cesta přes 260 znaků, dlouhé UNC a protokol týchž cest. |
 | Identita | Stejný kořen pod různým zápisem, vnořené kořeny, junction cyklus, odkaz mimo kořen, hardlinky a case kolize. |
 | Časy | NTFS, FAT/exFAT a SMB s doloženou přesností; dvousekundový rozdíl, přechod letního času a explicitní ignorování data. |
@@ -185,37 +223,46 @@ Scénáře níže jsou plán budoucího ověření. Při přípravě této dokum
 
 Rozhodovací tabulky ověřit jednotkově nad syntetickými stromy. Kopírování a obnovu ověřit integračně v dočasných adresářích s řízeně vyvolanými chybami. Rozhraní a součinnost s hostitelem ověřit ručně. Testy nesmějí používat skutečná uživatelská data jako cíl mazání.
 
-## Otevřená rozhodnutí a ověření
+## Rozhodnutí a zbývající ověření
 
 ### Rozhodnutí uživatele před implementací
 
-| ID | Rozhodnutí | Doporučený začátek | Důsledek jiné volby |
+| ID | Rozhodnutí | Dohodnutý stav nebo doporučení | Důsledky a alternativy |
 | --- | --- | --- | --- |
-| D1 | Mají být FTP/SFTP a archivy už v první verzi? | Místní a UNC/SMB složky. | Vzdálené zdroje vyžadují návrh schopností a spolupráce s dalšími pluginy; nelze jen předat jejich cestu do Win32. |
-| D2 | Má obousměrný režim přenášet smazání a rozpoznávat úpravy obou kopií? | Bezstavové chování ve stylu TC, bez automatického přenosu smazání. | Historický režim potřebuje perzistentní stav, pravidla inicializace, ztráty databáze a skutečné konflikty. |
-| D3 | Stačí asymetrie TC, nebo je požadováno i přesné zrcadlení? | Asymetrie TC; přesné zrcadlení jako samostatný pozdější režim. | Přesné zrcadlení může přepsat novější cíl starším zdrojem. Musí mít odlišné označení a náhled. |
-| D4 | Jak chránit přepsané a mazané soubory? | Navrhnout obnovitelný režim před povolením destruktivních akcí; při nedostupnosti obnovy akci zastavit. | Trvalé mazání musí být výslovná volba. Verzovací adresář přidává nároky na prostor, umístění a úklid. |
-| D5 | Jak přesná má být shoda metadat a speciálních souborů? | Obsah běžných souborů, čas posledního zápisu a dohodnuté základní atributy; odkazy zřetelně vynechat. | Úplný klon včetně ACL, ADS a topologie odkazů podstatně rozšiřuje provedení i testy. |
+| D1 | Podporovaná umístění první verze | **Rozhodnuto uživatelem:** zatím jen místní a SMB složky, včetně USB, UNC a mapovaných SMB jednotek. | Místní ↔ místní, místní ↔ SMB i SMB ↔ SMB. FTP/SFTP, archivy a jiné pluginové souborové systémy odloženy; první verze nepotřebuje jejich provider API. |
+| D2 | Historie obousměrné synchronizace | **Rozhodnuto uživatelem:** pro první verzi varianta A bez historie a bez automatického přenosu smazání. | Jednostranný soubor může být navržen ke zkopírování zpět; dvě nezávislé úpravy nelze spolehlivě rozpoznat bez předchozího stavu. Náhled a ruční volba směru zůstávají podstatné. Výslovně zvolené jednosměrné mazání řeší D3. |
+| D3 | Jednosměrný režim první verze | **Rozhodnuto uživatelem:** varianta A, pouze asymetrie podle TC; samostatné přesné zrcadlení odloženo. | Položky pouze vpravo mohou být navrženy k odstranění. Novější pravý soubor se automaticky nepřepíše ani nekopíruje zpět; ruční přepsání zůstává možné. Přesné kombinace porovnávacích voleb uzavře V1. |
+| D4 | Ochrana přepsaných a mazaných souborů | **Rozhodnuto uživatelem:** pro první verzi varianta A, vlastní složka obnovy pro přepisy i mazání, mimo oba synchronizované stromy. | Při chybě uchování se příslušná destruktivní operace neprovede. Obnova a úklid jsou v první verzi ruční; kopie jsou oddělené podle dvojice kořenů, běhu, strany a relativní cesty. Vyžaduje další prostor a někdy další přenos dat. |
+| D5 | Metadata a speciální soubory | **Rozhodnuto uživatelem:** pro první verzi varianta A podle podrobné tabulky výše: běžná data, čas zápisu, základní atributy a podmíněný přenos ADS; bez přenosu zdrojových oprávnění. | Odkazy, cloudové placeholdery a EFS se vynechávají; hardlinky se kopírují nezávisle; komprese a sparse uložení se nezaručují. Samotné rozdíly atributů či ADS nevyvolají synchronizaci. Varianta B je odložena. |
 
 ### Technická a behaviorální ověření
 
-| ID | Co uzavřít | Jak to ověřit |
+| ID | Co uzavřít | Stav a další ověření |
 | --- | --- | --- |
-| V1 | Přesný význam Podle obsahu bez Ignorovat datum a interakce s asymetrií | Malá sada dvojic se stejnou/různou velikostí, časem a obsahem v konkrétním vydání TC. Zahrnout asymetrii se stejnými časy i ignorovaným datem; zaznamenat verzi a výsledky. |
-| V2 | Vliv filtrů zobrazení a označení na provedení v TC | Kontrolovaný test s kopírováním i navrženým mazáním, včetně skrytých položek. Pak rozhodnout o věrnosti či výslovně popsané odchylce. |
-| V3 | Obsah závěrečného dialogu TC a jeho výchozí volby | Ověřit přepisy, směry, atributy, NTFS oprávnění, prázdné složky a přerušení v konkrétním vydání. Stará wiki tuto část nepopisuje. |
-| V4 | Sémantika výběru obou panelů a masek složek | Stanovit sjednocení/průnik výběrů, rekurzi a syntaxi. Příklady uvést přímo v nápovědě. |
-| V5 | Dlouhé Unicode kořeny v SDK 0.16 | Trasovat export kořenové cesty a ověřit, zda potřebujeme minimální kompatibilní rozšíření SDK. |
-| V6 | Bezpečné nahrazení, obnova, identity a metadata na Windows/SMB | Ověřit schopnosti API, síťové aliasy, kořeny/rodiče s reparse points a cloudové placeholdery. Nevyvozovat atomický běh celého stromu z atomické náhrady jednoho souboru. |
+| V1 | Přesný význam Podle obsahu bez Ignorovat datum a interakce s asymetrií; časová tolerance | Osm kombinací a doplňující hraniční časy doloženy. Návrh výchozí tolerance 3 s včetně, bez automatické hodinové korekce. Jiné filesystémy a SMB runtime neověřeny. |
+| V2 | Vliv filtrů zobrazení a označení na provedení v TC | Ověřen souhrn i skutečné kopie při filtru a ručním vynechání. Návrh provádět jen viditelné zařazené akce, přehledně uvést skryté. |
+| V3 | Obsah závěrečného dialogu TC a jeho výchozí volby v našem rozsahu | Provedeny kopie a schválené testovací mazání. Cancel při potvrzení přepisu ponechal cíl. Doplněno skutečné přerušení 2GiB přenosu: po OK (Stop) prázdný cíl, další položka se nekopírovala. Řízená změna posledního bytu při Verify vyvolala CRC error / The two files are DIFFERENT!; po Abort chybná kopie zůstala, další položka se nepřenesla. Ignore/Ignore all, přerušení přepisu a globální úklid neověřeny; globální úklid do v1 nenavržen. |
+| V4 | Sémantika výběru obou panelů a masek složek | Doplněn pravostranný i smíšený výběr, přímé děti vybrané složky bez Subdirs, ukotvené masky a **. Zbývá přesná specifikace parseru a její testy; nikoli úplné převzetí hledacích funkcí TC. |
+| V5 | Dlouhé Unicode kořeny v SDK 0.16 | Uživatel rozhodl používat stávající SDK a nezměněný Samandarin-0.16. Plugin zkopíruje GetPanelPath/NameW, provede explicitní převody a použije široká WinAPI. Omezení bajtové hranice a dlouhých kořenů se ověří během vývoje, zdokumentují a při zjištěné chybě bezpečně nahlásí. Rozšíření SDK je odložené. |
+| V6 | Bezpečné nahrazení, obnova, identity a metadata na Windows/SMB | Návrh posloupnosti a chybových stavů zdokumentován. NTFS sonda prokázala nežádoucí zachování starých ADS při ReplaceFileW, nutnost finálního nastavení času, nezávislost kopie hardlinku a jednu dlouhou Unicode API cestu. Bezpečný commit, závody, ACL a SMB musí prokázat integrační testy před povolením destruktivních zápisů. |
 
-V1–V4 vyžadují cílené porovnání s konkrétním vydáním Total Commanderu. Online rešerše nenahrazuje provedený test aplikace. Nejasnosti nemají být potichu doplněny domněnkou v kódu.
+V1–V4 byly rozšířeny druhou sadou přes Computer Use v TC 11.58. [Protokol](directory-sync-plugin-tc-observations.md) odlišuje pozorování, nápovědu a zbývající případy. [Audit SDK a WinAPI](directory-sync-plugin-sdk.md) obsahuje V5/V6 včetně konkrétní sondy a návrhu operací. Uživatel zvolil pokračování bez SMB testovací složky; žádný místní výsledek neprokazuje SMB. Nejasnosti nemají být potichu doplněny domněnkou v kódu.
+
+Třetí sada dokončila požadované místní scénáře přerušení přenosu a chybového Verify. TC při Abort po chybě ponechal již zapsanou vadnou kopii. Pro náš návrh musí neúspěšné ověření stagingu blokovat commit; chyba zjištěná až po commitu vyžaduje explicitní neúspěch a dostupnou obnovu podle D4. Nový náhled porovnání nenahrazuje záznam chyby běhu.
+
+### Co zbývá před implementací a co se ověřuje až při ní
+
+- **Produktová rozhodnutí D1–D5 a doplňující doporučení 1–4 jsou schválená.** Platí tolerance 3 s bez hodinové korekce, provádění pouze viditelných zařazených akcí, sjednocení výběrů včetně přímých dětí vybrané složky a základní cestové masky. Žádný globální úklid prázdných složek ani regulární výrazy/uložená hledání v1. Tyto body již nevyžadují další schválení.
+- **Technické předpoklady:** V5 je rozhodnuté jako adaptér nad nezměněným SDK Samandarin-0.16 s přijatými a dokumentovanými omezeními; rozšíření SDK ani hostitele není podmínkou zahájení vývoje. V6 navrhuje obnovu, staging, kontrolu identit a handle-based commit s přesnými ADS a cílovými oprávněními. Bezpečnost backendu a kompatibilitu pluginu musí prokázat testy během vývoje, destruktivní kroky před jejich povolením. Jde o technický návrh, nikoli o další povinné volby uživatele.
+- **Dopracovat běžné detaily návrhu:** výchozí volby porovnání a rekurze, kolizně bezpečné názvy obnovovacích kopií, formát protokolu a hlášení nepodporovaných položek. Konkrétní umístění složky obnovy nastaví uživatel při používání; její meze a ruční úklid už určuje D4.
+- **Při implementaci a před vydáním:** prokázat zachování dat a podporovaných vlastností, chování při přerušení, plném disku, ztrátě SMB, změně souboru či rodičovského adresáře a selhání obnovy. Doplnit integrační, UI a build kontroly podle testovací matice. Tyto testy dosud neproběhly; nejsou zaměnitelné s rešerší a nelze je všechny dokončit před vznikem kódu.
 
 ## Navržené etapy vývoje po projednání
 
-1. Uzavřít D1–D5 a V1–V5; schválit tabulky chování a rozsah první verze.
-2. Ověřit technické předpoklady SDK a připravit kostru pluginu s lokalizovaným dialogem, tmavým schématem a správným životním cyklem.
+1. Na základě schválených D1–D5 a doplňujících rozhodnutí dopracovat běžné detaily chování a testovací případy; nové podstatné odchylky výslovně předložit.
+2. Připravit kostru pluginu nad stávajícím SDK a ověřit načtení i panelový vstup na nezměněném Samandarin-0.16; lokalizovaný dialog, tmavé schéma a správný životní cyklus. Zdokumentovat zjištěná omezení cest.
 3. Implementovat sken, čisté porovnání a náhled bez zápisů; otestovat rozhodování a cesty.
-4. Uzavřít V6 včetně obnovy při přepisu; teprve potom povolit přepis existujících cílů. Doplnit kopírování s kontrolou zastaralého plánu, přerušením a protokolem.
+4. Implementovat a otestovat V6 včetně obnovy při přepisu; teprve po ověření povolit přepis existujících cílů. Doplnit kopírování s kontrolou zastaralého plánu, přerušením a protokolem.
 5. Po ověření obnovy také pro odstraněné položky doplnit asymetrické mazání a prázdné složky, poté profily a dokončit ergonomii.
 6. Provést akceptační scénáře a CI, připravit distribuci pluginu. Teprve potom řešit upstream PR a další režimy.
 

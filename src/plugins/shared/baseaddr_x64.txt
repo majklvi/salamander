@@ -128,3 +128,5 @@ salamatrixai       0x000001002ab00000
 salamatrixailocalllama 0x000001002ac00000
 diskdir        0x000001002ad00000
 lang_diskdir   0x000001003ad00000
+dirsync        0x000001002af00000
+lang_dirsync   0x000001003af00000

@@ -1,0 +1,91 @@
+// SPDX-FileCopyrightText: 2026 Open Salamander Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+#pragma code_page(65001)
+#include <winres.h>
+#include "../resource.h"
+#include "../versinfo.rh2"
+#include "versinfo.rc2"
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+IDD_PREVIEW DIALOGEX 0, 0, 610, 360
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MAXIMIZEBOX
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Directory Synchronization - Preview"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    LTEXT "&Left folder:", -1, 8, 9, 52, 10
+    EDITTEXT IDC_LEFT, 62, 6, 540, 14, ES_AUTOHSCROLL
+    LTEXT "&Right folder:", -1, 8, 29, 52, 10
+    EDITTEXT IDC_RIGHT, 62, 26, 540, 14, ES_AUTOHSCROLL
+    LTEXT "&Masks:", -1, 8, 49, 52, 10
+    EDITTEXT IDC_MASK, 62, 46, 325, 14, ES_AUTOHSCROLL
+    LTEXT "Time tolerance: 3 seconds (inclusive)", -1, 398, 49, 204, 10
+    CONTROL "&Subfolders", IDC_RECURSIVE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 67, 80, 12
+    CONTROL "By &content", IDC_CONTENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 95, 67, 75, 12
+    CONTROL "&Ignore date", IDC_IGNORE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 178, 67, 80, 12
+    CONTROL "&Asymmetric", IDC_ASYMMETRIC, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 266, 67, 80, 12
+    CONTROL "Only &selected", IDC_SELECTED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 354, 67, 90, 12
+    CONTROL "&Empty folders", IDC_EMPTY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 452, 67, 100, 12
+    DEFPUSHBUTTON "&Compare", IDC_COMPARE, 8, 86, 70, 16
+    PUSHBUTTON "S&top", IDC_STOP, 86, 86, 60, 16
+    LTEXT "Preview only. No files will be copied, overwritten or deleted.", -1, 157, 89, 440, 12
+    CONTROL "Equal", IDC_EQUAL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 112, 60, 12
+    CONTROL "Different", IDC_DIFFERENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 72, 112, 68, 12
+    CONTROL "Single-sided", IDC_SINGLE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 148, 112, 85, 12
+    CONTROL "Left to right", IDC_TORIGHT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 245, 112, 85, 12
+    CONTROL "Right to left", IDC_TOLEFT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 340, 112, 85, 12
+    CONTROL "", IDC_LIST, "SysListView32", LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 8, 132, 594, 165
+    COMBOBOX IDC_ACTION, 8, 305, 105, 90, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON "Apply to selected rows", IDC_APPLY, 120, 305, 110, 16
+    PUSHBUTTON "Plan summary", IDC_SUMMARY, 238, 305, 90, 16
+    LTEXT "Ready", IDC_STATUS, 8, 331, 510, 20
+    PUSHBUTTON "Close", IDCANCEL, 532, 334, 70, 16
+END
+STRINGTABLE
+BEGIN
+    IDS_NAME "Directory Synchronization"
+    IDS_DESCRIPTION "Compare local and SMB folders and review proposed actions. This preview version never writes to either folder."
+    IDS_MENU "Directory synchronization preview..."
+    IDS_INPUT_ERROR "Both panels must contain Windows folders with complete paths and decodable selected names. The current SDK cannot provide a usable input for these panels."
+    IDS_SCAN "Scanning: %llu entries; compared: %llu"
+    IDS_DONE "Complete: %llu rows; visible: %llu; hidden: %llu; blocked/conflicts: %llu"
+    IDS_CANCELLED "Cancelled. Partial results contain no actionable proposals."
+    IDS_FAILED "Comparison failed. Results have been discarded."
+    IDS_SUMMARY "Preview only - no operations can be executed.\n\nVisible proposed copies to right: %llu (%llu bytes)\nVisible proposed copies to left: %llu (%llu bytes)\nVisible proposed deletions on right: %llu\nVisible unresolved: %llu\nBlocked/conflicts (all rows): %llu\nHidden rows: %llu"
+    IDS_SELECT_ROW "Select one or more rows first. Blocked and conflicting rows cannot receive actions."
+    IDS_HELP "Choose the two Windows folders and Compare. Only selected uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nChange actions on selected rows and review Plan summary. Only visible actions enter that summary; blocked/conflicting rows always stay visible. This version only previews and cannot execute changes."
+    220 "Relative path"
+    221 "Left size"
+    222 "Left modified"
+    223 "Action"
+    224 "Right size"
+    225 "Right modified"
+    226 "State"
+    227 "Reason"
+    228 "Error"
+    240 "Equal"
+    241 "Only left"
+    242 "Only right"
+    243 "Different"
+    244 "Conflict"
+    245 "Blocked"
+    260 "Skip"
+    261 "Copy to right"
+    262 "Copy to left"
+    263 "Delete on right"
+    264 "Choose direction"
+    265 "Blocked"
+    280 "Size and time"
+    281 "Binary content"
+    282 "Left is newer"
+    283 "Right is newer"
+    284 "Counterpart missing"
+    285 "File/folder conflict"
+    286 "Incomplete or unreadable subtree"
+    287 "Unsupported reparse, cloud or encrypted item"
+    288 "File changed since scan"
+    289 "Ambiguous names"
+    290 "Cancelled"
+    291 "Invalid, overlapping or unsupported roots"
+    292 "Invalid masks (regex and saved searches are not supported)"
+    293 "Counterpart excluded by masks; protected"
+END

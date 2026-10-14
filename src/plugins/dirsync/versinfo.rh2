@@ -1,0 +1,21 @@
+// SPDX-FileCopyrightText: 2026 Open Salamander Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+#ifndef DIRSYNC_VERSINFO
+#define DIRSYNC_VERSINFO
+#define VERSINFO_MAJOR 0
+#define VERSINFO_MINORA 1
+#define VERSINFO_MINORB 0
+#include "spl_vers.h"
+#define VERSINFO_COPYRIGHT "Copyright (c) 2026 Open Salamander Authors"
+#define VERSINFO_COMPANY "Open Salamander"
+#define VERSINFO_DESCRIPTION "Directory Synchronization preview plugin"
+#ifdef _LANG
+#define VERSINFO_INTERNAL "ENGLISH"
+#define VERSINFO_ORIGINAL "ENGLISH.SLG"
+#else
+#define VERSINFO_INTERNAL "DIRSYNC"
+#define VERSINFO_ORIGINAL "DIRSYNC.SPL"
+#endif
+#define VERSINFO_SLG_WEB "github.com/majklvi/salamander"
+#define VERSINFO_SLG_COMMENT "English version"
+#endif
