@@ -1149,7 +1149,7 @@ CPlugins::CreateIconsList(BOOL gray, HWND dpiWindow)
                     iconList = p->PluginIcons;
                 HICON hIcon = iconList->GetIcon(p->PluginIconIndex, TRUE);
                 HICON sizedIcon = hIcon != NULL ?
-                                      (HICON)CopyImage(hIcon, IMAGE_ICON, iconSize, iconSize, 0) :
+                                      (HICON)HANDLES_Q(CopyImage(hIcon, IMAGE_ICON, iconSize, iconSize, 0)) :
                                       NULL;
                 ImageList_AddIcon(hIL, sizedIcon != NULL ? sizedIcon : hIcon);
                 if (sizedIcon != NULL)
