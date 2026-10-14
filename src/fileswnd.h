@@ -566,7 +566,7 @@ public:
     // it returns TRUE if the path fits into the buffer completely, otherwise a truncated path is returned
     BOOL GetGeneralPath(char* buf, int bufSize, BOOL convertFSPathToExternal = FALSE);
 
-    const char* GetPath() { return Path; }
+    const char* GetPath() const { return Path; }
     const wchar_t* GetPathW() const { return PathW.c_str(); }
     BOOL Is(CPanelType type) { return type == PanelType; }
     CPanelType GetPanelType() { return PanelType; }
@@ -862,6 +862,14 @@ public:
 
     CPanelSide PanelSide;
     ULONGLONG PanelTabId;
+
+    // Ordinary disk-row paths; Name/NameW remain basenames. Adapted from the
+    // pinned PR #769 getters without Branch View state or retained row pointers.
+    std::wstring GetItemFullPathW(const CFileData& file) const;
+    std::wstring GetItemDirectoryW(const CFileData& file) const;
+    std::wstring GetItemIdentityW(const CFileData& file) const;
+    std::wstring GetItemRelativePathW(const CFileData& file) const;
+
     bool CustomTabColorValid;
     COLORREF CustomTabColor;
     bool CustomTabPrefixValid;
