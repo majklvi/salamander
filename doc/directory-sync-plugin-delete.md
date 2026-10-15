@@ -56,7 +56,15 @@ Nezávislá kontrola na disku potvrdila: původní jméno chybí, v obnově jsou
 
 Soukromý hostitel byl běžně zavřen a jeho konfigurace obnovena ze zálohy s přesnou shodou SHA-256; tři uživatelské instalované instance zůstaly spuštěné. Evidence `C:\Samandarin\builds\dirsync-delete\gui-20261015\results.json`, původní konfigurace a malá obnova zůstávají mimo repozitář. SPL SHA-256 `96EE8EB4CB84E2501F3CB102B4529BE99ABDBEA8CE2CB4FBA7D8FC3FE3DF9FF7`, SLG `AB74D3E513A78E80A4A73F4FD7FE46730F6AB1537085747551F35A782774EA41`.
 
-Tento GUI běh pokrývá úspěšné mazání ON, souhrn, nové porovnání a panelový refresh. OFF, chybové scénáře a Stop/Close během práce nadále dokládají uvedené nativní testy; samostatný úspěšný GUI běh OFF zde tvrzen není. Test nevyžadoval opravu produkčního kódu.
+Tento GUI běh pokrývá úspěšné mazání ON, souhrn, nové porovnání a panelový refresh. Chybové scénáře a Stop/Close během práce dokládají uvedené nativní testy. Test nevyžadoval opravu produkčního kódu.
+
+### Dokončený GUI test bez obnovy (16. října 2026)
+
+Samostatná fixture `C:\Samandarin\builds\dirsync-delete\gui-off-20261016` byla ověřena přes Computer Use ve stejném privátním Release hostiteli 0.16 a Windows Dark Mode. Keep originals bylo vypnuté, pole Unicode cesty obnovy neaktivní. Potvrzení správně uvedlo **1 soubor / 21 B**, **1 vynechaný adresář** a výslovné varování OFF bez obnovy hlavních dat i ADS. Po konkrétním souhlasu uživatele se odstranilo pouze jméno `right\delete-off.txt` (hlavní data `DELETE WITHOUT BACKUP`, ADS `:漢字` = `OFF-ADS`). Souhrn: **Deleted 1, Errors/cancelled 0, Not started 0, omitted 1**, bez cest nového protokolu či obnovy.
+
+Nezávislá kontrola disku potvrdila chybějící cílové jméno, původní `KEEP` v obou keep.txt a ponechanou prázdnou složku. Další hardlinkové jméno `alias.txt` mimo oba stromy zachovalo hlavní data, ADS, atributy i DACL; jde o testovací kontrolu nezávislosti jmen, nikoli zálohu vytvořenou pluginem. Ve složce `recovery-漢字` zůstal přesně jediný předem připravený `older-backup.txt`, se shodným SHA-256 hlavních dat a nezměněným ADS `:note`. Nevznikl nový běh, manifest, delete.jsonl ani staging v porovnávaných stromech.
+
+Nové Compare zobrazilo jen dva řádky: ponechanou prázdnou složku a Equal/Skip pro keep.txt. Po zavření dialogu se pravý panel automaticky aktualizoval bez F2. Soukromý hostitel byl běžně zavřen, konfigurace obnovena s přesnou shodou SHA-256 a všechny tři původní uživatelské instance zůstaly spuštěné. Evidence je v `C:\Samandarin\builds\dirsync-delete\gui-off-20261016\results.json`; fixture i původní konfigurace zůstávají mimo repozitář. Test používal stejný produkční SPL/SLG s výše uvedenými hashi, nevyžadoval změnu kódu. Chybové a přerušovací scénáře OFF nadále dokládají nativní testy, nikoli tento úspěšný GUI běh.
 
 ### Meze
 
