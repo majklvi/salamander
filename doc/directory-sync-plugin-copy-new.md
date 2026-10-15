@@ -1,5 +1,7 @@
 # Directory Synchronization: kopie pouze do nových cílů
 
+Navazující ověření [Stop/Close a chyb po publikaci](directory-sync-plugin-copy-cancellation.md): 375 copy assertions a 429 lifecycle kontrol Debug/Release x64. Nový záznam odděluje úspěšné nativní testy od omezeného GUI měření.
+
 15. října 2026. Na výslovný pokyn uživatele implementována první zápisová etapa podle [mapování adaptéru](directory-sync-plugin-core-adapter.md). Podporuje pouze kopie souborů s chybějícím protějškem, v obou směrech. **Neprovádí přepis existujících cílů ani mazání uživatelských položek.** Obnova D4 ještě není implementována, protože tato etapa nemění původní cílové soubory. SDK, hostitel i veřejná rozhraní zůstávají beze změn; SMB se netestovalo.
 
 ## Chování a rozsah

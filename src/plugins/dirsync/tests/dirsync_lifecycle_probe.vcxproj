@@ -13,7 +13,7 @@
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup>
-    <ClCompile><DebugInformationFormat>ProgramDatabase</DebugInformationFormat></ClCompile>
+    <ClCompile><DebugInformationFormat>ProgramDatabase</DebugInformationFormat><PreprocessorDefinitions>DIRSYNC_COPY_TEST_HOOKS;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
     <Link><ModuleDefinitionFile></ModuleDefinitionFile><BaseAddress>0x180000000</BaseAddress><OutputFile>$(OutDir)$(ProjectName).dll</OutputFile></Link>
   </ItemDefinitionGroup>
   <ItemGroup>

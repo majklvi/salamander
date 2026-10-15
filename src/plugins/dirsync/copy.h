@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #pragma once
 #include "engine.h"
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
+#include <functional>
+#endif
 
 namespace dirsync {
-enum class CopyPhase { Checking, Copying, Verifying, Publishing, Finished };
+enum class CopyPhase { Checking, Copying, Verifying, Publishing, Published, Finished };
 struct CopyProgress {
     std::atomic<CopyPhase> phase{CopyPhase::Checking};
     std::atomic<uint64_t> copied{0}, verified{0}, completed{0}, item{0};
@@ -25,7 +28,7 @@ struct CopyReport {
 bool IsNewFileCopy(const Row& row);
 CopyReport CopyNewFiles(Result snapshot, const std::vector<size_t>& visible,
                        std::atomic<bool>& cancel, Progress& checking, CopyProgress& progress);
-#ifdef DIRSYNC_ENGINE_TEST
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
 // Deterministic ordinary failure/cancellation boundaries; never in shipped SPL.
 void SetCopyHook(std::function<void(CopyPhase, const std::wstring&)> hook);
 #endif

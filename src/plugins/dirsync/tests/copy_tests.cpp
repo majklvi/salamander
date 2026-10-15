@@ -166,8 +166,46 @@ void Paths() {
     Check(a.size()<260 && WideCharToMultiByte(CP_UTF8,0,a.c_str(),-1,nullptr,0,nullptr,nullptr)>260,"UTF8 long byte path fixture");
     Check(copied.items.size()==1 && copied.items[0].status==CopyStatus::Copied && Read(b+L"\\file")=="UTF8","short UTF16 long UTF8 components");
 }
+void AfterPublication() {
+    for(int mode=0;mode<3;++mode) {
+        Fixture f; Put(f.left+L"\\a","PUBLISHED"); Put(f.left+L"\\a:note","ADS"); Put(f.left+L"\\b","NEXT");
+        auto plan=f.Scan(); bool injected=false;
+        SetCopyHook([&](CopyPhase phase,const std::wstring& target) {
+            if(phase!=CopyPhase::Published || injected) return;
+            injected=true;
+            if(mode==0) Acl(target,L"D:P(D;;0x100;;;WD)(A;;FA;;;OW)"); // deny FILE_WRITE_ATTRIBUTES
+            else if(mode==1) Acl(target,L"D:P(A;;FA;;;OW)(A;;FR;;;WD)");
+            else f.cancel=true;
+        });
+        auto report=f.Run(plan); SetCopyHook({});
+        Check(injected && report.items.size()==2 && report.items[0].published,"observed actual publication");
+        if(mode<2) {
+            Check(report.items[0].status==CopyStatus::Failed && report.items[0].error==DWORD(mode==0?ERROR_ACCESS_DENIED:ERROR_INVALID_DATA),"post-publication error is reported");
+            Check(!report.cancelled && f.progress.completed==0,"failed final check is not successful completion");
+            Acl(f.right+L"\\a",L"D:P(A;;FA;;;OW)");
+        } else {
+            Check(report.items[0].status==CopyStatus::Copied && f.progress.completed==1,"Stop after publication preserves verified completion");
+            Check(report.cancelled && report.items[1].status==CopyStatus::Cancelled,"Stop after publication prevents next copy");
+        }
+        Check(Read(f.right+L"\\a")=="PUBLISHED" && Read(f.right+L"\\a:note")=="ADS","published data and ADS retained after error or Stop");
+        Check(Read(f.left+L"\\a")=="PUBLISHED","source preserved");
+        Check(report.items[0].remainingStage.empty() && GetFileAttributesW(ApiPath(f.right+L"\\b").c_str())==INVALID_FILE_ATTRIBUTES,"no staging report or subsequent target");
+        if(mode<2) Check(report.items[1].status==CopyStatus::NotStarted,"post-publication failure stops batch");
+        f.NoStaging(f.right);
+        HANDLE h=CreateFileW(ApiPath(f.right+L"\\a").c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+        Check(h!=INVALID_HANDLE_VALUE,"published file handles released"); if(h!=INVALID_HANDLE_VALUE) CloseHandle(h);
+    }
+    Fixture f; Put(f.left+L"\\a",std::string(1024*1024,'V')); auto plan=f.Scan(); bool read=false;
+    SetCopyHook([&](CopyPhase phase,const std::wstring&) {
+        if(phase==CopyPhase::Verifying && f.progress.verified>0) { read=true; f.cancel=true; }
+    });
+    auto report=f.Run(plan); SetCopyHook({});
+    Check(read && report.cancelled && report.items[0].status==CopyStatus::Cancelled,"Stop during actual Verify reads");
+    Check(!report.items[0].published && f.progress.verified>0 && f.progress.verified<2*1024*1024,"Verify interrupted before reading entire file");
+    Check(GetFileAttributesW(ApiPath(f.right+L"\\a").c_str())==INVALID_FILE_ATTRIBUTES,"partial Verify never publishes"); f.NoStaging(f.right);
+}
 }
 int main() {
-    try { Success(); Scope(); Boundaries(); Paths(); std::cout<<checks<<" copy assertions passed\n"; return 0; }
+    try { Success(); Scope(); Boundaries(); Paths(); AfterPublication(); std::cout<<checks<<" copy assertions passed\n"; return 0; }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }
 }

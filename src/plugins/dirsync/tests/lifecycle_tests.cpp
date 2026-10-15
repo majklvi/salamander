@@ -24,6 +24,14 @@ struct Fixture
         Dir(root); left=root+L"\\left"; right=root+L"\\right"; Dir(left); Dir(right);
     }
     void Dir(const std::wstring& path) { Check(CreateDirectoryW(path.c_str(),nullptr)!=FALSE,"fixture directory"); directories.push_back(path); }
+    void Data(const std::wstring& path)
+    {
+        HANDLE f=CreateFileW(path.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);
+        Check(f!=INVALID_HANDLE_VALUE,"copy fixture handle"); files.push_back(path);
+        std::vector<BYTE> data(1024*1024,42); DWORD n=0;
+        bool ok=WriteFile(f,data.data(),DWORD(data.size()),&n,nullptr)!=FALSE && n==data.size();
+        CloseHandle(f); Check(ok,"copy fixture data");
+    }
     void Sparse(const std::wstring& path)
     {
         HANDLE f=CreateFileW(path.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);
@@ -40,7 +48,9 @@ struct Module
     using Start=BOOL (WINAPI*)(const wchar_t*,const wchar_t*,BOOL);
     using Status=unsigned (WINAPI*)();
     using Release=unsigned (WINAPI*)(BOOL);
+    using CopyCancel=unsigned (WINAPI*)(BOOL);
     HMODULE handle=nullptr; Start start=nullptr; Status status=nullptr; Release release=nullptr;
+    Start copyStart=nullptr; Status copyStatus=nullptr; CopyCancel copyCancel=nullptr;
     explicit Module(const std::wstring& path)
     {
         handle=LoadLibraryW(path.c_str());
@@ -50,6 +60,10 @@ struct Module
         status=reinterpret_cast<Status>(GetProcAddress(handle,"ProbeStatus"));
         release=reinterpret_cast<Release>(GetProcAddress(handle,"ProbeRelease"));
         Check(start && status && release,"probe exports");
+        copyStart=reinterpret_cast<Start>(GetProcAddress(handle,"ProbeCopyStart"));
+        copyStatus=reinterpret_cast<Status>(GetProcAddress(handle,"ProbeCopyStatus"));
+        copyCancel=reinterpret_cast<CopyCancel>(GetProcAddress(handle,"ProbeCopyCancel"));
+        Check(copyStart && copyStatus && copyCancel,"copy lifecycle exports");
     }
     ~Module() { if(handle) { if(release) release(TRUE); FreeLibrary(handle); } }
 };
@@ -79,6 +93,29 @@ void Run(const std::wstring& dll,Fixture& f,bool content)
     }
     std::cout<<(content?"content":"scan")<<": force Release + immediate FreeLibrary passed\n";
 }
+void CopyControls(const std::wstring& dll,bool verify,bool close)
+{
+    Fixture f; f.Data(f.left+L"\\a"); f.Data(f.left+L"\\b"); Module module(dll);
+    Check(module.copyStart(f.left.c_str(),f.right.c_str(),verify)!=FALSE,"start copy lifecycle worker");
+    ULONGLONG deadline=GetTickCount64()+3000;
+    while(!(module.copyStatus()&1) && GetTickCount64()<deadline) Sleep(1);
+    Check(module.copyStatus()==1,"observe active actual copy/Verify callback");
+    ULONGLONG start=GetTickCount64();
+    Check(module.copyCancel(close)==31,"real Stop/Close handler cancels and joins copy with correct report");
+    Check(GetTickCount64()-start<3000,"Stop/Close local join within three seconds");
+    WIN32_FIND_DATAW entry{}; HANDLE find=FindFirstFileW((f.right+L"\\*").c_str(),&entry); bool empty=true;
+    if(find!=INVALID_HANDLE_VALUE) {
+        do { if(wcscmp(entry.cFileName,L".") && wcscmp(entry.cFileName,L"..")) empty=false; } while(FindNextFileW(find,&entry));
+        FindClose(find);
+    }
+    Check(empty,"Stop/Close leaves neither unpublished target nor staging");
+    for(const auto& path:f.files) {
+        HANDLE h=CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+        Check(h!=INVALID_HANDLE_VALUE,"source handles released after Stop/Close join"); if(h!=INVALID_HANDLE_VALUE) CloseHandle(h);
+    }
+    Check(FreeLibrary(module.handle)!=FALSE,"unload after copy Stop/Close"); module.handle=nullptr;
+    std::cout<<(close?"Close":"Stop")<<" during "<<(verify?"Verify":"copy")<<": handlers and join passed\n";
+}
 }
 int main()
 {
@@ -90,6 +127,7 @@ int main()
         Fixture scan; for(int i=0;i<256;++i) scan.Dir(scan.left+L"\\d"+std::to_wstring(i));
         Fixture content; content.Sparse(content.left+L"\\same.bin"); content.Sparse(content.right+L"\\same.bin");
         for(int pass=0;pass<3;++pass) { Run(dll,scan,false); Run(dll,content,true); }
+        for(bool verify:{false,true}) for(bool close:{false,true}) CopyControls(dll,verify,close);
         std::cout<<checks<<" lifecycle checks passed\n"; return 0;
     }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }

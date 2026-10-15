@@ -114,6 +114,9 @@ struct Security {
     }
 };
 using Streams = std::map<std::wstring,uint64_t>;
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
+thread_local std::function<void(CopyPhase,const std::wstring&)> hook;
+#endif
 Streams StreamsOf(const std::wstring& p)
 {
     WIN32_FIND_STREAM_DATA d{}; HANDLE find = FindFirstStreamW(ApiPath(p).c_str(),FindStreamInfoStandard,&d,0);
@@ -141,17 +144,17 @@ void Verify(const std::wstring& source, const std::wstring& stage, std::atomic<b
             Need(ReadFile(out.h,y.data(),DWORD(y.size()),&ny,nullptr));
             if (nx!=ny || memcmp(x.data(),y.data(),nx)!=0) throw Failure{ERROR_CRC};
             if (!nx) break; total+=nx; progress.verified.fetch_add(uint64_t(nx)*2,std::memory_order_relaxed);
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
+            if (hook) hook(CopyPhase::Verifying,stage);
+#endif
         }
         if (total!=stream.second) throw Failure{ERROR_CRC};
     }
     if (StreamsOf(source)!=a || StreamsOf(stage)!=a) throw Failure{ERROR_FILE_INVALID};
 }
-#ifdef DIRSYNC_ENGINE_TEST
-thread_local std::function<void(CopyPhase,const std::wstring&)> hook;
-#endif
 void Phase(CopyProgress& p, CopyPhase phase, const std::wstring& path) {
     p.phase=phase;
-#ifdef DIRSYNC_ENGINE_TEST
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
     if (hook) hook(phase,path);
 #else
     (void)path;
@@ -163,7 +166,7 @@ DWORD CALLBACK CopyCallback(LARGE_INTEGER, LARGE_INTEGER transferred, LARGE_INTE
 {
     auto& c=*static_cast<Callback*>(context);
     c.progress.copied=c.base+uint64_t(transferred.QuadPart);
-#ifdef DIRSYNC_ENGINE_TEST
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
     try { if (hook) hook(CopyPhase::Copying,c.stage); } catch (...) { c.cancel=true; }
 #endif
     return c.cancel ? PROGRESS_CANCEL : PROGRESS_CONTINUE;
@@ -219,6 +222,7 @@ void CopyOne(const std::wstring& sourceRoot, const std::wstring& targetRoot, con
         staging.Close();
         Need(MoveFileExW(ApiPath(stage).c_str(),ApiPath(target).c_str(),0));
         outcome.published=true;
+        Phase(progress,CopyPhase::Published,target);
         File published(Open(target,FILE_READ_ATTRIBUTES|FILE_WRITE_ATTRIBUTES)); Need(published.h!=INVALID_HANDLE_VALUE);
         if (!SameId(owned,Info(published.h))) throw Failure{ERROR_FILE_INVALID};
         Need(SetFileTime(published.h,nullptr,nullptr,&mtime));
@@ -279,7 +283,7 @@ CopyReport CopyNewFiles(Result snapshot,const std::vector<size_t>& visible,std::
     }
     Phase(progress,CopyPhase::Finished,L""); return report;
 }
-#ifdef DIRSYNC_ENGINE_TEST
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
 void SetCopyHook(std::function<void(CopyPhase,const std::wstring&)> value) { hook=std::move(value); }
 #endif
 } // namespace dirsync
