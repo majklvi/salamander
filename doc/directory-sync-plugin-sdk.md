@@ -139,6 +139,8 @@ Kontrakt adaptéru pluginu nad stávajícím SDK:
 
 ## V6: ověřené API vlastnosti a místní sonda
 
+Místní doplnění z 15. října: read-only engine nyní ukládá identity/ChangeTime a ověřuje snapshot před změnou návrhů a souhrnem. Řízené výměny souborů, rodičů a junction, změny po skenu a přesné hranice důkazu jsou v [protokolu implementace](directory-sync-plugin-implementation.md#ntfs-identity-a-změny-po-skenu-15-října-2026). [Nový návrh provedení a obnovy](directory-sync-plugin-execution-protocol.md) konkretizuje journal a recovery, ale nepovažuje read-only checkpoint za dostatečnou ochranu budoucího zápisu. V6 tím není uzavřeno; executor, jeho rename/DELETE sharing režim, ACL/ADS a pádová matice nejsou implementované ani ověřené.
+
 Prostředí: Windows 10.0.26200.0, svazek C: NTFS. Samostatná diagnostická sonda mimo repozitář: `C:\Samandarin\tc-sync-probe-20261014-r2\probe-winapi.ps1`. Volá přímo `CopyFileExW` a `ReplaceFileW` přes P/Invoke; neobsahuje plugin ani synchronizační engine. Úspěšný výstup je v `winapi-e82ce1bf599f46c294089a3483bc6286\result.json` pod stejným testovacím kořenem.
 
 | Sonda | Pozorování | Důsledek pro návrh |

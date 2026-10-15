@@ -264,8 +264,150 @@ void Cancellation()
     Check(progress.readBytes==10,"restart content progress counts both sides independently");
 }
 }
+void PostScan()
+{
+    auto blocked = [](const Result& r) { return std::all_of(r.rows.begin(),r.rows.end(),[](const Row& row) { return row.action==Action::Blocked; }); };
+    auto overwrite = [](const std::wstring& path) {
+        HANDLE h=CreateFileW(ApiPath(path).c_str(),GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
+        Check(h!=INVALID_HANDLE_VALUE,"mutate existing fixture"); DWORD n=0;
+        constexpr uint64_t ticks=134000000000000000;
+        FILETIME time{DWORD(ticks & 0xffffffff),DWORD(ticks>>32)};
+        bool ok=WriteFile(h,"BBBB",4,&n,nullptr) && n==4 && SetFileTime(h,nullptr,nullptr,&time);
+        CloseHandle(h); Check(ok,"same size and restored mtime fixture mutation");
+    };
+    {
+        Fixture f; std::atomic<bool> cancel{false}; Progress p; Options o;
+        f.Write(f.left+L"\\a.txt","AAAA");
+        Result r=Compare(f.left,f.right,o,cancel,p);
+        SetAfterScanHook([&] { cancel=true; });
+        Check(!Revalidate(r,cancel,p) && r.cancelled && blocked(r),"cancellation during validation blocks proposals");
+    }
+    for(int scenario=0;scenario<13;++scenario)
+    {
+        Fixture f; std::atomic<bool> cancel{false}; Progress progress; Options o;
+        wchar_t filesystem[32]{};
+        Check(GetVolumeInformationW(f.root.substr(0,3).c_str(),nullptr,0,nullptr,nullptr,nullptr,filesystem,32) &&
+            wcscmp(filesystem,L"NTFS")==0,"local NTFS test volume");
+        f.Write(f.left+L"\\a.txt","AAAA");
+        if(scenario!=3) f.Write(f.right+L"\\a.txt","AAAA");
+        Result r=Compare(f.left,f.right,o,cancel,progress);
+        Check(r.snapshot && !r.rows.empty(),"snapshot captured");
+        Check(Revalidate(r,cancel,progress),"unchanged NTFS plan validates");
+        r.rows[0].action=Action::None;
+        Check(Revalidate(r,cancel,progress) && r.rows[0].action==Action::None,"validation preserves manual action");
+        switch(scenario)
+        {
+        case 0: overwrite(f.left+L"\\a.txt"); break;
+        case 1:
+            Check(MoveFileW(ApiPath(f.left+L"\\a.txt").c_str(),ApiPath(f.root+L"\\retired.txt").c_str())!=FALSE,"replace source object");
+            f.files.push_back(f.root+L"\\retired.txt"); f.Write(f.left+L"\\a.txt","AAAA"); break;
+        case 2: Check(DeleteFileW(ApiPath(f.left+L"\\a.txt").c_str())!=FALSE,"source disappeared"); break;
+        case 3: f.Write(f.right+L"\\a.txt","AAAA"); break;
+        case 4: Check(DeleteFileW(ApiPath(f.right+L"\\a.txt").c_str())!=FALSE,"target disappeared"); break;
+        case 5:
+            Check(DeleteFileW(ApiPath(f.right+L"\\a.txt").c_str())!=FALSE,"remove before type change");
+            f.Dir(f.right+L"\\a.txt"); break;
+        case 6: f.Write(f.right+L"\\new.txt","new"); break;
+        case 7:
+            Check(MoveFileW(ApiPath(f.left).c_str(),ApiPath(f.root+L"\\saved").c_str())!=FALSE,"replace root after Compare releases pins");
+            f.directories.push_back(f.root+L"\\saved"); f.files.push_back(f.root+L"\\saved\\a.txt");
+            f.Dir(f.left); f.Write(f.left+L"\\a.txt","AAAA"); break;
+        case 8: cancel=true; break;
+        case 9: overwrite(f.right+L"\\a.txt"); break;
+        case 10: Check(SetFileAttributesW(ApiPath(f.left+L"\\a.txt").c_str(),FILE_ATTRIBUTE_HIDDEN)!=FALSE,"attribute changed"); break;
+        case 11:
+        {
+            HANDLE h=CreateFileW(ApiPath(f.left+L"\\a.txt").c_str(),FILE_WRITE_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);
+            Check(h!=INVALID_HANDLE_VALUE,"time mutation handle"); FILETIME time{1,1};
+            BOOL ok=SetFileTime(h,nullptr,nullptr,&time); CloseHandle(h); Check(ok!=FALSE,"mtime changed"); break;
+        }
+        case 12:
+            Check(CreateHardLinkW(ApiPath(f.root+L"\\alias.txt").c_str(),ApiPath(f.left+L"\\a.txt").c_str(),nullptr)!=FALSE,"hardlink created outside scan roots");
+            f.files.push_back(f.root+L"\\alias.txt"); break;
+        }
+        Check(!Revalidate(r,cancel,progress) && r.stale && blocked(r),"postscan mutation blocks entire plan");
+        cancel=false; Check(!Revalidate(r,cancel,progress),"stale plan cannot revive without Compare");
+    }
+    for(int scenario=0;scenario<4;++scenario)
+    {
+        Fixture f; std::atomic<bool> cancel{false}; Progress progress; Options o; o.content=true;
+        f.Dir(f.left+L"\\sub"); f.Dir(f.right+L"\\sub");
+        f.Write(f.left+L"\\sub\\a.txt","AAAA"); f.Write(f.right+L"\\sub\\a.txt","AAAA");
+        f.Dir(f.root+L"\\outside"); f.Write(f.root+L"\\outside\\a.txt","AAAA");
+        SetAfterScanHook([&] {
+            if(scenario==0)
+            {
+                Check(MoveFileW(ApiPath(f.left+L"\\sub\\a.txt").c_str(),ApiPath(f.root+L"\\retired.txt").c_str())!=FALSE,"replace file between scan and read");
+                f.files.push_back(f.root+L"\\retired.txt"); f.Write(f.left+L"\\sub\\a.txt","AAAA");
+            }
+            if(scenario==1 || scenario==2)
+            {
+                Check(MoveFileW(ApiPath(f.left+L"\\sub").c_str(),ApiPath(f.root+L"\\saved").c_str())!=FALSE,"exchange scanned parent");
+                f.directories.push_back(f.root+L"\\saved"); f.files.push_back(f.root+L"\\saved\\a.txt");
+                if(scenario==1) { f.Dir(f.left+L"\\sub"); f.Write(f.left+L"\\sub\\a.txt","AAAA"); }
+                else f.Junction(f.left+L"\\sub",f.root+L"\\outside");
+            }
+            if(scenario==3)
+            {
+                SetBeforeReadHook([&] {
+                    BOOL moved=MoveFileW(ApiPath(f.left).c_str(),ApiPath(f.root+L"\\root-moved").c_str());
+                    DWORD error=GetLastError();
+                    Check(!moved && (error==ERROR_SHARING_VIOLATION || error==ERROR_ACCESS_DENIED),"active read pins prevent root rename");
+                    HANDLE writer=CreateFileW(ApiPath(f.left+L"\\sub\\a.txt").c_str(),GENERIC_WRITE,
+                        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);
+                    bool denied=writer==INVALID_HANDLE_VALUE; if(!denied) CloseHandle(writer);
+                    Check(denied,"active content read excludes ordinary writer");
+                    HANDLE parent=CreateFileW(ApiPath(f.left+L"\\sub").c_str(),GENERIC_WRITE,
+                        FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+                    denied=parent==INVALID_HANDLE_VALUE; if(!denied) CloseHandle(parent);
+                    Check(denied,"pinned parent refuses writable reparse handle");
+                });
+            }
+        });
+        Result r=Compare(f.left,f.right,o,cancel,progress);
+        const Row* row=Find(r,L"sub\\a.txt");
+        Check(row && row->state==(scenario==3?State::Equal:State::Blocked),"identity/reparse swap outcome");
+        Check(scenario==3 || progress.readBytes==0,"replacement or junction target was not read");
+        if(scenario==2) Check(!Revalidate(r,cancel,progress) && r.stale,"junction swap also invalidates stored plan");
+    }
+    {
+        Fixture f; std::atomic<bool> cancel{false}; Progress p; Options o;
+        f.Write(f.left+L"\\good.txt","AAAA"); f.Write(f.right+L"\\good.txt","AAAA");
+        f.Dir(f.root+L"\\outside"); f.Junction(f.left+L"\\link",f.root+L"\\outside");
+        Result r=Compare(f.left,f.right,o,cancel,p);
+        Check(Revalidate(r,cancel,p),"unchanged blocked junction does not invalidate unrelated rows");
+        Check(Find(r,L"link") && Find(r,L"link")->action==Action::Blocked,"junction stays blocked after validation");
+    }
+    {
+        Fixture f; std::atomic<bool> cancel{false}; Progress p; Options o;
+        f.Write(f.left+L"\\same.txt","AAAA");
+        Check(CreateHardLinkW(ApiPath(f.right+L"\\same.txt").c_str(),ApiPath(f.left+L"\\same.txt").c_str(),nullptr)!=FALSE,"hardlink alias fixture");
+        f.files.push_back(f.right+L"\\same.txt");
+        Result r=Compare(f.left,f.right,o,cancel,p);
+        Check(r.rows.size()==1 && blocked(r) && r.rows[0].reason==Reason::Aliased,"same file identity across pair is blocked");
+        Check(Compare(f.left,f.left+L"\\..\\left",o,cancel,p).rows[0].action==Action::Blocked,"normalized alias roots rejected");
+        std::vector<wchar_t> shortPath(32768);
+        DWORD n=GetShortPathNameW(f.left.c_str(),shortPath.data(),DWORD(shortPath.size()));
+        if(n && n<shortPath.size() && f.left!=shortPath.data())
+            Check(Compare(f.left,shortPath.data(),o,cancel,p).rows[0].action==Action::Blocked,"8.3 alias of same root rejected");
+        else std::cout<<"8.3 alias case unavailable on fixture volume\n";
+        Check(Compare(f.left.substr(0,3),f.left,o,cancel,p).rows[0].action==Action::Blocked,"volume root contains nested input");
+        std::wstring out;
+        Check(!NormalizeRoot(f.left+L":stream",out),"alternate stream root rejected");
+        Check(!NormalizeRoot(f.left+std::wstring(1,L'\0')+L"ignored",out),"embedded NUL root rejected");
+    }
+    {
+        Fixture f; std::wstring a=f.left,b=f.right;
+        for(int i=0;i<5;++i) { std::wstring name=L"\\"+std::wstring(45,L'階')+std::to_wstring(i); a+=name;b+=name;f.Dir(a);f.Dir(b); }
+        f.Write(a+L"\\žluťoučký 😀.txt","AAAA"); f.Write(b+L"\\žluťoučký 😀.txt","AAAA");
+        std::atomic<bool> cancel{false}; Progress p; Options o;
+        Result r=Compare(a,b,o,cancel,p); Check(Revalidate(r,cancel,p),"long Unicode roots validate");
+        overwrite(a+L"\\žluťoučký 😀.txt");
+        Check(!Revalidate(r,cancel,p) && blocked(r),"long Unicode mutation invalidates");
+    }
+}
 int main()
 {
-    try { Matrix(); Masks(); Filesystem(); Cancellation(); std::cout<<assertions<<" assertions passed\n"; return 0; }
+    try { Matrix(); Masks(); Filesystem(); Cancellation(); PostScan(); std::cout<<assertions<<" assertions passed\n"; return 0; }
     catch(const std::exception& error) { std::cerr<<"FAILED: "<<error.what()<<"\n"; return 1; }
 }

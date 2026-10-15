@@ -10,6 +10,9 @@
 
 namespace dirsync
 {
+#ifdef DIRSYNC_ENGINE_TEST
+namespace { thread_local std::function<void()> afterScanHook, beforeReadHook; }
+#endif
 namespace
 {
 bool Same(const std::wstring& a, const std::wstring& b)
@@ -21,7 +24,7 @@ struct Less
 };
 bool Within(const std::wstring& path, const std::wstring& parent)
 {
-    return Same(path, parent) || (path.size() > parent.size() && path[parent.size()] == L'\\' &&
+    return Same(path, parent) || (!parent.empty() && path.size() > parent.size() && (parent.back() == L'\\' || path[parent.size()] == L'\\') &&
         Same(path.substr(0, parent.size()), parent));
 }
 uint64_t Ticks(FILETIME time)
@@ -46,6 +49,80 @@ bool Unsupported(DWORD attr)
     // Includes cloud reparse placeholders. Never hydrate/open their content.
     return (attr & (FILE_ATTRIBUTE_REPARSE_POINT | FILE_ATTRIBUTE_ENCRYPTED |
                     FILE_ATTRIBUTE_OFFLINE | 0x00040000 | 0x00400000)) != 0;
+}
+bool Identify(HANDLE handle, Entry& e)
+{
+    BY_HANDLE_FILE_INFORMATION info{}; FILE_BASIC_INFO basic{};
+    if (!GetFileInformationByHandle(handle, &info) ||
+        !GetFileInformationByHandleEx(handle, FileBasicInfo, &basic, sizeof(basic))) return false;
+    e.attributes = info.dwFileAttributes;
+    e.directory = (info.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    e.size = (uint64_t(info.nFileSizeHigh) << 32) | info.nFileSizeLow;
+    e.time = Ticks(info.ftLastWriteTime); e.change = uint64_t(basic.ChangeTime.QuadPart);
+    e.volume = info.dwVolumeSerialNumber;
+    e.id = (uint64_t(info.nFileIndexHigh) << 32) | info.nFileIndexLow;
+    e.links = info.nNumberOfLinks; e.identified = true;
+    return true;
+}
+bool Identity(const Entry& a, const Entry& b)
+{ return a.identified && b.identified && a.volume == b.volume && a.id == b.id; }
+bool Stamp(const Entry& a, const Entry& b)
+{
+    // An unchanged unsupported/unreadable node remains blocked on both scans.
+    // It cannot authorize actions in that subtree; do not invalidate unrelated
+    // rows solely because identity could not be queried for this blocked node.
+    if (a.error && b.error && !a.identified && !b.identified)
+        return a.error == b.error && a.reason == b.reason && a.attributes == b.attributes &&
+            a.directory == b.directory && a.size == b.size && a.time == b.time;
+    return Identity(a, b) && a.attributes == b.attributes && a.size == b.size &&
+        a.time == b.time && a.change == b.change && a.links == b.links && a.error == b.error;
+}
+using Parents = std::map<std::wstring, Entry, Less>;
+struct Pinned
+{
+    std::vector<std::unique_ptr<Handle>> handles;
+    Parents parents;
+    // Open each component without following reparses, keeping preceding handles
+    // until the caller finishes. Deny write/delete sharing on directories.
+    bool Open(const std::wstring& full, bool directory, DWORD& error)
+    {
+        size_t end = directory ? full.size() : full.find_last_of(L'\\');
+        size_t base = 3;
+        if (full.rfind(L"\\\\", 0) == 0)
+        {
+            size_t server = full.find(L'\\', 2);
+            base = full.find(L'\\', server + 1);
+            if (base == std::wstring::npos) base = full.size();
+        }
+        size_t n = base;
+        while (true)
+        {
+            std::wstring path = full.substr(0, n);
+            auto h = std::make_unique<Handle>(CreateFileW(ApiPath(path).c_str(), FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES,
+                FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+            if (h->value == INVALID_HANDLE_VALUE) { error = GetLastError(); return false; }
+            Entry e;
+            if (!Identify(h->value, e)) { error = GetLastError(); return false; }
+            if (!e.directory || Unsupported(e.attributes)) { error = ERROR_NOT_SUPPORTED; return false; }
+            parents.emplace(path, e); handles.push_back(std::move(h));
+            if (n >= end) break;
+            size_t next = full.find(L'\\', n);
+            if (next == n) next = full.find(L'\\', n + 1);
+            n = next == std::wstring::npos || next > end ? end : next;
+        }
+        return true;
+    }
+};
+std::wstring Canonical(HANDLE handle)
+{
+    DWORD n = GetFinalPathNameByHandleW(handle, nullptr, 0, VOLUME_NAME_DOS);
+    if (!n) return {};
+    std::vector<wchar_t> buffer(size_t(n) + 1);
+    DWORD used = GetFinalPathNameByHandleW(handle, buffer.data(), DWORD(buffer.size()), VOLUME_NAME_DOS);
+    if (!used || used >= buffer.size()) return {};
+    std::wstring path(buffer.data(), used);
+    while (path.size() > 3 && path.back() == L'\\' && path[path.size() - 2] != L':') path.pop_back();
+    return path;
 }
 struct Masks { std::vector<std::wstring> include, exclude; bool valid = true; };
 Masks Parse(const std::wstring& mask)
@@ -134,7 +211,13 @@ bool Excluded(const Masks& masks, const std::wstring& path, bool directory)
     }
     return false;
 }
-struct Tree { std::map<std::wstring, Entry, Less> entries; std::set<std::wstring, Less> blocked, excluded; };
+struct Tree
+{
+    std::map<std::wstring, Entry, Less> entries;
+    std::set<std::wstring, Less> blocked, excluded;
+    Parents parents;
+    Entry root;
+};
 void Add(Tree& tree, Entry entry)
 {
     auto inserted = tree.entries.emplace(entry.path, entry);
@@ -167,6 +250,27 @@ void Scan(const std::wstring& root, const Options& options, const Masks& masks,
     {
         std::wstring relative = std::move(pending.back()); pending.pop_back();
         std::wstring full = relative.empty() ? root : Join(root, relative);
+        Pinned pinned; DWORD pinError = 0;
+        if (!pinned.Open(full, true, pinError))
+        {
+            Entry e; e.path = relative; e.directory = true; e.error = pinError; e.reason = Reason::Changed;
+            tree.entries[relative] = e; tree.blocked.insert(relative); continue;
+        }
+        if (!relative.empty())
+        {
+            auto expected = tree.entries.find(relative);
+            if (expected == tree.entries.end() || !Identity(expected->second, pinned.parents.find(full)->second))
+            {
+                Entry e; e.path = relative; e.directory = true; e.error = ERROR_FILE_INVALID; e.reason = Reason::Changed;
+                tree.entries[relative] = e; tree.blocked.insert(relative); continue;
+            }
+        }
+        if (relative.empty()) tree.root = pinned.parents.find(full)->second;
+        for (const auto& parent : pinned.parents)
+        {
+            auto old = tree.parents.emplace(parent);
+            if (!old.second && !Identity(old.first->second, parent.second)) tree.blocked.insert(relative);
+        }
         DWORD attr = GetFileAttributesW(ApiPath(full).c_str());
         if (attr == INVALID_FILE_ATTRIBUTES || !(attr & FILE_ATTRIBUTE_DIRECTORY) || Unsupported(attr))
         {
@@ -203,8 +307,25 @@ void Scan(const std::wstring& root, const Options& options, const Masks& masks,
             bool include = e.directory;
             if (!include) for (const auto& p : masks.include) if (Pattern(p, e.path)) { include = true; break; }
             if (!include) { tree.excluded.insert(e.path); continue; }
+            if (!e.error)
+            {
+                Handle h(CreateFileW(ApiPath(Join(root, e.path)).c_str(), FILE_READ_ATTRIBUTES,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING,
+                    FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr));
+                Entry observed;
+                if (h.value == INVALID_HANDLE_VALUE || !Identify(h.value, observed))
+                { e.error = GetLastError(); e.reason = Reason::ScanError; }
+                else if (observed.directory != e.directory || (!e.directory && (observed.size != e.size || observed.time != e.time)) || Unsupported(observed.attributes))
+                { e.error = ERROR_FILE_INVALID; e.reason = Reason::Changed; }
+                else { observed.path = e.path; e = std::move(observed); }
+                if (e.error) tree.blocked.insert(e.path);
+            }
             if (e.directory && !e.error && options.emptyDirectories && !Descend(e.path, options))
             {
+                Pinned peekParents; DWORD peekError = 0;
+                if (!peekParents.Open(Join(root, e.path), true, peekError) ||
+                    !Identity(e, peekParents.parents.find(Join(root, e.path))->second))
+                { e.error = peekError ? peekError : ERROR_FILE_INVALID; e.reason = Reason::Changed; tree.blocked.insert(e.path); Add(tree, e); continue; }
                 WIN32_FIND_DATAW child{};
                 FindHandle peek{FindFirstFileW(ApiPath(Join(Join(root, e.path), L"*")).c_str(), &child)};
                 if (peek.value == INVALID_HANDLE_VALUE)
@@ -255,8 +376,17 @@ bool Stable(const BY_HANDLE_FILE_INFORMATION& info, const Entry& expected)
         ((uint64_t(info.nFileSizeHigh) << 32) | info.nFileSizeLow) == expected.size;
 }
 bool Content(const std::wstring& left, const std::wstring& right, const Row& row,
-             std::atomic<bool>& cancel, Progress& progress, bool& equal, DWORD& error)
+             const Tree& leftTree, const Tree& rightTree, std::atomic<bool>& cancel, Progress& progress, bool& equal, DWORD& error)
 {
+    Pinned leftParents, rightParents;
+    if (!leftParents.Open(left, false, error) || !rightParents.Open(right, false, error)) return false;
+    for (const auto& side : {std::make_pair(&leftParents, &leftTree), std::make_pair(&rightParents, &rightTree)})
+        for (const auto& parent : side.first->parents)
+        {
+            auto expected = side.second->parents.find(parent.first);
+            if (expected == side.second->parents.end() || !Identity(expected->second, parent.second))
+            { error = ERROR_FILE_INVALID; return false; }
+        }
     Handle a(CreateFileW(ApiPath(left).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
                          OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_SEQUENTIAL_SCAN, nullptr));
     if (a.value == INVALID_HANDLE_VALUE) { error = GetLastError(); return false; }
@@ -267,6 +397,12 @@ bool Content(const std::wstring& left, const std::wstring& right, const Row& row
     if (!GetFileInformationByHandle(a.value, &beforeA) || !GetFileInformationByHandle(b.value, &beforeB))
     { error = GetLastError(); return false; }
     if (!Stable(beforeA, row.left) || !Stable(beforeB, row.right)) { error = ERROR_FILE_INVALID; return false; }
+    Entry stampA, stampB;
+    if (!Identify(a.value, stampA) || !Identify(b.value, stampB)) { error = GetLastError(); return false; }
+    if (!Stamp(stampA, row.left) || !Stamp(stampB, row.right)) { error = ERROR_FILE_INVALID; return false; }
+#ifdef DIRSYNC_ENGINE_TEST
+    if (beforeReadHook) { auto hook = std::move(beforeReadHook); beforeReadHook = {}; hook(); }
+#endif
     std::vector<unsigned char> ab(65536), bb(65536);
     equal = true;
     while (!cancel)
@@ -282,6 +418,8 @@ bool Content(const std::wstring& left, const std::wstring& right, const Row& row
     if (!GetFileInformationByHandle(a.value, &afterA) || !GetFileInformationByHandle(b.value, &afterB))
     { error = GetLastError(); return false; }
     if (!Stable(afterA, row.left) || !Stable(afterB, row.right)) { error = ERROR_FILE_INVALID; return false; }
+    if (!Identify(a.value, stampA) || !Identify(b.value, stampB)) { error = GetLastError(); return false; }
+    if (!Stamp(stampA, row.left) || !Stamp(stampB, row.right)) { error = ERROR_FILE_INVALID; return false; }
     return true;
 }
 bool RootParentsSafe(const std::wstring& root)
@@ -299,6 +437,16 @@ bool RootParentsSafe(const std::wstring& root)
     return true;
 }
 }
+struct Snapshot
+{
+    std::wstring left, right, canonicalLeft, canonicalRight;
+    Options options;
+    Tree a, b;
+};
+#ifdef DIRSYNC_ENGINE_TEST
+void SetAfterScanHook(std::function<void()> hook) { afterScanHook = std::move(hook); }
+void SetBeforeReadHook(std::function<void()> hook) { beforeReadHook = std::move(hook); }
+#endif
 bool DecodePath(const char* input, std::wstring& output)
 {
     output.clear();
@@ -321,11 +469,13 @@ std::wstring ApiPath(const std::wstring& path)
 bool NormalizeRoot(const std::wstring& input, std::wstring& output)
 {
     std::wstring p = input;
+    if (p.find(L'\0') != std::wstring::npos) return false;
     if (p.rfind(L"\\\\.\\", 0) == 0) return false;
     if (p.rfind(L"\\\\?\\UNC\\", 0) == 0) p = L"\\\\" + p.substr(8);
     else if (p.rfind(L"\\\\?\\", 0) == 0) p.erase(0, 4);
     bool disk = p.size() >= 3 && ((p[0] >= L'A' && p[0] <= L'Z') || (p[0] >= L'a' && p[0] <= L'z')) && p[1] == L':' && p[2] == L'\\';
     bool unc = p.rfind(L"\\\\", 0) == 0 && p.find(L'\\', 2) != std::wstring::npos;
+    if (p.find(L':', disk ? 2 : 0) != std::wstring::npos) return false; // No ADS/device namespace roots.
     if ((!disk && !unc) || p.size() >= 32760 || p.find_first_of(L"*?\"<>|") != std::wstring::npos) return false;
     DWORD size = GetFullPathNameW(p.c_str(), 0, nullptr, nullptr);
     if (!size || size >= 32767) return false;
@@ -363,6 +513,8 @@ Row Classify(const Entry* left, const Entry* right, const Options& o, bool conte
     if (left->directory != right->directory)
     { row.state = State::Conflict; row.action = Action::Blocked; row.reason = Reason::TypeConflict; return row; }
     if (left->directory) return row;
+    if (Identity(*left, *right))
+    { row.state = State::Blocked; row.action = Action::Blocked; row.reason = Reason::Aliased; row.error = ERROR_INVALID_PARAMETER; return row; }
     uint64_t delta = left->time > right->time ? left->time - right->time : right->time - left->time;
     if (!o.ignoreDate && delta > o.tolerance)
     {
@@ -389,8 +541,24 @@ Result Compare(const std::wstring& inputLeft, const std::wstring& inputRight, co
         row.error = ERROR_INVALID_PARAMETER; result.rows.push_back(row); return result;
     }
     Tree a, b;
+    Pinned rootLeft, rootRight; DWORD rootError = 0;
+    bool pinned = rootLeft.Open(left, true, rootError) && rootRight.Open(right, true, rootError);
+    std::wstring canonicalLeft = pinned ? Canonical(rootLeft.handles.back()->value) : L"";
+    std::wstring canonicalRight = pinned ? Canonical(rootRight.handles.back()->value) : L"";
+    if (!pinned || canonicalLeft.empty() || canonicalRight.empty() || Within(canonicalLeft, canonicalRight) ||
+        Within(canonicalRight, canonicalLeft) || Identity(rootLeft.parents.find(left)->second, rootRight.parents.find(right)->second))
+    {
+        Row row; row.state = State::Blocked; row.action = Action::Blocked; row.reason = Reason::InvalidRoot;
+        row.error = rootError ? rootError : ERROR_INVALID_PARAMETER; result.rows.push_back(row); return result;
+    }
+    // Keep pins only around the enumeration/read they protect. A preview is
+    // not a long-lived filesystem lock; identities catch swaps between phases.
+    rootLeft.handles.clear(); rootRight.handles.clear();
     Scan(left, o, masks, cancel, progress, a);
     Scan(right, o, masks, cancel, progress, b);
+#ifdef DIRSYNC_ENGINE_TEST
+    if (afterScanHook) { auto hook = std::move(afterScanHook); afterScanHook = {}; hook(); }
+#endif
     std::map<std::wstring, bool, Less> paths;
     for (const auto& e : a.entries) paths[e.first] = true;
     for (const auto& e : b.entries) paths[e.first] = true;
@@ -422,7 +590,7 @@ Result Compare(const std::wstring& inputLeft, const std::wstring& inputRight, co
             ea->size == eb->size && (o.ignoreDate || row.state == State::Equal))
         {
             bool equal = true; DWORD error = 0;
-            if (!Content(Join(left, ea->path), Join(right, eb->path), row, cancel, progress, equal, error))
+            if (!Content(Join(left, ea->path), Join(right, eb->path), row, a, b, cancel, progress, equal, error))
             { row.state = State::Blocked; row.action = Action::Blocked; row.error = error; row.reason = error == ERROR_FILE_INVALID ? Reason::Changed : Reason::ScanError; }
             else { row = Classify(ea, eb, o, equal); row.reason = Reason::Content; }
         }
@@ -433,6 +601,42 @@ Result Compare(const std::wstring& inputLeft, const std::wstring& inputRight, co
     // Partial scans must never present speculative copy/delete proposals.
     if (result.cancelled) for (auto& row : result.rows)
     { row.action = Action::Blocked; row.reason = Reason::Cancelled; row.state = State::Blocked; }
+    if (!result.cancelled)
+    {
+        auto snapshot = std::make_shared<Snapshot>();
+        snapshot->left = left; snapshot->right = right; snapshot->options = o;
+        snapshot->canonicalLeft = std::move(canonicalLeft); snapshot->canonicalRight = std::move(canonicalRight);
+        snapshot->a = std::move(a); snapshot->b = std::move(b); result.snapshot = std::move(snapshot);
+    }
     return result;
+}
+bool Revalidate(Result& result, std::atomic<bool>& cancel, Progress& progress)
+{
+    bool valid = result.snapshot && !result.cancelled && !result.stale && !cancel;
+    if (valid)
+    {
+        const auto& old = *result.snapshot;
+        Options options = old.options; options.content = false;
+        Result current = Compare(old.left, old.right, options, cancel, progress);
+        auto equalTree = [](const Tree& a, const Tree& b) {
+            if (!Stamp(a.root, b.root) || a.entries.size() != b.entries.size() || a.blocked != b.blocked || a.excluded != b.excluded || a.parents.size() != b.parents.size()) return false;
+            auto i = a.entries.begin(), j = b.entries.begin();
+            for (; i != a.entries.end(); ++i, ++j)
+                if (i->first != j->first || !Stamp(i->second, j->second)) return false;
+            for (const auto& parent : a.parents)
+            {
+                auto other = b.parents.find(parent.first);
+                if (other == b.parents.end() || !Identity(parent.second, other->second) || parent.second.attributes != other->second.attributes) return false;
+            }
+            return true;
+        };
+        valid = current.snapshot && !current.cancelled && Same(old.canonicalLeft, current.snapshot->canonicalLeft) &&
+            Same(old.canonicalRight, current.snapshot->canonicalRight) && equalTree(old.a, current.snapshot->a) && equalTree(old.b, current.snapshot->b);
+    }
+    if (valid && !cancel) return true;
+    result.stale = true; result.cancelled = result.cancelled || cancel.load(); result.snapshot.reset();
+    for (auto& row : result.rows)
+    { row.state = State::Blocked; row.action = Action::Blocked; row.reason = result.cancelled ? Reason::Cancelled : Reason::Changed; row.error = result.cancelled ? ERROR_CANCELLED : ERROR_FILE_INVALID; }
+    return false;
 }
 }

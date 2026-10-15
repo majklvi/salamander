@@ -9,19 +9,26 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <memory>
+#ifdef DIRSYNC_ENGINE_TEST
+#include <functional>
+#endif
 
 namespace dirsync
 {
 enum class State { Equal, LeftOnly, RightOnly, Different, Conflict, Blocked };
 enum class Action { None, CopyRight, CopyLeft, DeleteRight, Decide, Blocked };
 enum class Reason { Metadata, Content, NewerLeft, NewerRight, Missing, TypeConflict,
-                    ScanError, Unsupported, Changed, Ambiguous, Cancelled, InvalidRoot, InvalidMask, Excluded };
+                    ScanError, Unsupported, Changed, Ambiguous, Cancelled, InvalidRoot, InvalidMask, Excluded, Aliased };
 struct Entry
 {
     std::wstring path;
     bool directory = false, empty = false;
     uint64_t size = 0, time = 0;
     DWORD attributes = 0, error = 0;
+    uint64_t volume = 0, id = 0, change = 0;
+    DWORD links = 0;
+    bool identified = false;
     Reason reason = Reason::Metadata;
 };
 struct Selection { std::wstring name; bool directory = false; };
@@ -43,7 +50,13 @@ struct Row
     Reason reason = Reason::Metadata;
     DWORD error = 0;
 };
-struct Result { std::vector<Row> rows; bool cancelled = false; };
+struct Snapshot;
+struct Result
+{
+    std::vector<Row> rows;
+    bool cancelled = false, stale = false;
+    std::shared_ptr<const Snapshot> snapshot;
+};
 struct Progress { std::atomic<uint64_t> scanned{0}, compared{0}, readBytes{0}; };
 bool DecodePath(const char* input, std::wstring& output);
 bool NormalizeRoot(const std::wstring& input, std::wstring& output);
@@ -56,4 +69,11 @@ Row Classify(const Entry* left, const Entry* right, const Options& options,
              bool contentEqual = true);
 Result Compare(const std::wstring& left, const std::wstring& right, const Options& options,
                std::atomic<bool>& cancel, Progress& progress);
+// Read-only checkpoint, never permission to execute a later filesystem write.
+// Any change/error/cancellation permanently blocks this result until Compare.
+bool Revalidate(Result& result, std::atomic<bool>& cancel, Progress& progress);
+#ifdef DIRSYNC_ENGINE_TEST
+void SetAfterScanHook(std::function<void()> hook);
+void SetBeforeReadHook(std::function<void()> hook);
+#endif
 }

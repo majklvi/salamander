@@ -52,18 +52,23 @@ void ConfigureDark(HWND dialog)
 }
 struct Preview
 {
+    enum class Intent { None, Apply, Summary };
     HWND window = nullptr;
     std::wstring left, right;
     std::wstring panelLeft, panelRight;
     dirsync::Options options;
     dirsync::Result result;
+    dirsync::Result checkedResult;
+    Intent intent = Intent::None;
+    std::vector<size_t> requestedRows;
+    int requestedAction = 0;
     std::vector<size_t> visible;
     std::atomic<bool> cancel{false};
     dirsync::Progress progress;
     std::thread worker;
     SIZE initialClient{}, minimumWindow{};
     std::vector<std::pair<HWND, RECT>> controls;
-    bool running = false, closing = false, failed = false;
+    bool running = false, closing = false, failed = false, validating = false;
     ~Preview() { Stop(); Join(); }
     void Stop()
     {
@@ -106,10 +111,13 @@ void Status(Preview& p)
     {
         wchar_t text[256]{};
         uint64_t bytes = p.progress.readBytes.load(std::memory_order_relaxed);
-        if (bytes) swprintf_s(text, Text(IDS_READING).c_str(), bytes, p.progress.scanned.load(), p.progress.compared.load());
+        if (p.validating) swprintf_s(text, Text(IDS_VALIDATING).c_str(), p.progress.scanned.load());
+        else if (bytes) swprintf_s(text, Text(IDS_READING).c_str(), bytes, p.progress.scanned.load(), p.progress.compared.load());
         else swprintf_s(text, Text(IDS_SCAN).c_str(), p.progress.scanned.load(), p.progress.compared.load());
         SetDlgItemTextW(p.window, IDC_STATUS, text); return;
     }
+    if (p.result.stale && !p.result.cancelled)
+    { SetDlgItemTextW(p.window, IDC_STATUS, Text(IDS_STALE).c_str()); return; }
     if (p.failed || p.result.cancelled)
     { SetDlgItemTextW(p.window, IDC_STATUS, Text(p.failed ? IDS_FAILED : IDS_CANCELLED).c_str()); return; }
     uint64_t blocked = 0;
@@ -171,6 +179,7 @@ void Start(Preview& p)
     p.options.emptyDirectories = Checked(p.window, IDC_EMPTY);
     p.options.onlySelected = Checked(p.window, IDC_SELECTED);
     InvalidatePlan(p);
+    p.validating = false; p.intent = Preview::Intent::None;
     p.cancel = false; p.progress.scanned = 0; p.progress.compared = 0; p.progress.readBytes = 0;
     p.running = true; Busy(p, true);
     // Disabling the focused input/Compare otherwise leaves the modal dialog
@@ -191,17 +200,48 @@ void Start(Preview& p)
         SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_COMPARE)), TRUE);
     }
 }
+void ValidatePreview(Preview& p, Preview::Intent intent)
+{
+    if (p.running) return;
+    if (!p.result.snapshot || p.result.cancelled || p.result.stale || p.failed)
+    { Message(p.window, IDS_STALE); return; }
+    p.requestedRows.clear();
+    p.requestedAction = int(SendDlgItemMessageW(p.window, IDC_ACTION, CB_GETCURSEL, 0, 0));
+    HWND list = GetDlgItem(p.window, IDC_LIST);
+    for (int i = ListView_GetNextItem(list, -1, LVNI_SELECTED); i >= 0; i = ListView_GetNextItem(list, i, LVNI_SELECTED))
+        p.requestedRows.push_back(p.visible[size_t(i)]);
+    p.cancel = false; p.progress.scanned = 0; p.progress.compared = 0; p.progress.readBytes = 0;
+    p.validating = true; p.intent = intent; p.running = true; p.checkedResult = {};
+    Busy(p, true);
+    SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_STOP)), TRUE);
+    try
+    {
+        p.worker = std::thread([&p]() {
+            // Existing rows stay readable by LVN_GETDISPINFO on the UI thread.
+            // Work on a separate copy; publish only after Join in Done.
+            try { p.checkedResult = p.result; dirsync::Revalidate(p.checkedResult, p.cancel, p.progress); }
+            catch (...) { p.failed = true; p.checkedResult = {}; }
+            PostMessageW(p.window, Done, 0, 0);
+        });
+        SetTimer(p.window, 1, 150, nullptr);
+    }
+    catch (...)
+    {
+        p.failed = true; p.running = false; p.validating = false; p.intent = Preview::Intent::None;
+        Busy(p, false); Status(p);
+        SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_COMPARE)), TRUE);
+    }
+}
 void Apply(Preview& p)
 {
-    int value = int(SendDlgItemMessageW(p.window, IDC_ACTION, CB_GETCURSEL, 0, 0));
+    int value = p.requestedAction;
     if (value < 0 || value > 4) return;
     auto action = static_cast<dirsync::Action>(value);
-    HWND list = GetDlgItem(p.window, IDC_LIST);
     bool found = false;
-    for (int i = ListView_GetNextItem(list, -1, LVNI_SELECTED); i >= 0; i = ListView_GetNextItem(list, i, LVNI_SELECTED))
+    for (size_t index : p.requestedRows)
     {
         found = true;
-        auto& row = p.result.rows[p.visible[size_t(i)]];
+        auto& row = p.result.rows[index];
         if (row.state == dirsync::State::Blocked || row.state == dirsync::State::Conflict) continue;
         if (action == dirsync::Action::CopyRight && !row.hasLeft) continue;
         if (action == dirsync::Action::CopyLeft && (!row.hasRight || p.options.asymmetric)) continue;
@@ -291,6 +331,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
     case WM_TIMER: Status(*p); return TRUE;
     case Done:
         p->Join(); p->running = false; KillTimer(window, 1);
+        if (p->validating) { p->result = std::move(p->checkedResult); p->validating = false; }
         if (p->closing) EndDialog(window, 0);
         else
         {
@@ -300,6 +341,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             if (restoreFocus)
                 SendMessageW(window, WM_NEXTDLGCTL,
                     WPARAM(GetDlgItem(window, p->visible.empty() ? IDC_COMPARE : IDC_LIST)), TRUE);
+            Preview::Intent intent = p->intent; p->intent = Preview::Intent::None;
+            if (!p->failed && !p->result.stale && !p->result.cancelled && !p->cancel)
+            {
+                if (intent == Preview::Intent::Apply) Apply(*p);
+                else if (intent == Preview::Intent::Summary) Summary(*p);
+            }
         }
         return TRUE;
     case WM_CLOSE:
@@ -313,8 +360,8 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_COMPARE: Start(*p); return TRUE;
         case IDC_STOP: p->Stop(); return TRUE;
         case IDCANCEL: SendMessageW(window, WM_CLOSE, 0, 0); return TRUE;
-        case IDC_APPLY: Apply(*p); return TRUE;
-        case IDC_SUMMARY: Summary(*p); return TRUE;
+        case IDC_APPLY: ValidatePreview(*p, Preview::Intent::Apply); return TRUE;
+        case IDC_SUMMARY: ValidatePreview(*p, Preview::Intent::Summary); return TRUE;
         case IDC_EQUAL: case IDC_DIFFERENT: case IDC_SINGLE: case IDC_TORIGHT: case IDC_TOLEFT:
             if (!p->running) Filter(*p); return TRUE;
         case IDC_SELECTED:

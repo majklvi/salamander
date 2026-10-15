@@ -1,0 +1,53 @@
+# Directory Synchronization: návrh provedení a obnovy
+
+Stav 15. října 2026. Toto je **návrh budoucího backendu**, nikoli popis implementovaného zápisového executoru nebo povolení zápisů. Navazuje na D1–D5 v [návrhu](directory-sync-plugin-design.md), V6 v [auditu](directory-sync-plugin-sdk.md) a [místní výsledky](directory-sync-plugin-implementation.md#ntfs-identity-a-změny-po-skenu-15-října-2026). SDK Samandarin-0.16 zůstává beze změn. SMB nebylo testováno; tento protokol musí nejprve prokázat místní NTFS sonda.
+
+## Co nová validace prokazuje
+
+Read-only engine ukládá identitu svazek/file index, ChangeTime, mtime, velikost, atributy a počet hardlinků, identity rodičů a kanonické kořeny. Před použitím návrhu či souhrnem znovu skenuje stejné kořeny a rozsah. Pozorovaná změna nebo přerušení zablokuje celý původní náhled. Shodný mtime a velikost nestačí k přijetí jiného objektu. Za běhu čtení se drží nereparsované rodiče a soubory otevřené; při nekompatibilním sdílení se operace odmítne.
+
+**Úspěch Revalidate není zámek ani token k budoucímu zápisu.** Není zde průběžný watcher, transakční snapshot stromu, USN protokol ani hash dat/ADS. Skeny stran jsou postupné; změna může nastat během validace nebo bezprostředně po posledním pozorování. Ani ChangeTime není autentizační důkaz. Záměrné obnovení všech metadat, již existující zapisovatelé/mappingy, file-ID reuse, jiné filesystémy a privilegované zásahy nejsou tímto prokázány. Backend proto musí vše potřebné znovu ověřit při získání skutečných operačních handlů a držet je až do dokončení příslušného kroku.
+
+Microsoft popisuje porovnání serial number/file index pro identitu v [GetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfileinformationbyhandle). Rozdíl mezi ChangeTime a časem datového proudu je v [FILE_BASIC_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info). Nejde o převzetí vzorového kódu.
+
+## Neměnný plán běhu
+
+Před spuštěním vytvořit nový run UUID a zmrazit pouze viditelné zařazené akce: generaci náhledu, volby, masky/výběry, směry, přesné relativní komponenty, očekávanou přítomnost/nepřítomnost a fingerprint obou stran. Skryté, nerozhodnuté a blokované řádky nevykonávat; jejich počty uvést ve finálním potvrzení. Změna kořenů/voleb nebo další Compare zneplatní dosavadní generaci a souhlas s ní.
+
+Při preflightu zkontrolovat identity i kanonické cesty kořenů a obnovy: obnova musí ležet mimo oba synchronizované stromy, včetně aliasů. Ověřit všechny rodičovské komponenty bez následování reparse pointů. Odmítnout neplatné relativní komponenty, NUL, ADS jako hlavní cestu, únik pomocí `..`, rezervované namespace a nebezeztrátově kódovatelné názvy. Vyhodnotit celou matici zdrojových/cílových identit napříč akcemi; alias zdroje na jiný destruktivní cíl nesmí být přehlédnut jen proto, že má jinou relativní cestu. Case-sensitive adresáře, SUBST a další mount aliasy musí mít samostatný důkaz před povolením zápisů.
+
+Nedostatek přístupu, nepodporované identity nebo neprokazatelná bezpečnost rodiče znamenají blokování; nesmí následovat jednodušší path-based fallback. Odmítnout konflikt typu soubor/složka; žádné rekurzivní mazání na základě starého náhledu. Pro nově vytvářený adresář je nutné zvlášť ověřit nepřítomnost, bezpečné vytvoření a následnou identitu; pro odstranění prázdného adresáře těsně před akcí ověřit skutečnou prázdnost.
+
+## Posloupnost jedné souborové operace
+
+1. **VALIDATED:** otevřít a držet řetězy rodičů a přesné objekty. Ověřit identitu a metadata proti zmrazenému plánu. Zdroj držet stabilní pro čtení; požadované sdílení musí vyloučit běžné souběžné zapisovače. Předem existující zapisovatelný mapping musí být odmítnut nebo samostatně prokázán bezpečný. Nepřítomnost cíle není rezervace jména.
+2. **BACKUP_READY:** před přepisem i mazáním vytvořit nezávislou kopii původního cíle v obnově. Žádný hardlink a žádné pouhé přesunutí jediné kopie. Struktura `<pair-id>/<run-uuid>/<side>/<op-uuid>/`, původní relativní cesta v manifestu; UUID objektu se vytváří výhradně přes create-new. Zkopírovat a ověřit úplný požadovaný obsah obnovy, včetně původních ADS a metadat potřebných k ruční obnově. Neúplná nebo neověřená kopie není BACKUP_READY. Chyba místa, oprávnění, čtení, flush či Verify blokuje destruktivní krok.
+3. **STAGED:** pro kopii vytvořit unikátní staging na cílovém svazku u bezpečně drženého cílového rodiče. Zkopírovat výchozí proud a podporované ADS podle D5; data ověřit proti stále drženému zdroji, například SHA-256 každého proudu a přesnou sadou jmen/délek. Nastavit schválený mtime a základní atributy až po datových změnách, ověřit cílové ACL podle pravidel D5. Nepřenášet zdrojová oprávnění a nezachovávat omylem staré cílové ADS. Neověřený staging se nikdy nepublikuje. U nového cíle BACKUP_READY znamená prokazatelně očekávanou absenci, nikoli vytvořenou zálohu neexistujícího souboru.
+4. **COMMIT_INTENT:** znovu ověřit objekty a rodiče, zajistit dostupnou obnovu, uložit a flushnout záměr v journalu před změnou namespace. Zavolat pouze implementačně ověřené operace nad drženými objekty. Běžný rename s `ReplaceIfExists=TRUE` neposkytuje podmínku „nahraď jen tento očekávaný file ID“; samotný předchozí test cesty nestačí.
+5. **OLD_RELOCATED / PUBLISHED:** jako první kandidát k ověření se navrhuje přejmenovat **držený původní cíl** do unikátní karantény na stejném svazku a staging publikovat pod původním jménem bez povoleného nahrazení. Pro nový cíl publikovat rovnou bez nahrazení. Cizí položka vytvořená ve vzniklé mezeře musí vyvolat kolizi; nepřepisovat ji. Přístup DELETE a sdílení handlů pro vlastní rename je nutné ověřit sondou; současné read-only piny nejsou hotové operační handly. Relativní rename vůči drženému parent handle je kandidát, jeho použitelnost v cílovém prostředí se teprve prokáže. Pro mazání není staging: ověřený původní objekt po záloze přesunout do karantény, následně případně odstranit přes jeho handle.
+6. **VERIFIED / COMPLETE:** po publikaci ověřit identitu nového objektu, data/ADS, metadata a očekávané namespace. Při neúspěchu nehlásit úspěch a neodstraňovat obnovu. Journalovat ukončený výsledek každého kroku; uživateli zobrazit dokončené, přeskočené, zastavené, chybové a nejisté operace odděleně. Teprve potom lze odstranit výhradně vlastní nepotřebný staging/karanténu podle ověřených ID; žádný globální úklid podle názvu nebo masky. Obnovovací kopie a protokol zůstávají podle D4 k ruční správě.
+
+Kandidát se dvěma rename **není atomický přepis celého souboru bez mezery**. Po OLD_RELOCATED může původní cesta krátce chybět; pád tento stav může prodloužit. Výhodou návrhu je jednoznačné zachování starého objektu a odmítnutí cizí kolize. Před implementací finálního potvrzení musí být tato vlastnost zřetelná. Pokud bude požadavkem atomická náhrada bez mezery, je nutné nejprve prokázat jiný protokol se stejnou ochranou identity; nepřecházet potichu na ReplaceFileW. Starší sonda již prokázala zachování některých starých cílových ADS při ReplaceFileW.
+
+[FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info) dokumentuje rozdíl povoleného nahrazení a odmítnutí kolize, včetně parametru RootDirectory. API neposkytuje zde předpokládanou celou transakci plánu. [CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew) vymezuje create-new, open-reparse a sdílení; požadavky na attributes/extended attributes mají zvláštní pravidla, proto samotné popisy share flags nenahrazují NTFS sondy.
+
+## Journal a obnova po pádu
+
+Navržený formát je verzovaný UTF-8 JSON Lines. Každý záznam má run/op UUID, rostoucí sekvenci, stav, UTC čas, schválený směr, root ID, relativní cestu, identity a fingerprinty před/po, vlastní cesty stagingu/karantény/obnovy, velikosti a hashe proudů, Win32 chybu a výsledek Verify. Doplňovat délku a checksum záznamu pro detekci neúplného konce. Checksum není podpis a neopravňuje k zápisu na cestu přečtenou z nedůvěryhodného logu. Každý údaj musí jít znovu ověřit proti filesystemu.
+
+Journal umístit do run složky obnovy, zabezpečit proti nechtěné úpravě a nezaměňovat jej s historií synchronizace z odloženého D2. Tento journal popisuje jeden běh a jeho obnovu; neodhaduje změny od předchozí synchronizace. Zálohu, staging a záznamy flushovat v definovaném pořadí. [FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers) je součást tohoto návrhu, není to dosud provedený důkaz odolnosti proti výpadku napájení. Rename, journal na jiném svazku a jejich durability nejsou jedna transakce.
+
+| Poslední ověřený stav | Chování při přerušení/příštím spuštění |
+| --- | --- |
+| VALIDATED / neúplná záloha či staging | Původní cíl ponechat; nic nepublikovat. Vlastní neúplné objekty identifikovat v protokolu. |
+| BACKUP_READY / STAGED, bez COMMIT_INTENT | Původní cíl ponechat, zachovat obnovu; pokračování vyžaduje nový náhled a kontrolu. |
+| COMMIT_INTENT bez potvrzení rename | Stav je nejistý. Zjistit skutečné identity na původní cestě, v karanténě a stagingu; neodvozovat výsledek jen z posledního řádku logu. |
+| OLD_RELOCATED, cíl chybí | Původní objekt a nezávislá obnova jsou k dispozici. Nabídnout ruční obnovu; neobnovovat přes novou cizí položku. |
+| PUBLISHED bez VERIFIED nebo neúspěšné Verify | Zachovat nový i starý obsah a hlásit chybu/nejasný stav. Žádný automatický rollback přes mezitím změněný cíl. |
+| COMPLETE | Výsledek neměnit automatickým restartem. Obnova a log zůstávají pro ruční zásah. |
+
+Stop zpracovat před další operací, při kopírování zálohy/stagingu a před vstupem do commit úseku. Po prvním rename nepřerušit libovolně mezi instrukcemi: dokončit krátký úsek do evidovaného stavu nebo selhat s dostupným starým obsahem. Násilné ukončení procesu může přijít kdykoli a nesmí spoléhat na Release ani destructory. Celý běh není atomická transakce; již dokončené operace se samovolně nevracejí.
+
+## Co musí prokázat další etapa
+
+Nejbližší krok je **izolovaná NTFS sonda protokolu na syntetických datech**, ještě mimo pluginový executor. Ověřit DELETE/sharing režimy a relativní rename, kolize v každé mezeře, úplnou nezávislou obnovu, přesné ADS, ACL a finální časy. Vynutit plný disk/odmítnutá práva, chybu Verify a přerušení procesu před i po každém trvalém kroku. Ověřit opakované spuštění recovery pouze jako čtení a nezměnění cizí kolize. Zvlášť prokázat vytvoření cílového adresáře a odstranění prázdného adresáře. Dokud tyto sondy neprojdou, žádný destruktivní zápis v pluginu nepovolit. SMB, automatický rollback, jiné filesystémy a plná odolnost proti výpadku napájení zůstávají oddělené neprovedené etapy.

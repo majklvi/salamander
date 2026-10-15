@@ -105,6 +105,40 @@ Debug plugin/jazyk Win32, x64, ARM64 a Release x64 se po opravách sestavily s w
 
 Důkazy mimo Git: `C:\Samandarin\builds\dirsync\dpi-keyboard-20261015`, `ui-debug.log`, `ui-release.log`, `lifecycle-debug.log`, `before.json`, `after.json`, `sparse-after.json`. Všechny čtyři malé vstupní soubory zachovaly SHA-256, délku a UTC mtime; oba velké soubory zachovaly 64 GiB, mtime a nulové alokované rozsahy a šly výhradně otevřít ke čtení. Velké fixture byly poté odstraněny a konfigurace soukromého hostitele obnovena. SMB, SDK a zápisový backend se neměnily.
 
+## NTFS identity a změny po skenu (15. října 2026)
+
+Místní etapa nad `b8a6f409` doplnila read-only kontrolu hotového plánu. Neobsahuje zápisový executor, backup, staging ani journal. Mutace níže provádí výhradně test nad vlastními syntetickými fixture; plugin otevírá pouze existující položky ke čtení a dotazům.
+
+Původní engine neukládal file ID a před čtením ověřoval jen velikost/mtime. Nově ukládá serial number svazku + 64bit NTFS file index, ChangeTime, počet hardlinků, atributy a metadata. Snapshot vlastní i kořeny, volby, stromy a identity rodičů. Komponenty rodičů se otevírají postupně bez následování reparse pointů a drží po dobu enumerace/čtení; používá se `FILE_LIST_DIRECTORY | FILE_READ_ATTRIBUTES` a sdílení pouze pro čtení. Samotný atributový handle se při sondě neprokázal jako dostatečná ochrana přejmenování. Piny se neuchovávají po celou dobu zobrazení náhledu. Přibylo odmítnutí ADS a vloženého NUL v kořeni, kontrola kanonických aliasů a oprava lexikálního překryvu kořene svazku s potomkem. Stejná fyzická identita na obou stranách souborového páru je blokovaná.
+
+`Revalidate` provádí nový sken téhož rozsahu bez čtení obsahu a porovnává snapshoty; změna, nová chyba nebo zrušení trvale zablokuje všechny původní řádky až do nového Compare. Nezměněné známé nepodporované položky zůstávají blokované a nebrání validaci nesouvisejících řádků. UI provádí validaci na workeru před Apply a Plan summary. Pracuje s kopií výsledku, aby se neměnila data současně čtená listview. Požadované řádky a akce se zachytí při stisku Apply; pozdější přesun výběru během kontroly žádost nezmění. Ověření neprovádí souborové operace. Neexistuje průběžný watcher: na displeji může zůstat snapshot až do dalšího checkpointu.
+
+| Řízená místní NTFS kontrola | Výsledek |
+| --- | --- |
+| Nezměněný plán a ruční návrh | Opakovaná validace prošla a zachovala návrh. |
+| Zápis jiných čtyř bajtů do stejného objektu, stejná délka a obnovený původní mtime | Změna vlevo i vpravo zneplatnila plán díky novému fingerprintu; samotná porovnávací tolerance se při validaci nepoužívá. |
+| Nový objekt se stejným názvem, daty, velikostí a mtime | Validace zablokovala plán. Při výměně mezi skenem a obsahovým čtením byl pár Blocked a readBytes 0. |
+| Zmizení zdroje, zmizení existujícího cíle, vznik dříve chybějícího cíle, nový soubor, změna souboru na složku | Každá mutace zablokovala původní plán; další validace jej neobnovila. |
+| Změna atributů, mtime nebo vytvoření dalšího hardlinku mimo skenované kořeny | Každá zneplatnila plán. |
+| Výměna kořenového adresáře po dokončení Compare | Validace zneplatnila plán; operace fixture zároveň prokázala uvolnění pinů po Compare. |
+| Výměna podsložky po skenu za jiný obyčejný adresář se shodně pojmenovaným souborem | Obsahové čtení blokováno podle identity rodiče, readBytes 0. |
+| Výměna podsložky po skenu za junction do vlastního `outside` | Čtení blokováno bez přečtení dat z cíle junction, readBytes 0; také následná validace starého plánu selhala. Testovací hook existuje jen při `DIRSYNC_ENGINE_TEST`, není v SPL. |
+| Během skutečně připraveného čtení s drženými handly | Pokus o přejmenování kořene, otevření zapisovače dat a otevření rodiče pro GENERIC_WRITE selhal; následné čtení původního páru prošlo. Jde o konkrétní Win32/NTFS pokusy, ne důkaz proti všem privilegovaným nebo mappingovým závodům. |
+| Stejný objekt přes hardlink na obou stranách páru | Návrh blokován. Nejde o úplnou analýzu aliasů mezi různými řádky budoucího prováděcího plánu. |
+| Kořeny přes `..`, skutečný 8.3 alias téhož kořene, kořen svazku s potomkem; ADS/NUL vstup | Odmítnuty. 8.3 jméno bylo v tomto místním běhu skutečně dostupné; na volume bez krátkých jmen test tuto dílčí větev výslovně oznámí jako nedostupnou. SUBST nebyl testován. |
+| Dlouhé kořeny s více CJK komponentami a soubor `žluťoučký 😀.txt` | Nezměněný snapshot prošel, následná změna dat s obnoveným mtime jej zneplatnila. Původní matice dlouhých/Unicode cest také znovu prošla. |
+| Cancel před validací i během jejího vlastního průchodu | Plan stale/cancelled, všechny původní řádky Blocked. |
+
+Vše běželo na NTFS; nové scénáře to ověřují přes GetVolumeInformationW. Nativní engine test nyní prošel v Debug i Release x64 s **539 assertions** včetně původních testů a přípravy fixture, nikoli 539 samostatných scénářů. Debug lifecycle test znovu prošel se 347 kontrolami a resource/layout s 937. Plugin a jazyk prošly Debug Win32/x64/ARM64 a Release x64 s warnings-as-errors.
+
+Computer Use v izolovaném Release x64 hostiteli ověřilo Apply a souhrn po validaci: ruční Copy to right se zachovalo a souhrn ukázal 1 / 4 B. Řízený zápis `AAAA → BBBB → CCCC` do levého testovacího souboru při zachování 4 B a UTC mtime zneplatnil starý plán před souhrnem i před Apply; návrh se změnil na Blocked a dialog požadoval nové Compare. Nezměněný pravý soubor zůstal `AAAA`; žádná navržená kopie se neprovedla. Při přípravě se deaktivace listview v Busy projevila bílým pozadím po opětovném zapnutí ve schématu Windows Dark Mode; finální řešení seznam nedeaktivuje a zachytí žádost před validací. Finální tmavý náhled a změna návrhu byly znovu ověřeny. Soukromý hostitel byl ukončen a jeho konfigurace obnovena.
+
+Protokoly mimo Git: `C:\Samandarin\builds\dirsync\safety-20261015`, `engine-Debug.log`, `engine-Release.log`, `lifecycle-Debug.log`, `ui-Debug.log`, `ui-after.json`. Vzdálené CI se pro tyto lokální změny zatím nespouštělo.
+
+**Hranice důkazu:** validace je metadata checkpoint, není atomický snapshot ani oprávnění k pozdějšímu zápisu. Neověřuje hashe obsahu/ADS, změny po svém posledním pozorování, všechny souběžné změny během skenu, záměrné obnovení ChangeTime, file-ID reuse, zapisovatelné mappingy, case-sensitive NTFS, SUBST, ACL matici ani jiné filesystémy/SMB. Přísné piny navíc vyžadují možnost listovat rodičovské komponenty; konflikt přístupu/sdílení blokuje větev a nepoužije slabší fallback. Nezměněný metadata náhled může označovat stejně velké/stejně staré různé soubory jako Equal, pokud nebylo zvoleno By content; nová validace tuto schválenou porovnávací sémantiku nemění.
+
+[Návrh protokolu provedení a obnovy](directory-sync-plugin-execution-protocol.md) rozlišuje čerstvou validaci, stabilní operační handly, nezávislou obnovu, ověřený staging, journal, commit a obnovu po pádu. Kandidát dvou rename má výslovně popsanou mezeru v existenci cíle a vyžaduje samostatnou NTFS sondu. Bez důkazu těchto kroků zůstávají zápisy zakázané.
+
 ## Sestavení a testy
 
 Pluginový projekt: `src/plugins/dirsync/vcxproj/dirsync.vcxproj`; jazykový projekt je jeho závislost. Používá stávající shared props a platformy solution. Nativní test je pojmenován `*_tests.vcxproj`, takže jej najde existující `tools/run_native_tests.ps1`.
@@ -126,7 +160,7 @@ Pro načtení jsou potřeba `dirsync.spl` a sousední `lang/english.slg`; zkopí
 ## Meze a další etapy
 
 - Omezení V5 zůstává přijaté: panelový kořen přichází jako bajty, dekódování je UTF-8 nejdříve a ACP při neplatném UTF-8. Ztracenou nebo nejednoznačnou historickou informaci nelze tímto adaptérem zpětně rekonstruovat. Selhání SDK/převodu/otevření musí být viditelné; backend nemá nový obecný limit MAX_PATH. Místní runtime případy výše nezaručují všechny délky, historická ACP jména nebo UNC. Hostitelská navigace dlouhého kořene navíc obsahuje prokázaný pád, který plugin před svým spuštěním nemůže ohlásit.
-- Statické vynechání reparse points a kontroly před/po čtení nepředstavují dokončenou ochranu před všemi závody výměny rodiče. Před zápisy je nutné prokázat identity, aliasy a držení rodičů podle V6. Přesná bezpečnost komerčních SMB serverů se z místního NTFS nevyvozuje.
+- NTFS identity, checkpointy a držení rodičů při čtení mají výše uvedené konkrétní výsledky a meze. Nejde o dokončený zápisový protokol; před zápisy zbývá V6 včetně operačních handlů, kolizí, záloh, ADS/ACL a obnovy po pádu podle samostatného návrhu. Bezpečnost SMB se z místního NTFS nevyvozuje.
 - Místní Stop/Close, skutečný force Release workeru s odmapováním testovací DLL a běžné i násilné ukončení vlastního hostitele při skenu/obsahu jsou ověřené výše. Neověřen zůstává force unload s aktivním GUI callbackem, kritický shutdown Windows a pomalé nebo zaseknuté SMB I/O. UI smoke nepokrývá všechny DPI, překlady, klávesové a přístupnostní scénáře. První jazyk je English v samostatném přeložitelném SLG.
 - Profily, otevření externího porovnávače a vykonání plánu nejsou součástí této první etapy. Plán je jen v paměti a po novém porovnání se znovu vytvoří.
 - SMB runtime nebylo podle pokynu uživatele použito. ARM64/Win32 jsou sestavené, ale GUI běželo pouze na x64. Příslušné CI se vyhodnotí až pro publikovaný aktuální commit; lokální build není výsledek vzdáleného draft PR.
