@@ -3,6 +3,7 @@
 #include "../copy.h"
 #include "../recovery.h"
 #include "../overwrite.h"
+#include "../delete.h"
 #include "copy_space_faults.h"
 #include <sddl.h>
 #include <winioctl.h>
@@ -80,6 +81,7 @@ void Acl(const std::wstring& path,const wchar_t* text,bool protect=true) {
     PSECURITY_DESCRIPTOR sd=nullptr; Check(ConvertStringSecurityDescriptorToSecurityDescriptorW(text,SDDL_REVISION_1,&sd,nullptr)!=FALSE,"SDDL");
     BOOL ok=SetFileSecurityW(ApiPath(path).c_str(),DACL_SECURITY_INFORMATION|
         (protect?PROTECTED_DACL_SECURITY_INFORMATION:UNPROTECTED_DACL_SECURITY_INFORMATION),sd);
+    if(!ok) std::wcerr<<L"SetFileSecurity fixture "<<path<<L": "<<GetLastError()<<L"\n";
     LocalFree(sd); Check(ok!=FALSE,"fixture DACL");
 }
 std::wstring Dacl(const std::wstring& path) {
@@ -530,6 +532,131 @@ void OverwritePaths() {
     auto selected=Replace(f,OverwritePlan(f),true,root,{0,0,size_t(-1)});
     Check(selected.complete && selected.items.size()==1 && Read(f.right+L"\\a")=="NEW A" && Read(f.right+L"\\b")=="OLD B","only frozen visible rows replaced and duplicates ignored");
 }
+DeleteReport RemoveFiles(Fixture& f,const Result& plan,bool keep,const std::wstring& recovery,const std::vector<size_t>& selected={}) {
+    std::vector<size_t> rows=selected; if(rows.empty()) for(size_t i=0;i<plan.rows.size();++i) rows.push_back(i);
+    return DeleteFiles(plan,rows,keep,recovery,f.cancel,f.checking,f.progress);
+}
+bool Exists(const std::wstring& path) { return GetFileAttributesW(ApiPath(path).c_str())!=INVALID_FILE_ATTRIBUTES; }
+void DeletionSuccess() {
+    for(bool keep:{false,true}) {
+        Fixture f; const auto recovery=f.root+L"\\recovery"; f.Dir(recovery);
+        Put(f.right+L"\\a","OLD A"); Put(f.right+L"\\a:漢字","OLD ADS"); Put(f.right+L"\\a:empty","");
+        Put(f.right+L"\\b",""); Put(f.right+L"\\b:note","EMPTY MAIN");
+        Put(f.left+L"\\new","NEW"); Put(f.left+L"\\same","SAME"); Put(f.right+L"\\same","SAME");
+        f.Dir(f.right+L"\\empty-dir"); f.Dir(f.right+L"\\sub"); Put(f.right+L"\\sub\\c","CHILD");
+        Check(CreateHardLinkW(ApiPath(f.root+L"\\alias").c_str(),ApiPath(f.right+L"\\a").c_str(),nullptr)!=FALSE,"delete hardlink fixture");
+        Check(SetFileAttributesW(ApiPath(f.right+L"\\a").c_str(),FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM)!=FALSE,"delete hidden/system fixture");
+        const auto acl=Dacl(f.root+L"\\alias"); const auto attrs=GetFileAttributesW(ApiPath(f.root+L"\\alias").c_str());
+        Options o; o.asymmetric=true; o.emptyDirectories=true;
+        auto plan=Compare(f.left,f.right,o,f.cancel,f.checking);
+        auto report=RemoveFiles(f,plan,keep,keep?recovery:L"invalid unused recovery");
+        Check(report.complete && !report.error && report.items.size()==3,"asymmetric regular-file deletions complete");
+        for(const auto& item:report.items) Check(item.status==DeleteStatus::Deleted && item.removed && !Exists(item.target),"only accepted file names deleted");
+        Check(Exists(f.right+L"\\empty-dir") && Exists(f.right+L"\\sub") && !Exists(f.right+L"\\new") && Read(f.left+L"\\new")=="NEW" &&
+            Read(f.right+L"\\same")=="SAME","deletion leaves directories, source and other action types intact");
+        Check(Read(f.root+L"\\alias")=="OLD A" && Read(f.root+L"\\alias:漢字")=="OLD ADS" && Dacl(f.root+L"\\alias")==acl &&
+            GetFileAttributesW(ApiPath(f.root+L"\\alias").c_str())==attrs,"other hardlink data, ADS, attributes and DACL unchanged");
+        Check(f.progress.completed==(keep?6u:3u),"delete progress includes only backups and accepted deletions");
+        if(keep) {
+            Check(report.recovery.complete && report.recovery.items.size()==3,"all deletion originals backed up");
+            for(const auto& item:report.recovery.items) {
+                Check(item.logged && item.copy.status==CopyStatus::Copied,"each saved original verified and logged");
+                if(plan.rows[item.row].path==L"a") {
+                    Check(Read(item.saved)=="OLD A" && Read(item.saved+L":漢字")=="OLD ADS" && Read(item.saved+L":empty").empty(),"deleted main and full ADS set retained");
+                    const auto restore=f.root+L"\\manual-restore";
+                    Check(CopyFileW(ApiPath(item.saved).c_str(),ApiPath(restore).c_str(),TRUE)!=FALSE && Read(restore)=="OLD A" &&
+                        Read(restore+L":漢字")=="OLD ADS","manual restore to a new name");
+                }
+            }
+            const auto log=Read(report.journal);
+            Check(log.find("\"operation\":\"delete_right\"")!=std::string::npos && log.find("\"status\":\"deleted\"")!=std::string::npos &&
+                log.find("\"removed\":true")!=std::string::npos && log.find("\"status\":\"complete\"")!=std::string::npos,"complete deletion protocol");
+        } else Check(report.recovery.items.empty() && report.recovery.runDirectory.empty() && report.journal.empty(),"OFF has no backup or persistent deletion log");
+        f.NoStaging(f.right);
+    }
+    Fixture f; Put(f.right+L"\\a","A"); Put(f.right+L"\\b","B"); auto plan=f.Scan(true);
+    auto report=RemoveFiles(f,plan,false,L"",{0,0,9999});
+    Check(report.complete && report.items.size()==1 && !Exists(f.right+L"\\a") && Read(f.right+L"\\b")=="B","frozen visible set deduplicated and hidden file retained");
+    Fixture symmetric; Put(symmetric.right+L"\\a","KEEP"); plan=symmetric.Scan(); plan.rows[0].action=Action::DeleteRight;
+    report=RemoveFiles(symmetric,plan,false,L"");
+    Check(report.stale && !report.complete && Read(symmetric.right+L"\\a")=="KEEP","symmetric snapshot cannot authorize manually forged deletion");
+    for(int mode=0;mode<3;++mode) {
+        Fixture blocked; Put(blocked.right+L"\\a","KEEP"); const auto recovery=blocked.root+L"\\recovery"; blocked.Dir(recovery);
+        auto invalid=RemoveFiles(blocked,blocked.Scan(true),true,mode==0?L"":mode==1?blocked.right:blocked.root+L"\\missing");
+        Check(!invalid.complete && invalid.error && !invalid.items[0].removed && Read(blocked.right+L"\\a")=="KEEP","invalid, overlapping or missing recovery blocks deletion");
+    }
+    Fixture excluded; excluded.Dir(excluded.left+L"\\private"); excluded.Dir(excluded.right+L"\\private");
+    Put(excluded.left+L"\\private\\a","SOURCE"); Put(excluded.right+L"\\private\\a","KEEP");
+    Options options; options.asymmetric=true; options.mask=L"*.* | private\\";
+    auto filtered=Compare(excluded.left,excluded.right,options,excluded.cancel,excluded.checking);
+    auto omitted=RemoveFiles(excluded,filtered,false,L"");
+    Check(omitted.items.empty() && Read(excluded.right+L"\\private\\a")=="KEEP","excluded subtree never deleted");
+}
+void DeletionFailures() {
+    for(bool keep:{false,true}) for(int mode=0;mode<15;++mode) {
+        if(!keep && mode>=9) continue;
+        Fixture f; const auto recovery=f.root+L"\\recovery"; f.Dir(recovery);
+        const std::string data(2*1024*1024,'O'); Put(f.right+L"\\a",data); Put(f.right+L"\\a:old","ADS"); Put(f.right+L"\\b","B");
+        if(mode==1) Check(SetFileAttributesW(ApiPath(f.right+L"\\a").c_str(),FILE_ATTRIBUTE_READONLY)!=FALSE,"readonly delete fixture");
+        if(mode==8) { Acl(f.right,L"D:P(D;;0x40;;;WD)(A;OICI;FA;;;OW)"); Acl(f.right+L"\\a",L"D:P(D;;SD;;;WD)(A;;FA;;;OW)"); }
+        auto plan=f.Scan(true); HANDLE lock=INVALID_HANDLE_VALUE; bool reached=false,removed=false;
+        if(mode==0) Put(f.right+L"\\a",data+"CHANGED",false);
+        if(mode==2) { lock=CreateFileW(ApiPath(f.right+L"\\a").c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr); Check(lock!=INVALID_HANDLE_VALUE,"exclusive delete lock"); }
+        SetCopyHook([&](CopyPhase phase,const std::wstring& path) {
+            if(phase==CopyPhase::Deleted) removed=true;
+            if(reached) return;
+            if(phase==CopyPhase::Deleting) {
+                if(mode==3) { reached=true; f.cancel=true; }
+                if(mode==5) { reached=true; Put(f.left+L"\\a","NEW COUNTERPART"); }
+                if(mode==6) { reached=true; Put(f.right+L"\\a",data+"CHANGED",false); }
+                if(mode==7) { reached=true; Check(MoveFileW(ApiPath(f.right).c_str(),ApiPath(f.root+L"\\old-right").c_str())!=FALSE,"move owned parent"); f.Junction(f.right,f.root+L"\\old-right"); }
+            }
+            if(mode==4 && phase==CopyPhase::Deleted) { reached=true; f.cancel=true; }
+            if(mode==9 && phase==CopyPhase::Copying && f.progress.copied>0) { reached=true; f.cancel=true; }
+            if(mode==10 && phase==CopyPhase::Verifying && f.progress.verified>0) { reached=true; f.cancel=true; }
+            if(mode==11 && phase==CopyPhase::Verifying) { reached=true; Put(path,"BAD",false); }
+        });
+        if(mode==12) dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::MainData,ERROR_DISK_FULL,2);
+        if(mode==13 || mode==14) SetRecoveryLogHook([&](const std::wstring& line)->DWORD {
+            if((mode==13 && line.find(L"\"event\":\"planned\"")!=std::wstring::npos && line.find(L"\"target\":")!=std::wstring::npos) ||
+               (mode==14 && removed && line.find(L"\"event\":\"result\"")!=std::wstring::npos)) { reached=true; return ERROR_WRITE_FAULT; } return 0;
+        });
+        auto report=RemoveFiles(f,plan,keep,recovery); SetCopyHook({}); SetRecoveryLogHook({});
+        if(lock!=INVALID_HANDLE_VALUE) CloseHandle(lock);
+        if(mode==8) { Acl(f.right,L"D:P(A;OICI;FA;;;OW)"); Acl(f.right+L"\\a",L"D:P(A;;FA;;;OW)"); }
+        if(report.complete || !(report.error || report.stale || report.cancelled)) std::cerr<<"delete failure mode="<<mode<<", recovery="<<keep<<"\n";
+        Check(!report.complete && (report.error || report.stale || report.cancelled),"delete failure never complete");
+        Check(report.items.size()==2 && !report.items[1].removed && Read(f.right+L"\\b")=="B","first failure/cancel prevents subsequent deletion");
+        if(mode==4 || mode==14) Check(report.items[0].removed && report.items[0].status==DeleteStatus::Deleted && !Exists(f.right+L"\\a"),"accepted deletion retained after late Stop/log failure");
+        else Check(!report.items[0].removed && Read(f.right+L"\\a")==((mode==0 || mode==6)?data+"CHANGED":data) &&
+            Read(f.right+L"\\a:old")=="ADS","failure before deletion preserves original main and ADS");
+        if(mode==0) Check(report.stale,"post-scan target change makes deletion stale");
+        if(mode==1) Check(report.error==ERROR_ACCESS_DENIED && report.recovery.items.empty() &&
+            (GetFileAttributesW(ApiPath(f.right+L"\\a").c_str())&FILE_ATTRIBUTE_READONLY),"read-only refused before backup without attribute changes");
+        if(mode==2) Check(report.stale || report.error==ERROR_SHARING_VIOLATION,"locked deletion refused");
+        if(mode==3 || mode==4) Check(reached && report.cancelled,"Stop before/after DeleteFile observed");
+        if(mode==5) Check(reached && report.error==ERROR_FILE_EXISTS && Read(f.left+L"\\a")=="NEW COUNTERPART","new counterpart prevents deletion");
+        if(mode==6) Check(reached && report.error==ERROR_FILE_INVALID,"changed target before delete refused");
+        if(mode==7) Check(reached && report.error==ERROR_NOT_SUPPORTED,"reparse parent before delete refused");
+        if(mode==8) Check(report.error==ERROR_ACCESS_DENIED,"real delete permission denial preserved");
+        if(mode==9 || mode==10) Check(reached && report.recovery.cancelled && report.items[0].status==DeleteStatus::NotStarted,"Stop in recovery Copy/Verify prevents every deletion");
+        if(mode==11) Check(reached && report.recovery.error==ERROR_CRC,"damaged recovery prevents every deletion");
+        if(mode==12) Check(dirsync_test::SpaceFaultReached() && report.recovery.items[0].logged && report.items[0].status==DeleteStatus::NotStarted,"failed second backup prevents first deletion");
+        if(mode==13 || mode==14) Check(reached && report.journalError==ERROR_WRITE_FAULT && Read(report.journal).find("\"event\":\"end\"")==std::string::npos,"delete journal error retains incomplete evidence");
+        if(keep && mode>=3 && mode<=8) Check(report.recovery.complete && Read(report.recovery.items[0].saved)==data && Read(report.recovery.items[0].saved+L":old")=="ADS","verified recovery retained after later failure/Stop");
+    }
+}
+void DeletionPaths() {
+    for(bool keep:{false,true}) for(bool wide:{false,true}) {
+        Fixture f; const auto recovery=f.root+L"\\recovery-漢字"; f.Dir(recovery);
+        for(int i=0;i<(wide?4:1);++i) { auto part=L"\\"+std::wstring(wide?70:90,L'階'); f.left+=part; f.right+=part; f.Dir(f.left); f.Dir(f.right); }
+        const auto name=L"\\žluťoučký-😀.txt"; Put(f.right+name,"OLD"); Put(f.right+name+L":漢字","ADS");
+        Check(wide?f.right.size()>260:WideCharToMultiByte(CP_UTF8,0,f.right.c_str(),-1,nullptr,0,nullptr,nullptr)>260,"long Unicode deletion ancestors");
+        auto report=RemoveFiles(f,f.Scan(true),keep,recovery);
+        Check(report.complete && report.items.size()==1 && report.items[0].removed && !Exists(f.right+name),"long Unicode deletion succeeds");
+        if(keep) Check(Read(report.recovery.items[0].saved)=="OLD" && Read(report.recovery.items[0].saved+L":漢字")=="ADS","long Unicode deletion recovery succeeds");
+    }
+}
 void DiskSpace() {
     using dirsync_test::SpaceFault;
     for(auto fault:{SpaceFault::Reserve,SpaceFault::MainData,SpaceFault::NamedStream,SpaceFault::RetainStage,SpaceFault::Publish}) {
@@ -578,6 +705,7 @@ void DiskSpace() {
 int main() {
     try { Success(); Scope(); ModifyOnlyDestination(); Boundaries(); Paths(); AfterPublication(); DiskSpace();
         RecoverySuccess(); RecoveryFailures(); RecoveryPaths(); OverwriteSuccess(); OverwriteFailures(); OverwritePaths();
-        std::cout<<checks<<" copy/recovery/overwrite assertions passed\n"; return 0; }
+        DeletionSuccess(); DeletionFailures(); DeletionPaths();
+        std::cout<<checks<<" copy/recovery/overwrite/delete assertions passed\n"; return 0; }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }
 }

@@ -6,6 +6,7 @@
 #include "copy.h"
 #include "recovery.h"
 #include "overwrite.h"
+#include "delete.h"
 #include <aclapi.h>
 #include <objbase.h>
 #include <algorithm>
@@ -365,8 +366,8 @@ std::wstring OutcomeLine(size_t index,const CopyOutcome& c,const wchar_t* comple
 #if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
 void SetRecoveryLogHook(std::function<DWORD(const std::wstring&)> callback) { recoveryLogHook=std::move(callback); }
 #endif
-RecoveryReport SaveOriginals(Result snapshot,const std::vector<size_t>& visible,const std::wstring& recoveryRoot,
-    std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress)
+static RecoveryReport SaveOriginalsImpl(Result snapshot,const std::vector<size_t>& visible,const std::wstring& recoveryRoot,
+    std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress,bool deletion)
 {
     RecoveryReport report; std::wstring left,right;
     File journal;
@@ -375,7 +376,9 @@ RecoveryReport SaveOriginals(Result snapshot,const std::vector<size_t>& visible,
         for (size_t i:visible) {
             if (i>=snapshot.rows.size() || !unique.insert(i).second) continue;
             const auto& row=snapshot.rows[i];
-            if (IsOriginalToSave(row)) { RecoveryItem item; item.row=i; item.right=row.action==Action::CopyRight; report.items.push_back(std::move(item)); }
+            if (deletion?IsFileDeletion(row):IsOriginalToSave(row)) {
+                RecoveryItem item; item.row=i; item.right=deletion || row.action==Action::CopyRight; report.items.push_back(std::move(item));
+            }
             else if (row.action!=Action::None) ++report.omitted;
         }
         if (report.items.empty()) return report;
@@ -436,6 +439,98 @@ RecoveryReport SaveOriginals(Result snapshot,const std::vector<size_t>& visible,
         report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
     }
     catch (...) { report.error=ERROR_NOT_ENOUGH_MEMORY; }
+    Phase(progress,CopyPhase::Finished,L""); return report;
+}
+RecoveryReport SaveOriginals(Result snapshot,const std::vector<size_t>& visible,const std::wstring& recoveryRoot,
+    std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress)
+{ return SaveOriginalsImpl(std::move(snapshot),visible,recoveryRoot,cancel,checking,progress,false); }
+bool IsFileDeletion(const Row& row)
+{
+    const auto& e=row.right;
+    return row.action==Action::DeleteRight && row.state==State::RightOnly && !row.hasLeft && row.hasRight &&
+        e.identified && !e.directory && !e.error && !Unsupported(e.attributes) && Relative(row.path);
+}
+DeleteReport DeleteFiles(Result snapshot,const std::vector<size_t>& visible,bool keepOriginals,
+    const std::wstring& recoveryRoot,std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress)
+{
+    DeleteReport report; report.keepOriginals=keepOriginals; std::wstring left,right; File journal;
+    try {
+        std::set<size_t> unique; std::vector<size_t> selected;
+        for(size_t i:visible) {
+            if(i>=snapshot.rows.size() || !unique.insert(i).second) continue;
+            const auto& row=snapshot.rows[i];
+            if(IsFileDeletion(row)) { DeleteOutcome item; item.row=i; report.items.push_back(std::move(item)); selected.push_back(i); }
+            else if(row.action!=Action::None) ++report.omitted;
+        }
+        if(report.items.empty()) return report;
+        if(!SnapshotAsymmetric(snapshot) || !SnapshotRoots(snapshot,left,right) || !Revalidate(snapshot,cancel,checking)) {
+            report.stale=true; report.cancelled=cancel.load(); return report;
+        }
+        for(auto& item:report.items) {
+            const auto& row=snapshot.rows[item.row]; item.target=Join(right,row.path);
+            if(row.right.attributes & FILE_ATTRIBUTE_READONLY) {
+                item.status=DeleteStatus::Failed; item.error=ERROR_ACCESS_DENIED; throw Failure{item.error};
+            }
+        }
+        if(keepOriginals) {
+            report.recovery=SaveOriginalsImpl(snapshot,selected,recoveryRoot,cancel,checking,progress,true);
+            if(!report.recovery.complete || report.recovery.items.size()!=report.items.size() ||
+                !std::all_of(report.recovery.items.begin(),report.recovery.items.end(),
+                    [](const RecoveryItem& item) { return item.logged && item.copy.status==CopyStatus::Copied; })) {
+                report.stale=report.recovery.stale; report.cancelled=report.recovery.cancelled;
+                report.error=report.recovery.error?report.recovery.error:ERROR_INVALID_DATA; return report;
+            }
+            report.journal=Join(report.recovery.runDirectory,L"delete.jsonl");
+            journal.h=Open(report.journal,GENERIC_WRITE,FILE_SHARE_READ,CREATE_NEW); Need(journal.h!=INVALID_HANDLE_VALUE);
+        }
+        auto append=[&](const std::wstring& line) {
+            if(!keepOriginals) return;
+            try { RecoveryLine(journal.h,line); }
+            catch(const Failure& failure) { report.journalError=failure.error; throw; }
+        };
+        append(L"{\"event\":\"run\",\"schema\":1,\"operation\":\"delete_right\",\"keepOriginals\":true,\"left\":"+
+            Json(left)+L",\"right\":"+Json(right)+L",\"recoveryManifest\":"+Json(report.recovery.journal)+L"}");
+        for(size_t n=0;n<report.items.size();++n) append(L"{\"event\":\"planned\",\"item\":"+std::to_wstring(n+1)+
+            L",\"target\":"+Json(report.items[n].target)+L",\"saved\":"+Json(keepOriginals?report.recovery.items[n].saved:L"")+L"}");
+        auto resultLine=[&](size_t n) {
+            const auto& item=report.items[n];
+            const wchar_t* status=item.status==DeleteStatus::Deleted?L"deleted":item.status==DeleteStatus::Cancelled?L"cancelled":
+                item.status==DeleteStatus::Failed?L"failed":L"not_started";
+            return L"{\"event\":\"result\",\"item\":"+std::to_wstring(n+1)+L",\"status\":"+Json(status)+
+                L",\"error\":"+std::to_wstring(item.error)+L",\"removed\":"+(item.removed?L"true":L"false")+L"}";
+        };
+        size_t n=0;
+        for(;n<report.items.size();++n) {
+            auto& item=report.items[n]; const auto& row=snapshot.rows[item.row];
+            progress.item=n+(keepOriginals?report.items.size():0);
+            try {
+                Phase(progress,CopyPhase::Deleting,item.target); Stop(cancel);
+                // Ordinary final checks, no attribute clearing or recursive fallback.
+                // Missing left parents are valid, but existing ancestors must be safe.
+                try { Parents(left,Join(left,row.path),false,cancel); }
+                catch(const Failure& failure) { if(failure.error!=ERROR_FILE_NOT_FOUND && failure.error!=ERROR_PATH_NOT_FOUND) throw; }
+                Absent(Join(left,row.path)); Parents(right,item.target,false,cancel);
+                File current(Open(item.target,FILE_READ_ATTRIBUTES)); Need(current.h!=INVALID_HANDLE_VALUE);
+                if(!Unchanged(row.right,Info(current.h))) throw Failure{ERROR_FILE_INVALID};
+                Stop(cancel); current.Close();
+                Need(DeleteFileW(ApiPath(item.target).c_str()));
+                item.removed=true; item.status=DeleteStatus::Deleted; progress.completed.fetch_add(1);
+                Phase(progress,CopyPhase::Deleted,item.target);
+            } catch(const Failure& failure) {
+                item.error=report.error=failure.error;
+                report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
+                item.status=report.cancelled?DeleteStatus::Cancelled:DeleteStatus::Failed;
+            } catch(...) { item.error=report.error=ERROR_NOT_ENOUGH_MEMORY; item.status=DeleteStatus::Failed; }
+            append(resultLine(n));
+            if(item.status!=DeleteStatus::Deleted) { ++n; break; }
+        }
+        for(;n<report.items.size();++n) append(resultLine(n));
+        append(L"{\"event\":\"end\",\"status\":"+Json(report.error?(report.cancelled?L"cancelled":L"failed"):L"complete")+L"}");
+        report.complete=!report.error;
+    } catch(const Failure& failure) {
+        report.error=failure.error;
+        report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
+    } catch(...) { report.error=ERROR_NOT_ENOUGH_MEMORY; }
     Phase(progress,CopyPhase::Finished,L""); return report;
 }
 bool IsFileOverwrite(const Row& row) { return IsOriginalToSave(row); }

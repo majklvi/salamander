@@ -7,7 +7,7 @@
 #endif
 
 namespace dirsync {
-enum class CopyPhase { Checking, Copying, Preparing, Verifying, Publishing, Published, Finished };
+enum class CopyPhase { Checking, Copying, Preparing, Verifying, Publishing, Published, Deleting, Deleted, Finished };
 struct CopyProgress {
     std::atomic<CopyPhase> phase{CopyPhase::Checking};
     std::atomic<uint64_t> copied{0}, verified{0}, completed{0}, item{0};
