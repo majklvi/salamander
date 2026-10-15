@@ -159,6 +159,14 @@ Pro načtení jsou potřeba `dirsync.spl` a sousední `lang/english.slg`; zkopí
 
 ## Meze a další etapy
 
+### Izolovaná sonda zápisového protokolu (15. října 2026)
+
+Mimo plugin vznikl samostatný `tests/protocol_probe.vcxproj` bez SDK/engine závislosti, který zapisuje výhradně nová syntetická data. Debug i Release x64 prošly 347 assertions a 53 pomocnými procesy v každém běhu. Ověřeny kill hranice přepisu, nového cíle i mazání, neúplný/poškozený journal, kooperativní Stop, kolize, Verify, nezávislá záloha, ruční obnova do nového jména, testované DACL/atributy a dlouhá Unicode cesta. Skutečné Access denied a sharing chyby jsou oddělené od injekcí plného disku a flush. [Úplné výsledky, reprodukce a zbývající meze](directory-sync-plugin-ntfs-protocol-probe.md).
+
+Sonda současně prokázala dvě překážky převzetí návrhu do produkce: striktní read-only parent sharing odmítá vlastní rename a hlavní datový proud nezamyká ADS. Experimentální native rename potřeboval širší parent sharing; není to schválený bezpečnostní fallback. Finální atributy bylo nutné nastavit až po publikaci, protože rename přidal Archive. V6 zůstává otevřená. Pluginové zdroje, SDK, hostitel a běžné CI se v této etapě nezměnily; zápisový executor ani SMB testy nevznikly.
+
+### Zbývající omezení
+
 - Omezení V5 zůstává přijaté: panelový kořen přichází jako bajty, dekódování je UTF-8 nejdříve a ACP při neplatném UTF-8. Ztracenou nebo nejednoznačnou historickou informaci nelze tímto adaptérem zpětně rekonstruovat. Selhání SDK/převodu/otevření musí být viditelné; backend nemá nový obecný limit MAX_PATH. Místní runtime případy výše nezaručují všechny délky, historická ACP jména nebo UNC. Hostitelská navigace dlouhého kořene navíc obsahuje prokázaný pád, který plugin před svým spuštěním nemůže ohlásit.
 - NTFS identity, checkpointy a držení rodičů při čtení mají výše uvedené konkrétní výsledky a meze. Nejde o dokončený zápisový protokol; před zápisy zbývá V6 včetně operačních handlů, kolizí, záloh, ADS/ACL a obnovy po pádu podle samostatného návrhu. Bezpečnost SMB se z místního NTFS nevyvozuje.
 - Místní Stop/Close, skutečný force Release workeru s odmapováním testovací DLL a běžné i násilné ukončení vlastního hostitele při skenu/obsahu jsou ověřené výše. Neověřen zůstává force unload s aktivním GUI callbackem, kritický shutdown Windows a pomalé nebo zaseknuté SMB I/O. UI smoke nepokrývá všechny DPI, překlady, klávesové a přístupnostní scénáře. První jazyk je English v samostatném přeložitelném SLG.

@@ -1,6 +1,8 @@
 # Directory Synchronization: návrh provedení a obnovy
 
-Stav 15. října 2026. Toto je **návrh budoucího backendu**, nikoli popis implementovaného zápisového executoru nebo povolení zápisů. Navazuje na D1–D5 v [návrhu](directory-sync-plugin-design.md), V6 v [auditu](directory-sync-plugin-sdk.md) a [místní výsledky](directory-sync-plugin-implementation.md#ntfs-identity-a-změny-po-skenu-15-října-2026). SDK Samandarin-0.16 zůstává beze změn. SMB nebylo testováno; tento protokol musí nejprve prokázat místní NTFS sonda.
+Stav 15. října 2026. Toto je **návrh budoucího backendu**, nikoli popis implementovaného zápisového executoru nebo povolení zápisů. Navazuje na D1–D5 v [návrhu](directory-sync-plugin-design.md), V6 v [auditu](directory-sync-plugin-sdk.md) a [místní výsledky](directory-sync-plugin-implementation.md#ntfs-identity-a-změny-po-skenu-15-října-2026). SDK Samandarin-0.16 zůstává beze změn. SMB nebylo testováno. [Izolovaná NTFS sonda](directory-sync-plugin-ntfs-protocol-probe.md) již ověřila přerušení, kolize a obnovu; celý protokol však zatím neprokázala.
+
+**Doplnění po sondě:** read-only piny rodičů blokují i vlastní rename; experimentální nativní relativní rename fungoval až se share WRITE na rodiči, který tím přestal být neměnný. Otevřený hlavní datový proud navíc nebránil změně/přidání ADS. Pro bezpečné produkční zápisy tedy zůstává nutný další důkaz stability rodičů a úplné sady proudů. Sonda není backend k převzetí do pluginu.
 
 ## Co nová validace prokazuje
 
@@ -33,6 +35,8 @@ Kandidát se dvěma rename **není atomický přepis celého souboru bez mezery*
 
 ## Journal a obnova po pádu
 
+Místní sonda rovněž prokázala doplnění Archive při rename. Po publikaci proto znovu nastavit schválený konečný mtime/základní atributy **přes tentýž publikovaný handle** a ověřit je před VERIFIED; samotné nastavení na stagingu nestačí. Pokud tento krok selže, zachovat obnovu a hlásit neúspěšný či nejistý výsledek. Přesná produktová politika Archive zůstává k upřesnění. Read-only neblokovalo operační DELETE handle a rename, takže tento atribut nesmí nahrazovat vědomé povolení přepisu.
+
 Navržený formát je verzovaný UTF-8 JSON Lines. Každý záznam má run/op UUID, rostoucí sekvenci, stav, UTC čas, schválený směr, root ID, relativní cestu, identity a fingerprinty před/po, vlastní cesty stagingu/karantény/obnovy, velikosti a hashe proudů, Win32 chybu a výsledek Verify. Doplňovat délku a checksum záznamu pro detekci neúplného konce. Checksum není podpis a neopravňuje k zápisu na cestu přečtenou z nedůvěryhodného logu. Každý údaj musí jít znovu ověřit proti filesystemu.
 
 Journal umístit do run složky obnovy, zabezpečit proti nechtěné úpravě a nezaměňovat jej s historií synchronizace z odloženého D2. Tento journal popisuje jeden běh a jeho obnovu; neodhaduje změny od předchozí synchronizace. Zálohu, staging a záznamy flushovat v definovaném pořadí. [FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers) je součást tohoto návrhu, není to dosud provedený důkaz odolnosti proti výpadku napájení. Rename, journal na jiném svazku a jejich durability nejsou jedna transakce.
@@ -50,4 +54,6 @@ Stop zpracovat před další operací, při kopírování zálohy/stagingu a př
 
 ## Co musí prokázat další etapa
 
-Nejbližší krok je **izolovaná NTFS sonda protokolu na syntetických datech**, ještě mimo pluginový executor. Ověřit DELETE/sharing režimy a relativní rename, kolize v každé mezeře, úplnou nezávislou obnovu, přesné ADS, ACL a finální časy. Vynutit plný disk/odmítnutá práva, chybu Verify a přerušení procesu před i po každém trvalém kroku. Ověřit opakované spuštění recovery pouze jako čtení a nezměnění cizí kolize. Zvlášť prokázat vytvoření cílového adresáře a odstranění prázdného adresáře. Dokud tyto sondy neprojdou, žádný destruktivní zápis v pluginu nepovolit. SMB, automatický rollback, jiné filesystémy a plná odolnost proti výpadku napájení zůstávají oddělené neprovedené etapy.
+První izolovaná sonda níže navržených případů je [dokončena v popsaném rozsahu](directory-sync-plugin-ntfs-protocol-probe.md): 347 assertions / 53 procesů v Debug i Release x64. Reálný plný svazek a porucha flush se nahradily výslovně označenou injekcí; výpadek napájení se neověřoval. Nejbližší navazující práce je důkaz bezpečných operačních rodičů a kompletní sady ADS při souběhu, nikoli zahájení executoru.
+
+Pokračovat stále mimo pluginový executor: prokázat bezpečné relativní vytvoření a kontinuální držení operačních objektů, ochranu celé sady ADS a rodičů při souběžných reparse/ACL změnách. Na izolovaném malém svazku doplnit skutečný plný disk a řízené I/O chyby; rozšířit ACL a metadata případy podle limitů sondy. Dokud zbývající bezpečnostní důkazy neprojdou, žádný destruktivní zápis v pluginu nepovolit. SMB, automatický rollback, jiné filesystémy a plná odolnost proti výpadku napájení zůstávají oddělené neprovedené etapy.
