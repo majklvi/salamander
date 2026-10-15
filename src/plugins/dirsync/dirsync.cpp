@@ -173,6 +173,9 @@ void Start(Preview& p)
     InvalidatePlan(p);
     p.cancel = false; p.progress.scanned = 0; p.progress.compared = 0; p.progress.readBytes = 0;
     p.running = true; Busy(p, true);
+    // Disabling the focused input/Compare otherwise leaves the modal dialog
+    // without a keyboard target. Keep cancellation reachable during work.
+    SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_STOP)), TRUE);
     try
     {
         p.worker = std::thread([&p]() {
@@ -182,7 +185,11 @@ void Start(Preview& p)
         });
         SetTimer(p.window, 1, 150, nullptr);
     }
-    catch (...) { p.failed = true; p.running = false; Busy(p, false); Status(p); }
+    catch (...)
+    {
+        p.failed = true; p.running = false; Busy(p, false); Status(p);
+        SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_COMPARE)), TRUE);
+    }
 }
 void Apply(Preview& p)
 {
@@ -275,7 +282,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 if (id == IDC_LIST) { r.right += dx; r.bottom += dy; }
                 else if (id == IDC_LEFT || id == IDC_RIGHT) r.right += dx;
                 else if (id == IDC_STATUS) { r.top += dy; r.bottom += dy; r.right += dx; }
-                else if (id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDCANCEL)
+                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDCANCEL)
                 { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
             }
@@ -285,7 +292,15 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
     case Done:
         p->Join(); p->running = false; KillTimer(window, 1);
         if (p->closing) EndDialog(window, 0);
-        else { Busy(*p, false); Filter(*p); }
+        else
+        {
+            HWND focused = GetFocus();
+            bool restoreFocus = !focused || focused == GetDlgItem(window, IDC_STOP);
+            Busy(*p, false); Filter(*p);
+            if (restoreFocus)
+                SendMessageW(window, WM_NEXTDLGCTL,
+                    WPARAM(GetDlgItem(window, p->visible.empty() ? IDC_COMPARE : IDC_LIST)), TRUE);
+        }
         return TRUE;
     case WM_CLOSE:
         if (p->running) { p->closing = true; p->Stop(); }

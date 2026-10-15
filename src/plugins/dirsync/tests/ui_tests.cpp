@@ -1,0 +1,114 @@
+// SPDX-FileCopyrightText: 2026 Open Salamander Authors
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Inspect the compiled shipping dialog, without creating or automating a window.
+// Explicit font DPI tests do not simulate a monitor or WM_DPICHANGED.
+#define NOMINMAX
+#include <windows.h>
+#include <string>
+#include <vector>
+#include <set>
+#include <iostream>
+#include <stdexcept>
+#include <cwctype>
+#include <cstring>
+#include "../resource.h"
+namespace
+{
+int checks = 0;
+void Check(bool ok, const char* message) { ++checks; if (!ok) throw std::runtime_error(message); }
+struct Reader
+{
+    const BYTE* at; const BYTE* end;
+    template<class T> T Read()
+    {
+        Check(size_t(end - at) >= sizeof(T), "resource bounds");
+        T value; memcpy(&value, at, sizeof(T)); at += sizeof(T); return value;
+    }
+    void Align() { while (reinterpret_cast<UINT_PTR>(at) % 4) Read<BYTE>(); }
+    std::wstring Text()
+    {
+        WORD c = Read<WORD>(); if (c == 0xffff) { Read<WORD>(); return {}; }
+        std::wstring text; while (c) { text += wchar_t(c); c = Read<WORD>(); } return text;
+    }
+};
+struct Control { DWORD style, id; short x, y, width, height; WORD type; std::wstring text; };
+std::wstring Caption(const std::wstring& text)
+{
+    std::wstring value;
+    for (size_t i = 0; i < text.size(); ++i)
+    {
+        if (text[i] != L'&') value += text[i];
+        else if (i + 1 < text.size() && text[i + 1] == L'&') { value += L'&'; ++i; }
+    }
+    return value;
+}
+void Test()
+{
+    HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(IDD_PREVIEW), MAKEINTRESOURCEW(5));
+    Check(resource != nullptr, "shipping dialog resource");
+    const BYTE* bytes = static_cast<const BYTE*>(LockResource(LoadResource(nullptr, resource)));
+    Check(bytes != nullptr, "dialog data");
+    Reader r{bytes, bytes + SizeofResource(nullptr, resource)};
+    Check(r.Read<WORD>() == 1 && r.Read<WORD>() == 0xffff, "extended dialog");
+    r.Read<DWORD>(); r.Read<DWORD>(); DWORD style = r.Read<DWORD>(); WORD count = r.Read<WORD>();
+    r.Read<short>(); r.Read<short>(); short width = r.Read<short>(), height = r.Read<short>();
+    r.Text(); r.Text(); r.Text(); Check((style & DS_SETFONT) != 0, "dialog font");
+    WORD points = r.Read<WORD>(), weight = r.Read<WORD>(); BYTE italic = r.Read<BYTE>(), charset = r.Read<BYTE>();
+    std::wstring face = r.Text(); Check(face == L"MS Shell Dlg", "repository dialog font");
+    std::vector<Control> controls; std::set<wchar_t> keys;
+    for (WORD i = 0; i < count; ++i)
+    {
+        r.Align(); r.Read<DWORD>(); r.Read<DWORD>(); Control c{}; c.style = r.Read<DWORD>();
+        c.x = r.Read<short>(); c.y = r.Read<short>(); c.width = r.Read<short>(); c.height = r.Read<short>(); c.id = r.Read<DWORD>();
+        WORD type = r.Read<WORD>();
+        if (type == 0xffff) c.type = r.Read<WORD>();
+        else while (type) type = r.Read<WORD>();
+        c.text = r.Text(); WORD extra = r.Read<WORD>(); for (WORD j = 0; j < extra; ++j) r.Read<BYTE>();
+        for (size_t j = 0; j + 1 < c.text.size(); ++j) if (c.text[j] == L'&')
+        {
+            if (c.text[j + 1] == L'&') { ++j; continue; }
+            Check(keys.insert(wchar_t(towlower(c.text[j + 1]))).second, "unique dialog mnemonic");
+        }
+        if (c.id == IDC_LIST || c.id == IDC_ACTION || c.id == IDC_COMPARE || c.id == IDCANCEL)
+            Check((c.style & WS_TABSTOP) != 0, "primary controls reachable by Tab");
+        controls.push_back(c);
+    }
+    for (int dpi : {96, 120, 144, 192, 240})
+    {
+        HDC dc = CreateCompatibleDC(nullptr); Check(dc != nullptr, "measurement DC");
+        HFONT font = CreateFontW(-MulDiv(points, dpi, 72), 0, 0, 0, weight, italic, FALSE, FALSE,
+            charset, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH, face.c_str());
+        Check(font != nullptr, "DPI font"); HGDIOBJ old = SelectObject(dc, font);
+        TEXTMETRICW metrics{}; SIZE alphabet{};
+        Check(GetTextMetricsW(dc, &metrics) != FALSE, "font metrics");
+        Check(GetTextExtentPoint32W(dc, L"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", 52, &alphabet) != FALSE, "dialog base units");
+        int baseX = (alphabet.cx / 26 + 1) / 2, baseY = metrics.tmHeight;
+        bool fits = true;
+        std::vector<RECT> bounds;
+        for (const auto& c : controls)
+        {
+            // Combo height includes the open dropdown, not only its closed face.
+            int h = c.type == 0x85 ? 14 : c.height;
+            fits &= c.x >= 0 && c.y >= 0 && c.x + c.width <= width && c.y + h <= height;
+            RECT box{MulDiv(c.x, baseX, 4), MulDiv(c.y, baseY, 8),
+                MulDiv(c.x + c.width, baseX, 4), MulDiv(c.y + h, baseY, 8)};
+            for (const RECT& other : bounds) { RECT intersection{}; fits &= !IntersectRect(&intersection, &box, &other); }
+            bounds.push_back(box);
+            if (c.text.empty()) continue;
+            auto text = Caption(c.text); SIZE size{};
+            Check(GetTextExtentPoint32W(dc, text.c_str(), int(text.size()), &size) != FALSE, "caption metrics");
+            int padding = c.type == 0x80 ? MulDiv((c.style & 0xf) == BS_AUTOCHECKBOX ? 20 : 12, dpi, 96) : 0;
+            if (size.cx + padding > MulDiv(c.width, baseX, 4) || size.cy > MulDiv(h, baseY, 8))
+            { std::wcerr << L"DPI " << dpi << L": clipped caption " << c.text << L"\n"; fits = false; }
+        }
+        SelectObject(dc, old); DeleteObject(font); DeleteDC(dc);
+        Check(fits, "dialog bounds and captions fit at requested font DPI");
+        std::cout << dpi << " DPI: compiled dialog geometry and caption metrics passed\n";
+    }
+}
+}
+int main()
+{
+    try { Test(); std::cout << checks << " resource/layout checks passed\n"; return 0; }
+    catch (const std::exception& e) { std::cerr << "FAILED: " << e.what() << "\n"; return 1; }
+}

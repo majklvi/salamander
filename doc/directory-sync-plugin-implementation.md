@@ -76,6 +76,35 @@ GUI fixture: 40 000 prázdných adresářů s 2 000 neodpovídajícími vylučov
 
 Protokoly mimo Git: `C:\Samandarin\builds\dirsync\lifecycle-20261015`: `native-debug.log`, `native-release.log`, `scan-normal.json`, `content-normal.json`, `scan-killed.json`, `content-killed.json` a `fixtures-after.json`. Chyba produkčního lifecycle kódu se při těchto kontrolách neprojevila; žádná změna SDK ani zápisová funkce nepřibyla.
 
+## Klávesnice a kontrola rozložení pro různá DPI (15. října 2026)
+
+Ověření vychází z `22cdb3ab` a lokálních oprav níže. Skutečný náhled běžel v soukromém Release x64 hostiteli 0.16 se schématem Windows Dark Mode, ovládaném přes Computer Use. Systémové měřítko se nezměnilo: Settings → System → Display hlásí vzdálenou relaci a zakazuje změnit nastavení displeje; současně uvádí vlastní scale factor. Nebylo vynucováno odhlášení ani obcházena tato ochrana. Efektivní DPI konkrétního dialogu nebylo změřeno, nelze je dovozovat z velikosti screenshotu.
+
+Nalezeny a opraveny dvě chyby ovládání:
+
+- `By &content` a `&Compare` sdílely Alt+C, `&Subfolders` a `Only &selected` sdílely Alt+S. Původní Alt+C pouze zaměřil obsahovou volbu. Anglická šablona nyní používá jedinečné mnemoniky; přibyly také k filtrům, souhrnu a použití návrhu. Nabídka akcí má viditelný popisek Proposal s Alt+P, ukotvený se spodním ovládáním při změně velikosti. Texty zůstávají v přeložitelném SLG.
+- Spuštění deaktivovalo ovládací prvek s fokusem a ponechalo dialog bez funkčního klávesového cíle. Po dokončení nefungovaly ani Tab a mnemoniky, dokud uživatel neklikl myší. Start nyní předá fokus na Stop; po dokončení se fokus ze Stop vrátí do výsledků, případně na Compare při prázdném seznamu. Pokud uživatel během práce zaměří jiný aktivní prvek, dokončení mu fokus nepřebírá. Selhání vytvoření workeru obnoví fokus na Compare; tato výjimečná větev nebyla uměle vyvolána.
+
+| Skutečný klávesový/UI scénář po opravě | Výsledek |
+| --- | --- |
+| Otevření přes Alt+P v hostiteli, D, Enter | Náhled se otevřel bez myši; výchozí levý kořen byl vybraný. |
+| Alt+C, potom Alt+Q | Tři výsledky; Alt+Q skryl Equal, zůstaly dva jednostranné řádky a hidden 1. Ověřuje i funkční klávesnici po dokončení. |
+| Alt+P v náhledu, Shift+Tab, Home, Shift+Down, Tab | Přechod z comboboxu do seznamu a zpět; označeny oba viditelné řádky. Výběr přežil přesun fokusu. |
+| Down a Home v comboboxu, Alt+W | Šipka změnila volbu na Copy to right, Home zpět na Skip. Alt+W změnil oba vybrané návrhy na Skip; neprovedl souborové operace. |
+| Alt+Y, Enter | Souhrn se otevřel a potvrdil nulu kopií/mazání a jeden skrytý řádek. Enter zavřel pouze souhrn. |
+| Alt+M, zápis `left*`, Enter | Úprava masky ihned zneplatnila starý náhled; Enter z editace spustil Compare a zobrazil jediný levý soubor. |
+| Alt+Space, X; Alt+Space, R | Maximalizace a návrat. Seznam a kořeny se roztáhly, Proposal a spodní tlačítka zůstaly pohromadě; všechny sloupce byly při maximalizaci dosažitelné. Nejde o změnu DPI. |
+| Alt+O, Alt+C při 64GiB sparse páru, mezerník | Samostatná mnemonika obsahu fungovala. Během čtení byl Stop viditelně zaměřený; při přes 3,5 miliardách přečtených bajtů / completed pairs 0 mezerník přerušil práci. Cancelled, jediný částečný řádek Blocked. |
+| Alt+C po Cancelled, Escape při novém čtení | Nový běh začal; při přes 5 miliardách přečtených bajtů Escape zavřel náhled a vrátil ovládání panelům. Hostitel pak šel běžně ukončit. |
+
+Rozložení pro další DPI ověřuje nový nativní `dirsync_ui_tests.vcxproj`. Do testovacího EXE se zkompiluje skutečný `lang.rc`; test čte `DLGTEMPLATEEX`, kontroluje jedinečnost mnemonik a Tab styly hlavních prvků, hranice a překrývání ovládání. Pro 96, 120, 144, 192 a 240 DPI (100–250 %) vytváří GDI font předepsaného `MS Shell Dlg` / 8 pt, počítá dialogové jednotky z jeho metrik a měří popisky včetně rezervy na tlačítka a checkboxy. Ve všech pěti případech popisky vešly a prvky se nepřekrývaly. Combo se posuzuje zavřené, nikoli jako rozbalený seznam. Debug i Release x64 prošly: **937 kontrol**, převážně včetně bezpečného čtení resource; nejde o 937 vizuálních scénářů. Test nevytváří ani neautomatizuje okno a najde jej stávající native runner.
+
+**Neověřeno:** skutečné vykreslení a interakce na monitorech s jiným DPI, přesun otevřeného dialogu mezi různými DPI, `WM_DPICHANGED`, dostupnost celého minimálního dialogu na malých pracovních plochách při vysokém měřítku, překlady, vysoký kontrast a čtečka obrazovky. Metriky fontu nenahrazují kontrolu tématu, renderingu checkboxů, scrollbars, focus indikátorů a hostitelského škálování. Plugin nemá vlastní handler `WM_DPICHANGED`; z těchto testů nelze prohlásit dynamické přepínání DPI za podporované. Zbývající monitorové scénáře je třeba dokončit v relaci, která změnu měřítka umožňuje.
+
+Debug plugin/jazyk Win32, x64, ARM64 a Release x64 se po opravách sestavily s warnings-as-errors. Znovu prošel Debug x64 lifecycle test (347 kontrol), který kompiluje změněný `dirsync.cpp`. Aktuální vzdálené CI platí pro `22cdb3ab`, ne pro tyto necommitované opravy.
+
+Důkazy mimo Git: `C:\Samandarin\builds\dirsync\dpi-keyboard-20261015`, `ui-debug.log`, `ui-release.log`, `lifecycle-debug.log`, `before.json`, `after.json`, `sparse-after.json`. Všechny čtyři malé vstupní soubory zachovaly SHA-256, délku a UTC mtime; oba velké soubory zachovaly 64 GiB, mtime a nulové alokované rozsahy a šly výhradně otevřít ke čtení. Velké fixture byly poté odstraněny a konfigurace soukromého hostitele obnovena. SMB, SDK a zápisový backend se neměnily.
+
 ## Sestavení a testy
 
 Pluginový projekt: `src/plugins/dirsync/vcxproj/dirsync.vcxproj`; jazykový projekt je jeho závislost. Používá stávající shared props a platformy solution. Nativní test je pojmenován `*_tests.vcxproj`, takže jej najde existující `tools/run_native_tests.ps1`.
@@ -88,6 +117,8 @@ Příklad přímého lokálního sestavení (cestu k MSBuild zvolit podle instal
 & C:\Samandarin\builds\dirsync\tests\Debug_x64\dirsync_tests.exe
 & $msbuild src/plugins/dirsync/tests/dirsync_lifecycle_tests.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64 /p:OPENSAL_BUILD_DIR=C:\Samandarin\builds\dirsync\
 & C:\Samandarin\builds\dirsync\tests\Debug_x64\dirsync_lifecycle_tests.exe
+& $msbuild src/plugins/dirsync/tests/dirsync_ui_tests.vcxproj /t:Build /p:Configuration=Debug /p:Platform=x64 /p:OPENSAL_BUILD_DIR=C:\Samandarin\builds\dirsync\
+& C:\Samandarin\builds\dirsync\tests\Debug_x64\dirsync_ui_tests.exe
 ```
 
 Pro načtení jsou potřeba `dirsync.spl` a sousední `lang/english.slg`; zkopírovat celou složku pluginu. Installer obsahuje příslušné položky a automatická registrace je ověřena v oddělené testovací distribuci přes `plugins.ver`. Sestavení celého Inno balíčku nebylo provedeno.
