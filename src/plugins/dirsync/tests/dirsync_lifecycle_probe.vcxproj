@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Open Salamander Authors; SPDX-License-Identifier: GPL-2.0-or-later -->
+<!-- Test-only DLL: the real plugin implementation, with a controlled SDK caller. -->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\vcxproj\dirsync.vcxproj" />
+  <PropertyGroup>
+    <ProjectGuid>{D769FBC6-F8B9-40AB-BCA2-7C276A74CB80}</ProjectGuid>
+    <OutDir>$(OPENSAL_BUILD_DIR)tests\$(Configuration)_$(Platform)\</OutDir>
+    <IntDir>$(OutDir)DirSyncLifecycleProbeIntermediate\</IntDir>
+    <TargetExt>.dll</TargetExt>
+    <TargetPath>$(OutDir)$(ProjectName).dll</TargetPath>
+    <TargetFileName>$(ProjectName).dll</TargetFileName>
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile><DebugInformationFormat>ProgramDatabase</DebugInformationFormat></ClCompile>
+    <Link><ModuleDefinitionFile></ModuleDefinitionFile><BaseAddress>0x180000000</BaseAddress><OutputFile>$(OutDir)$(ProjectName).dll</OutputFile></Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Remove="..\dirsync.cpp" />
+    <ClCompile Include="lifecycle_probe.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader></ClCompile>
+    <ResourceCompile Remove="@(ResourceCompile)" />
+    <ProjectReference Remove="@(ProjectReference)" />
+  </ItemGroup>
+</Project>
