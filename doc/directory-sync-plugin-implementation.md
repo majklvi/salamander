@@ -165,10 +165,18 @@ Mimo plugin vznikl samostatný `tests/protocol_probe.vcxproj` bez SDK/engine zá
 
 Sonda současně prokázala dvě překážky převzetí návrhu do produkce: striktní read-only parent sharing odmítá vlastní rename a hlavní datový proud nezamyká ADS. Experimentální native rename potřeboval širší parent sharing; není to schválený bezpečnostní fallback. Finální atributy bylo nutné nastavit až po publikaci, protože rename přidal Archive. V6 zůstává otevřená. Pluginové zdroje, SDK, hostitel a běžné CI se v této etapě nezměnily; zápisový executor ani SMB testy nevznikly.
 
+### Zúžení dalšího vývoje na úroveň jádra (15. října 2026)
+
+Uživatel po sondě výslovně schválil úroveň spolehlivosti současného jádra Samandarin-0.16. [Aktuální návrh](directory-sync-plugin-execution-protocol.md) proto nahrazuje přísnější transakční postup. D4/D5, stávající read-only validace, základní ochrany cest, běžné chyby a Stop zůstávají. Úplné zamykání ADS/rodičů, úmyslné reparse/ACL závody, native relativní backend, crash replay a fyzická power-loss ověřování jsou odložené; další rozšiřování těchto sond není podmínkou první verze.
+
+Rozpracované necommitnuté concurrency rozšíření sondy bylo odstraněno bez sestavení/spuštění. Publikovaný `protocol_probe` a jeho výsledky 347 assertions / 53 procesů se neměnily. V této úpravě nejsou žádné změny produkčního ani testovacího kódu, SDK nebo hostitele; provedena byla kontrola dokumentačních odkazů a diffu, nikoli nové runtime testy či CI.
+
+Doporučený další krok je krátké mapování konkrétních postupů jádra a dostupného SDK na nový cíl / přepis s obnovou / mazání s obnovou, ADS/ACL/atributy, Stop/chyby a Unicode/dlouhé cesty. Výstup má určit nejmenší potřebný pluginový adaptér a běžné akceptační případy. Executor ani SMB testy tím zatím nezačínají.
+
 ### Zbývající omezení
 
 - Omezení V5 zůstává přijaté: panelový kořen přichází jako bajty, dekódování je UTF-8 nejdříve a ACP při neplatném UTF-8. Ztracenou nebo nejednoznačnou historickou informaci nelze tímto adaptérem zpětně rekonstruovat. Selhání SDK/převodu/otevření musí být viditelné; backend nemá nový obecný limit MAX_PATH. Místní runtime případy výše nezaručují všechny délky, historická ACP jména nebo UNC. Hostitelská navigace dlouhého kořene navíc obsahuje prokázaný pád, který plugin před svým spuštěním nemůže ohlásit.
-- NTFS identity, checkpointy a držení rodičů při čtení mají výše uvedené konkrétní výsledky a meze. Nejde o dokončený zápisový protokol; před zápisy zbývá V6 včetně operačních handlů, kolizí, záloh, ADS/ACL a obnovy po pádu podle samostatného návrhu. Bezpečnost SMB se z místního NTFS nevyvozuje.
+- NTFS identity, checkpointy a držení rodičů při čtení mají výše uvedené konkrétní výsledky a meze. Nejde o dokončený zápisový protokol; V6 se dál ověřuje v rozsahu běžných operací jádra, D4/D5 a chybových scénářů podle aktualizovaného návrhu. Úplné souběhové záruky a transakční obnova jsou odložené. Bezpečnost SMB se z místního NTFS nevyvozuje.
 - Místní Stop/Close, skutečný force Release workeru s odmapováním testovací DLL a běžné i násilné ukončení vlastního hostitele při skenu/obsahu jsou ověřené výše. Neověřen zůstává force unload s aktivním GUI callbackem, kritický shutdown Windows a pomalé nebo zaseknuté SMB I/O. UI smoke nepokrývá všechny DPI, překlady, klávesové a přístupnostní scénáře. První jazyk je English v samostatném přeložitelném SLG.
 - Profily, otevření externího porovnávače a vykonání plánu nejsou součástí této první etapy. Plán je jen v paměti a po novém porovnání se znovu vytvoří.
 - SMB runtime nebylo podle pokynu uživatele použito. ARM64/Win32 jsou sestavené, ale GUI běželo pouze na x64. Příslušné CI se vyhodnotí až pro publikovaný aktuální commit; lokální build není výsledek vzdáleného draft PR.

@@ -2,6 +2,12 @@
 
 15. října 2026. Navazuje na [návrh protokolu](directory-sync-plugin-execution-protocol.md). **Plugin zůstává read-only.** Sonda je samostatný EXE bez vazby na engine, SPL, hostitele nebo SDK. Není zařazena do distribuce ani běžného CI; její zápisy se týkají pouze čerstvě vytvořených syntetických dat. SMB se nepoužilo.
 
+## Následné rozhodnutí o rozsahu (15. října 2026)
+
+Tento protokol uchovává výsledky již provedené experimentální sondy. Uživatel následně schválil jako cíl úroveň běžných souborových operací současného jádra, viz [aktuální návrh](directory-sync-plugin-execution-protocol.md). Úplná ochrana rodičů a celé sady ADS při libovolném souběhu, native relativní backend a transakční journal jsou **odložené**, nikoli podmínka zahájení běžného vývoje. D4/D5, základní kontroly a pravdivé ošetření chyb zůstávají platné. Níže uvedené překážky se vztahují k původnímu přísnějšímu protokolu; neznamenají, že běžný plugin musí nejprve získat silnější záruky než jádro.
+
+Navazující rozpracované concurrency rozšíření nebylo sestaveno ani spuštěno; při zúžení rozsahu se odstranily pouze jeho vlastní necommitnuté zdroje a zapojení. Není zde nový výsledek reparse/ACL/ADS souběhových testů. Publikovaná sonda a její reprodukce zůstávají beze změn.
+
 ## Výsledek a význam
 
 Debug i Release x64 prošly **347 assertions a 53 pomocnými procesy v každém běhu**, včetně 25 násilných ukončení: 12 hranic přepisu, šest hranic nového cíle, šest hranic mazání a jeden běh pro poškozený journal. Číslo assertions zahrnuje i ověření prostředí a opakované kontroly; nejde o 347 nezávislých scénářů. Lokálně Windows 11 Pro 10.0.26200, NTFS na C:, MSVC 14.51, MSBuild 18.10, x64 Debug/Release, warning level 4 a warnings as errors.
@@ -91,11 +97,11 @@ if ($LASTEXITCODE -ne 0) { throw 'probe failed' }
 
 Finální Debug fixtures `C:\Samandarin\builds\dirsync\protocol-20261015-debug-final5`, Release `C:\Samandarin\builds\dirsync\protocol-20261015-release-final3`. Výpisy `C:\Samandarin\builds\dirsync\protocol-debug.log` a `protocol-release.log`, prostředí `protocol-environment.json`. Předchozí r1–r8 a final varianty jsou průzkumné běhy v oddělených složkách, nikoli finální výsledky. Běhy r1–r4 skončily na matici rename nebo mappingu; další neúplné běhy odhalily read-only a Archive předpoklady. Evidence z build adresáře se necommituje.
 
-## Co zůstává před zápisy neprokázané
+## Historické meze sondy a odložená ověřování
 
 1. **Úplná stabilita rodičů a proudů při souběhu.** Prokázat bezpečné otevírání/create-new vzhledem k parent handlu a ochranu ADS včetně přidání/odebrání proudu, změn ACL a reparse. Nativní rename s širším sharingem je pouze kandidát; nesmí nahradit bezpečnostní kontroly. Staging se v sondě znovu otevírá a kontroluje ID; toto není hotový důkaz kontinuálního držení všech produkčních objektů.
 2. **Reálný nedostatek prostoru a I/O porucha.** Použít izolovaný malý NTFS svazek a řízené prostředí pro skutečné chyby zápisu/flush/journalu. Systémový disk se nezaplňoval. Reálné výpadky napájení, durability rename/directory entries a journalu na jiném svazku nebyly testovány.
 3. **Rozsah přístupových práv a metadat.** Testované chráněné DACL dávaly vlastníkovi plná práva. Chybí složitější inherited/deny ACL, nedostatek WRITE_DAC/WRITE_ATTRIBUTES, změna ACL během operace, EFS, sparse/komprese, všechna hardlinková propojení napříč plánem, case-sensitive adresáře a mount/SUBST aliasy. Bez důkazu zůstávají blokované nebo mimo podporu podle D5.
 4. **Produktový formát a zotavení.** Plný zabezpečený manifest, nedůvěryhodné poškozené logy, obnovení po restartu aplikace, zobrazení nejistých stavů a ruční obnova/úklid mají teprve vzniknout. Neobnovovat automaticky přes jiný ID. Uživatelsky vyjasnit neatomickou mezeru a chování Read-only; není zde dodatečné schválení destruktivních akcí.
 
-Doporučený další krok je stále izolovaný: prokázat ochranu celé sady ADS a relativní vytváření objektů s rodiči při reparse/ACL závodech. Teprve pak rozhodnout, zda tento commit kandidát splní požadovanou bezpečnost, nebo zda potřebuje jiný postup. Žádný zápisový executor, SMB test ani změna SDK nebyly přidány.
+Původně doporučené další reparse/ACL/ADS souběhové sondy se po rozhodnutí uživatele odkládají. Následuje úzké mapování jádra a SDK na D4/D5 a běžné testy podle aktuálního návrhu; native commit kandidát se do pluginu nepřebírá. Žádný zápisový executor, SMB test ani změna SDK nebyly přidány.
