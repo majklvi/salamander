@@ -31,7 +31,7 @@ struct Reader
         std::wstring text; while (c) { text += wchar_t(c); c = Read<WORD>(); } return text;
     }
 };
-struct Control { DWORD style, id; short x, y, width, height; WORD type; std::wstring text; };
+struct Control { DWORD style, id; short x, y, width, height; WORD type; std::wstring text, className; };
 std::wstring Caption(const std::wstring& text)
 {
     std::wstring value;
@@ -42,9 +42,9 @@ std::wstring Caption(const std::wstring& text)
     }
     return value;
 }
-void Test()
+void Test(int dialog)
 {
-    HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(IDD_PREVIEW), MAKEINTRESOURCEW(5));
+    HRSRC resource = FindResourceW(nullptr, MAKEINTRESOURCEW(dialog), MAKEINTRESOURCEW(5));
     Check(resource != nullptr, "shipping dialog resource");
     const BYTE* bytes = static_cast<const BYTE*>(LockResource(LoadResource(nullptr, resource)));
     Check(bytes != nullptr, "dialog data");
@@ -62,7 +62,7 @@ void Test()
         c.x = r.Read<short>(); c.y = r.Read<short>(); c.width = r.Read<short>(); c.height = r.Read<short>(); c.id = r.Read<DWORD>();
         WORD type = r.Read<WORD>();
         if (type == 0xffff) c.type = r.Read<WORD>();
-        else while (type) type = r.Read<WORD>();
+        else while (type) {c.className+=wchar_t(type);type = r.Read<WORD>();}
         c.text = r.Text(); WORD extra = r.Read<WORD>(); for (WORD j = 0; j < extra; ++j) r.Read<BYTE>();
         for (size_t j = 0; j + 1 < c.text.size(); ++j) if (c.text[j] == L'&')
         {
@@ -70,8 +70,12 @@ void Test()
             Check(keys.insert(wchar_t(towlower(c.text[j + 1]))).second, "unique dialog mnemonic");
         }
         if (c.id == IDC_LIST || c.id == IDC_ACTION || c.id == IDC_COMPARE || c.id == IDC_COPY_NEW ||
-            c.id == IDC_RECOVERY_ROOT || c.id == IDC_SAVE_ORIGINALS || c.id == IDC_KEEP_ORIGINALS || c.id == IDC_OVERWRITE || c.id == IDC_DELETE_FILES || c.id == IDCANCEL)
+            c.id == IDC_RECOVERY_ROOT || c.id == IDC_SAVE_ORIGINALS || c.id == IDC_KEEP_ORIGINALS || c.id == IDC_OVERWRITE || c.id == IDC_DELETE_FILES || c.id == IDCANCEL ||
+            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_VALUE || c.id == IDC_INFO_NOTES || c.id == IDOK)
             Check((c.style & WS_TABSTOP) != 0, "primary controls reachable by Tab");
+        if(c.id==IDC_STATUS) Check(c.className==L"msctls_statusbar32", "real native status bar");
+        if(c.id==IDC_INFO_VALUE || c.id==IDC_INFO_NOTES)
+            Check((c.style&ES_READONLY)!=0 && (c.style&ES_MULTILINE)!=0 && (c.style&WS_VSCROLL)!=0,"selectable scrolling read-only details");
         controls.push_back(c);
     }
     for (int dpi : {96, 120, 144, 192, 240})
@@ -101,6 +105,14 @@ void Test()
             int padding = c.type == 0x80 ? MulDiv((c.style & 0xf) == BS_AUTOCHECKBOX ? 20 : 12, dpi, 96) : 0;
             if (size.cx + padding > MulDiv(c.width, baseX, 4) || size.cy > MulDiv(h, baseY, 8))
             { std::wcerr << L"DPI " << dpi << L": clipped caption " << c.text << L"\n"; fits = false; }
+            if(dialog==IDD_INFORMATION && c.id==IDOK) {
+                for(int id:{IDS_UI_SUMMARY,IDS_UI_START_COPY,IDS_UI_START_SAVE,IDS_UI_START_OVERWRITE,IDS_UI_START_DELETE}) {
+                    wchar_t label[128]{};int n=LoadStringW(GetModuleHandleW(nullptr),id,label,128);
+                    Check(n>0,"localized action caption present"); SIZE action{};
+                    Check(GetTextExtentPoint32W(dc,label,n,&action)!=FALSE,"action caption metrics");
+                    Check(action.cx+MulDiv(12,dpi,96)<=MulDiv(c.width,baseX,4),"dynamic action captions fit");
+                }
+            }
         }
         SelectObject(dc, old); DeleteObject(font); DeleteDC(dc);
         Check(fits, "dialog bounds and captions fit at requested font DPI");
@@ -110,6 +122,6 @@ void Test()
 }
 int main()
 {
-    try { Test(); std::cout << checks << " resource/layout checks passed\n"; return 0; }
+    try { Test(IDD_PREVIEW); Test(IDD_INFORMATION); std::cout << checks << " resource/layout checks passed\n"; return 0; }
     catch (const std::exception& e) { std::cerr << "FAILED: " << e.what() << "\n"; return 1; }
 }

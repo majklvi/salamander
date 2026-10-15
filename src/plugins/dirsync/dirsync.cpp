@@ -105,6 +105,124 @@ void ConfigureDark(HWND dialog)
     DarkModeSetEnabled(dark);
     if (dialog) { DarkModeApplyWindow(dialog); DarkModeRefreshTitleBar(dialog); DarkModeApplyTree(dialog); }
 }
+using InfoRows = std::vector<std::pair<std::wstring, std::wstring>>;
+void Field(InfoRows& rows, int label, const std::wstring& value)
+{ rows.push_back({Text(label), value}); }
+void Field(InfoRows& rows, int label, uint64_t value)
+{ Field(rows, label, std::to_wstring(value)); }
+struct Information
+{
+    int title;
+    InfoRows rows;
+    std::wstring notes;
+    bool confirm;
+    SIZE initial{}, minimum{};
+    std::vector<std::pair<HWND, RECT>> controls;
+};
+std::wstring EditLines(const std::wstring& text)
+{
+    std::wstring result;
+    for (size_t i=0; i<text.size(); ++i) {
+        if (text[i]==L'\n' && (i==0 || text[i-1]!=L'\r')) result+=L'\r';
+        result+=text[i];
+    }
+    return result;
+}
+void InformationColumns(HWND window)
+{
+    HWND list=GetDlgItem(window,IDC_INFO_TABLE); RECT r{}; GetClientRect(list,&r);
+    RECT units{0,0,195,0}; MapDialogRect(window,&units);
+    ListView_SetColumnWidth(list,0,units.right);
+    ListView_SetColumnWidth(list,1,std::max(80,int(r.right-units.right)-GetSystemMetrics(SM_CXVSCROLL)-4));
+}
+INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
+{
+    auto* info=reinterpret_cast<Information*>(GetWindowLongPtrW(window,DWLP_USER));
+    try {
+        if(message==WM_INITDIALOG) {
+            info=reinterpret_cast<Information*>(l);
+            SetWindowLongPtrW(window,DWLP_USER,reinterpret_cast<LONG_PTR>(info));
+            SetWindowTextW(window,Text(info->title).c_str());
+            HWND list=GetDlgItem(window,IDC_INFO_TABLE);
+            ListView_SetUnicodeFormat(list,TRUE);
+            ListView_SetExtendedListViewStyle(list,LVS_EX_FULLROWSELECT|LVS_EX_DOUBLEBUFFER|LVS_EX_LABELTIP);
+            for(int i=0;i<2;++i) {
+                auto title=Text(i?IDS_UI_VALUE:IDS_UI_FIELD);
+                LVCOLUMNW column{}; column.mask=LVCF_TEXT|LVCF_WIDTH; column.pszText=title.data(); column.cx=180;
+                SendMessageW(list,LVM_INSERTCOLUMNW,i,LPARAM(&column));
+            }
+            for(size_t i=0;i<info->rows.size();++i) {
+                auto& row=info->rows[i]; LVITEMW item{}; item.mask=LVIF_TEXT; item.iItem=int(i); item.pszText=row.first.data();
+                SendMessageW(list,LVM_INSERTITEMW,0,LPARAM(&item));
+                item.iSubItem=1; item.pszText=row.second.data(); SendMessageW(list,LVM_SETITEMTEXTW,i,LPARAM(&item));
+            }
+            for(int id:{IDC_INFO_VALUE,IDC_INFO_NOTES}) SendDlgItemMessageW(window,id,EM_SETLIMITTEXT,0x7ffffffe,0);
+            SetDlgItemTextW(window,IDC_INFO_NOTES,EditLines(info->notes).c_str());
+            if(!info->confirm) {
+                RECT r{};GetWindowRect(GetDlgItem(window,IDCANCEL),&r);MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&r),2);
+                MoveWindow(GetDlgItem(window,IDOK),r.left,r.top,r.right-r.left,r.bottom-r.top,FALSE);
+                ShowWindow(GetDlgItem(window,IDCANCEL),SW_HIDE);
+                SetDlgItemTextW(window,IDOK,Text(IDS_UI_SUMMARY).c_str());
+                SendMessageW(window,DM_SETDEFID,IDOK,0);
+            } else {
+                int label=info->title==IDS_UI_DELETE_CONFIRM?IDS_UI_START_DELETE:
+                    info->title==IDS_UI_OVERWRITE_CONFIRM?IDS_UI_START_OVERWRITE:
+                    info->title==IDS_UI_SAVE_CONFIRM?IDS_UI_START_SAVE:IDS_UI_START_COPY;
+                SetDlgItemTextW(window,IDOK,Text(label).c_str());
+            }
+            if(!info->rows.empty()) ListView_SetItemState(list,0,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+            RECT client{},outer{}; GetClientRect(window,&client); GetWindowRect(window,&outer);
+            info->initial={client.right,client.bottom}; info->minimum={outer.right-outer.left,outer.bottom-outer.top};
+            for(HWND child=GetWindow(window,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT)) {
+                RECT r{};GetWindowRect(child,&r);MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&r),2);
+                info->controls.push_back({child,r});
+            }
+            InformationColumns(window);
+            DarkModeApplyWindow(window);DarkModeRefreshTitleBar(window);DarkModeApplyTree(window);
+            return TRUE;
+        }
+        if(!info) return FALSE;
+        LRESULT brush=0;
+        if(dark && DarkModeHandleCtlColor(message,w,l,brush)) return brush;
+        switch(message) {
+        case WM_GETMINMAXINFO:
+            if(info->minimum.cx) reinterpret_cast<MINMAXINFO*>(l)->ptMinTrackSize={info->minimum.cx,info->minimum.cy};
+            return TRUE;
+        case WM_SIZE:
+            if(info->initial.cx && w!=SIZE_MINIMIZED) {
+                int dx=LOWORD(l)-info->initial.cx,dy=HIWORD(l)-info->initial.cy;
+                for(const auto& c:info->controls) {
+                    auto r=c.second;int id=GetDlgCtrlID(c.first);
+                    if(id==IDC_INFO_TABLE) {r.right+=dx;r.bottom+=dy;}
+                    else {r.top+=dy;r.bottom+=dy;r.right+=dx;if(id==IDOK || id==IDCANCEL)r.left+=dx;}
+                    MoveWindow(c.first,r.left,r.top,r.right-r.left,r.bottom-r.top,TRUE);
+                }
+                InformationColumns(window);
+            }
+            return TRUE;
+        case WM_NOTIFY:
+            if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_INFO_TABLE && reinterpret_cast<NMHDR*>(l)->code==LVN_ITEMCHANGED) {
+                int index=ListView_GetNextItem(GetDlgItem(window,IDC_INFO_TABLE),-1,LVNI_SELECTED);
+                SetDlgItemTextW(window,IDC_INFO_VALUE,index>=0 && size_t(index)<info->rows.size()?EditLines(info->rows[size_t(index)].second).c_str():L"");
+            }
+            return TRUE;
+        case WM_SETTINGCHANGE: case WM_THEMECHANGED:
+            DarkModeApplyTree(window);DarkModeRefreshTitleBar(window);return TRUE;
+        case WM_COMMAND:
+            if(LOWORD(w)==IDOK || LOWORD(w)==IDCANCEL) {EndDialog(window,LOWORD(w));return TRUE;}
+            break;
+        case WM_CLOSE: EndDialog(window,IDCANCEL);return TRUE;
+        }
+    } catch(...) {EndDialog(window,IDCANCEL);return TRUE;}
+    return FALSE;
+}
+bool InformationBox(HWND parent,int title,InfoRows rows,const std::wstring& notes,bool confirm=false)
+{
+    Information info{title,std::move(rows),notes,confirm,{}, {}, {}};
+    INT_PTR result=DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_INFORMATION),parent,InformationDialog,LPARAM(&info));
+    if(result==-1) Message(parent,IDS_FAILED);
+    return result==IDOK;
+}
 struct Preview
 {
     enum class Intent { None, Apply, Summary, Copy, Save, Overwrite, Delete };
@@ -172,37 +290,46 @@ std::wstring Cell(const dirsync::Row& row, int column)
     }
     return L"";
 }
+void StatusPane(HWND window,int part,const std::wstring& text)
+{
+    SendDlgItemMessageW(window,IDC_STATUS,SB_SETTEXTW,part,LPARAM(text.c_str()));
+    SendDlgItemMessageW(window,IDC_STATUS,SB_SETTIPTEXTW,part,LPARAM(text.c_str()));
+}
+void SizeStatus(HWND window)
+{
+    HWND bar=GetDlgItem(window,IDC_STATUS);
+    SendMessageW(bar,WM_SIZE,0,0);
+    RECT client{};GetClientRect(window,&client);
+    int parts[]={client.right*44/100,-1};
+    SendMessageW(bar,SB_SETPARTS,2,LPARAM(parts));
+}
 void Status(Preview& p)
 {
-    if (p.running)
-    {
-        wchar_t text[256]{};
-        if (p.copying || p.saving || p.overwriting || p.deleting) {
-            swprintf_s(text, Text(p.deleting?IDS_DELETE_PROGRESS:p.overwriting?IDS_OVERWRITE_PROGRESS:p.saving?IDS_SAVE_PROGRESS:IDS_COPY_PROGRESS).c_str(), p.copyProgress.item.load()+1,
-                (p.overwriting || p.deleting)?p.transferCount:uint64_t(p.copyRows.size()), p.copyProgress.copied.load(), p.copyProgress.verified.load(),
-                p.copyProgress.completed.load());
-            SetDlgItemTextW(p.window,IDC_STATUS,text); return;
+    std::wstring state; wchar_t counts[512]{};
+    if(p.running) {
+        if(p.copying || p.saving || p.overwriting || p.deleting) {
+            state=Text(p.deleting?IDS_UI_OP_DELETE:p.overwriting?IDS_UI_OP_OVERWRITE:p.saving?IDS_UI_OP_SAVE:IDS_UI_OP_COPY);
+            wchar_t item[128]{};uint64_t total=(p.overwriting || p.deleting)?p.transferCount:uint64_t(p.copyRows.size());
+            swprintf_s(item,Text(IDS_UI_TRANSFER).c_str(),std::min(p.copyProgress.item.load()+1,total),total);
+            state+=L" | "+std::wstring(item);
+            swprintf_s(counts,Text(IDS_UI_TRANSFER_STATS).c_str(),p.copyProgress.copied.load(),p.copyProgress.verified.load(),p.copyProgress.completed.load());
+        } else {
+            uint64_t bytes=p.progress.readBytes.load();
+            state=Text(p.validating?IDS_UI_VALIDATE:bytes?IDS_UI_COMPARE:IDS_UI_SCAN);
+            if(bytes) swprintf_s(counts,Text(IDS_UI_READ_STATS).c_str(),bytes,p.progress.scanned.load(),p.progress.compared.load());
+            else swprintf_s(counts,Text(IDS_UI_SCAN_STATS).c_str(),p.progress.scanned.load(),p.progress.compared.load());
         }
-        uint64_t bytes = p.progress.readBytes.load(std::memory_order_relaxed);
-        if (p.validating) swprintf_s(text, Text(IDS_VALIDATING).c_str(), p.progress.scanned.load());
-        else if (bytes) swprintf_s(text, Text(IDS_READING).c_str(), bytes, p.progress.scanned.load(), p.progress.compared.load());
-        else swprintf_s(text, Text(IDS_SCAN).c_str(), p.progress.scanned.load(), p.progress.compared.load());
-        SetDlgItemTextW(p.window, IDC_STATUS, text); return;
+        if(p.cancel) state=Text(IDS_UI_STOPPING);
+    } else {
+        if(p.hasCopyReport || p.hasRecoveryReport || p.hasOverwriteReport || p.hasDeleteReport) state=Text(IDS_UI_FINISHED);
+        else if(p.result.stale && !p.result.cancelled) state=Text(IDS_STALE);
+        else if(p.failed || p.result.cancelled) state=Text(p.failed?IDS_FAILED:IDS_CANCELLED);
+        else state=Text(p.result.snapshot?IDS_UI_COMPLETE:IDS_UI_READY);
+        uint64_t blocked=0;
+        for(const auto& row:p.result.rows) if(row.state==dirsync::State::Blocked || row.state==dirsync::State::Conflict) ++blocked;
+        swprintf_s(counts,Text(IDS_UI_ROWS).c_str(),uint64_t(p.result.rows.size()),uint64_t(p.visible.size()),uint64_t(p.result.rows.size()-p.visible.size()),blocked);
     }
-    if (p.hasCopyReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_COPY_AGAIN).c_str()); return; }
-    if (p.hasRecoveryReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_SAVE_AGAIN).c_str()); return; }
-    if (p.hasOverwriteReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_OVERWRITE_AGAIN).c_str()); return; }
-    if (p.hasDeleteReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_DELETE_AGAIN).c_str()); return; }
-    if (p.result.stale && !p.result.cancelled)
-    { SetDlgItemTextW(p.window, IDC_STATUS, Text(IDS_STALE).c_str()); return; }
-    if (p.failed || p.result.cancelled)
-    { SetDlgItemTextW(p.window, IDC_STATUS, Text(p.failed ? IDS_FAILED : IDS_CANCELLED).c_str()); return; }
-    uint64_t blocked = 0;
-    for (const auto& row : p.result.rows) if (row.state == dirsync::State::Blocked || row.state == dirsync::State::Conflict) ++blocked;
-    wchar_t text[512]{};
-    swprintf_s(text, Text(IDS_DONE).c_str(), uint64_t(p.result.rows.size()), uint64_t(p.visible.size()),
-               uint64_t(p.result.rows.size() - p.visible.size()), blocked);
-    SetDlgItemTextW(p.window, IDC_STATUS, text);
+    StatusPane(p.window,0,state);StatusPane(p.window,1,counts);
 }
 void Filter(Preview& p)
 {
@@ -347,10 +474,12 @@ void Summary(Preview& p)
         if (row.action == dirsync::Action::DeleteRight) ++deletes;
         if (row.action == dirsync::Action::Decide) ++unresolved;
     }
-    wchar_t text[2048]{};
-    swprintf_s(text, Text(IDS_SUMMARY).c_str(), nr, br, nl, bl, deletes, unresolved, blocked,
-               uint64_t(p.result.rows.size() - p.visible.size()));
-    DarkModeMessageBoxW(p.window, text, Text(IDS_NAME).c_str(), MB_OK | MB_ICONINFORMATION);
+    InfoRows rows;
+    Field(rows,IDS_UI_TO_RIGHT,Number(nr)+L" / "+Number(br));
+    Field(rows,IDS_UI_TO_LEFT,Number(nl)+L" / "+Number(bl));
+    Field(rows,IDS_UI_DELETE_RIGHT,deletes);Field(rows,IDS_UI_UNRESOLVED,unresolved);
+    Field(rows,IDS_UI_BLOCKED,blocked);Field(rows,IDS_UI_HIDDEN,uint64_t(p.result.rows.size()-p.visible.size()));
+    InformationBox(p.window,IDS_UI_PLAN,std::move(rows),Text(IDS_UI_PLAN_NOTE));
 }
 void CopySummary(Preview& p)
 {
@@ -365,13 +494,14 @@ void CopySummary(Preview& p)
         }
         if (!item.remainingStage.empty()) details+=L"\n"+Text(IDS_COPY_REMAINDER)+item.remainingStage;
     }
-    wchar_t text[1024]{};
-    swprintf_s(text,Text(IDS_COPY_RESULT).c_str(),copied,failed,pending,uint64_t(p.copyReport.omitted));
-    std::wstring message=text;
+    InfoRows rows;
+    Field(rows,IDS_UI_COPIED,copied);Field(rows,IDS_UI_ERRORS,failed);Field(rows,IDS_UI_PENDING,pending);
+    Field(rows,IDS_UI_OMITTED,uint64_t(p.copyReport.omitted));
+    std::wstring message=Text(IDS_UI_RESULT_NOTE);
     if (p.copyReport.stale) message+=L"\n"+Text(IDS_STALE);
     if (p.copyReport.cancelled) message+=L"\n"+Text(IDS_COPY_STOPPED);
-    message+=details;
-    DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OK|MB_ICONINFORMATION);
+    if(!details.empty()) Field(rows,IDS_UI_ERROR_DETAILS,details);
+    InformationBox(p.window,IDS_UI_COPY_RESULT,std::move(rows),message);
 }
 void CopyNew(Preview& p)
 {
@@ -382,9 +512,8 @@ void CopyNew(Preview& p)
         else if (r.action!=dirsync::Action::None) ++omitted;
     }
     if (p.copyRows.empty()) { Message(p.window,IDS_COPY_EMPTY); return; }
-    wchar_t confirm[1024]{};
-    swprintf_s(confirm,Text(IDS_COPY_CONFIRM).c_str(),uint64_t(p.copyRows.size()),bytes,omitted);
-    if (DarkModeMessageBoxW(p.window,confirm,Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONQUESTION)!=IDOK) return;
+    InfoRows fields;Field(fields,IDS_UI_FILES,uint64_t(p.copyRows.size()));Field(fields,IDS_UI_BYTES,bytes);Field(fields,IDS_UI_OMITTED,omitted);
+    if(!InformationBox(p.window,IDS_UI_COPY_CONFIRM,std::move(fields),Text(IDS_UI_COPY_POLICY),true)) return;
     p.cancel=false; p.failed=false; p.copying=true; p.running=true; p.hasCopyReport=false;
     p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
     p.copyProgress.phase=dirsync::CopyPhase::Checking; p.copyReport={};
@@ -416,14 +545,15 @@ void RecoverySummary(Preview& p)
                 (item.copy.published?L"\n"+Text(IDS_SAVE_PUBLISHED_ERROR):L"");
         if (!item.copy.remainingStage.empty()) details+=L"\n"+Text(IDS_COPY_REMAINDER)+item.copy.remainingStage;
     }
-    wchar_t text[1024]{};
-    swprintf_s(text,Text(IDS_SAVE_RESULT).c_str(),copied,failed,pending,logged,uint64_t(p.recoveryReport.omitted));
-    std::wstring message=std::wstring(text)+p.recoveryReport.journal;
+    InfoRows rows;Field(rows,IDS_UI_COPIED,copied);Field(rows,IDS_UI_ERRORS,failed);Field(rows,IDS_UI_PENDING,pending);
+    Field(rows,IDS_UI_LOGGED,logged);Field(rows,IDS_UI_OMITTED,uint64_t(p.recoveryReport.omitted));
+    Field(rows,IDS_UI_MANIFEST,p.recoveryReport.journal);
+    std::wstring message=Text(IDS_UI_RESULT_NOTE)+L"\n\n"+Text(IDS_UI_SAVE_POLICY);
     if (!p.recoveryReport.complete) message+=L"\n"+Text(IDS_SAVE_INCOMPLETE);
     if (p.recoveryReport.error) message+=L"\n"+Text(IDS_COPY_ERROR)+Number(p.recoveryReport.error);
     if (p.recoveryReport.stale) message+=L"\n"+Text(IDS_STALE);
-    message+=details;
-    DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OK|MB_ICONINFORMATION);
+    if(!details.empty()) Field(rows,IDS_UI_ERROR_DETAILS,details);
+    InformationBox(p.window,IDS_UI_SAVE_RESULT,std::move(rows),message);
 }
 void SaveOriginals(Preview& p)
 {
@@ -437,10 +567,9 @@ void SaveOriginals(Preview& p)
         else if (r.action!=dirsync::Action::None) ++omitted;
     }
     if (p.copyRows.empty()) { Message(p.window,IDS_SAVE_EMPTY); return; }
-    wchar_t confirm[2048]{};
-    swprintf_s(confirm,Text(IDS_SAVE_CONFIRM).c_str(),uint64_t(p.copyRows.size()),bytes,omitted);
-    auto message=std::wstring(confirm)+p.recoveryRoot;
-    if (DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONQUESTION)!=IDOK) return;
+    InfoRows fields;Field(fields,IDS_UI_FILES,uint64_t(p.copyRows.size()));Field(fields,IDS_UI_ORIGINAL_BYTES,bytes);Field(fields,IDS_UI_OMITTED,omitted);
+    Field(fields,IDS_UI_RECOVERY_FOLDER,p.recoveryRoot);
+    if(!InformationBox(p.window,IDS_UI_SAVE_CONFIRM,std::move(fields),Text(IDS_UI_SAVE_POLICY),true)) return;
     p.cancel=false; p.failed=false; p.saving=true; p.running=true; p.hasCopyReport=false; p.hasRecoveryReport=false;
     p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
     p.copyProgress.phase=dirsync::CopyPhase::Checking; p.recoveryReport={};
@@ -478,18 +607,18 @@ void OverwriteSummary(Preview& p)
             break;
         }
     }
-    wchar_t text[1024]{};
-    swprintf_s(text,Text(IDS_OVERWRITE_RESULT).c_str(),copied,failed,pending,uint64_t(report.omitted));
-    auto message=std::wstring(text)+L"\n\n"+Text(report.keepOriginals?IDS_OVERWRITE_ON:IDS_OVERWRITE_OFF);
+    InfoRows rows;Field(rows,IDS_UI_REPLACED,copied);Field(rows,IDS_UI_ERRORS,failed);Field(rows,IDS_UI_PENDING,pending);
+    Field(rows,IDS_UI_OMITTED,uint64_t(report.omitted));Field(rows,IDS_UI_RECOVERY,Text(report.keepOriginals?IDS_UI_ON:IDS_UI_OFF));
+    auto message=Text(IDS_UI_RESULT_NOTE)+L"\n\n"+Text(report.keepOriginals?IDS_OVERWRITE_ON:IDS_OVERWRITE_OFF);
     if(report.keepOriginals) {
-        wchar_t recovery[256]{}; swprintf_s(recovery,Text(IDS_OVERWRITE_RECOVERY).c_str(),recovered,uint64_t(report.items.size()));
-        message+=L"\n"+std::wstring(recovery)+L"\n"+report.recovery.journal+L"\n"+report.journal;
+        Field(rows,IDS_UI_RECOVERED,Number(recovered)+L" / "+Number(uint64_t(report.items.size())));
+        Field(rows,IDS_UI_MANIFEST,report.recovery.journal);Field(rows,IDS_UI_JOURNAL,report.journal);
     }
     if(!report.complete) message+=L"\n"+Text(IDS_OVERWRITE_INCOMPLETE);
     if(report.error) message+=L"\n"+Text(IDS_COPY_ERROR)+Number(report.error);
     if(report.stale) message+=L"\n"+Text(IDS_STALE);
-    message+=details;
-    DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OK|MB_ICONINFORMATION);
+    if(!details.empty()) Field(rows,IDS_UI_ERROR_DETAILS,details);
+    InformationBox(p.window,IDS_UI_OVERWRITE_RESULT,std::move(rows),message);
 }
 void Overwrite(Preview& p)
 {
@@ -504,10 +633,11 @@ void Overwrite(Preview& p)
     if(p.copyRows.empty()) { Message(p.window,IDS_OVERWRITE_EMPTY); return; }
     const bool keep=settings.keepOriginals; const auto root=ControlText(p.window,IDC_RECOVERY_ROOT);
     if(keep && root.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
-    wchar_t confirm[2048]{};
-    swprintf_s(confirm,Text(IDS_OVERWRITE_CONFIRM).c_str(),uint64_t(p.copyRows.size()),bytes,originalBytes,omitted);
-    auto message=std::wstring(confirm)+L"\n\n"+Text(keep?IDS_OVERWRITE_ON:IDS_OVERWRITE_OFF)+(keep?L"\n"+root:L"");
-    if(DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONWARNING)!=IDOK) return;
+    InfoRows fields;Field(fields,IDS_UI_FILES,uint64_t(p.copyRows.size()));Field(fields,IDS_UI_BYTES,bytes);
+    Field(fields,IDS_UI_ORIGINAL_BYTES,originalBytes);Field(fields,IDS_UI_OMITTED,omitted);
+    Field(fields,IDS_UI_RECOVERY,Text(keep?IDS_UI_ON:IDS_UI_OFF));if(keep)Field(fields,IDS_UI_RECOVERY_FOLDER,root);
+    auto message=Text(IDS_UI_OVERWRITE_POLICY)+L"\n\n"+Text(keep?IDS_OVERWRITE_ON:IDS_OVERWRITE_OFF);
+    if(!InformationBox(p.window,IDS_UI_OVERWRITE_CONFIRM,std::move(fields),message,true)) return;
     p.cancel=false; p.failed=false; p.overwriting=true; p.running=true;
     p.hasCopyReport=p.hasRecoveryReport=p.hasOverwriteReport=p.hasDeleteReport=false; p.overwriteReport={};
     p.transferCount=uint64_t(p.copyRows.size())*(keep?2:1);
@@ -545,16 +675,18 @@ void DeleteSummary(Preview& p)
             break;
         }
     }
-    wchar_t text[1024]{}; swprintf_s(text,Text(IDS_DELETE_RESULT).c_str(),deleted,failed,pending,uint64_t(report.omitted));
-    auto message=std::wstring(text)+L"\n\n"+Text(report.keepOriginals?IDS_DELETE_ON:IDS_DELETE_OFF);
+    InfoRows rows;Field(rows,IDS_UI_DELETED,deleted);Field(rows,IDS_UI_ERRORS,failed);Field(rows,IDS_UI_PENDING,pending);
+    Field(rows,IDS_UI_OMITTED,uint64_t(report.omitted));Field(rows,IDS_UI_RECOVERY,Text(report.keepOriginals?IDS_UI_ON:IDS_UI_OFF));
+    auto message=Text(IDS_UI_RESULT_NOTE)+L"\n\n"+Text(report.keepOriginals?IDS_DELETE_ON:IDS_DELETE_OFF);
     if(report.keepOriginals) {
-        wchar_t recovery[256]{}; swprintf_s(recovery,Text(IDS_OVERWRITE_RECOVERY).c_str(),recovered,uint64_t(report.items.size()));
-        message+=L"\n"+std::wstring(recovery)+L"\n"+report.recovery.journal+L"\n"+report.journal;
+        Field(rows,IDS_UI_RECOVERED,Number(recovered)+L" / "+Number(uint64_t(report.items.size())));
+        Field(rows,IDS_UI_MANIFEST,report.recovery.journal);Field(rows,IDS_UI_JOURNAL,report.journal);
     }
     if(!report.complete) message+=L"\n"+Text(IDS_DELETE_INCOMPLETE);
     if(report.error) message+=L"\n"+Text(IDS_COPY_ERROR)+Number(report.error);
     if(report.stale) message+=L"\n"+Text(IDS_STALE);
-    DarkModeMessageBoxW(p.window,(message+details).c_str(),Text(IDS_NAME).c_str(),MB_OK|MB_ICONINFORMATION);
+    if(!details.empty()) Field(rows,IDS_UI_ERROR_DETAILS,details);
+    InformationBox(p.window,IDS_UI_DELETE_RESULT,std::move(rows),message);
 }
 void DeleteFiles(Preview& p)
 {
@@ -568,9 +700,11 @@ void DeleteFiles(Preview& p)
     if(p.copyRows.empty()) { Message(p.window,IDS_DELETE_EMPTY); return; }
     const bool keep=settings.keepOriginals; const auto root=ControlText(p.window,IDC_RECOVERY_ROOT);
     if(keep && root.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
-    wchar_t confirm[2048]{}; swprintf_s(confirm,Text(IDS_DELETE_CONFIRM).c_str(),uint64_t(p.copyRows.size()),bytes,omitted);
-    auto message=std::wstring(confirm)+L"\n\n"+Text(keep?IDS_DELETE_ON:IDS_DELETE_OFF)+(keep?L"\n"+root:L"");
-    if(DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONWARNING)!=IDOK) return;
+    InfoRows fields;Field(fields,IDS_UI_FILES,uint64_t(p.copyRows.size()));Field(fields,IDS_UI_ORIGINAL_BYTES,bytes);
+    Field(fields,IDS_UI_OMITTED,omitted);Field(fields,IDS_UI_RECOVERY,Text(keep?IDS_UI_ON:IDS_UI_OFF));
+    if(keep)Field(fields,IDS_UI_RECOVERY_FOLDER,root);
+    auto message=Text(IDS_UI_DELETE_POLICY)+L"\n\n"+Text(keep?IDS_DELETE_ON:IDS_DELETE_OFF);
+    if(!InformationBox(p.window,IDS_UI_DELETE_CONFIRM,std::move(fields),message,true)) return;
     p.cancel=false; p.failed=false; p.deleting=true; p.running=true;
     p.hasCopyReport=p.hasRecoveryReport=p.hasOverwriteReport=p.hasDeleteReport=false; p.deleteReport={};
     p.transferCount=uint64_t(p.copyRows.size())*(keep?2:1);
@@ -622,10 +756,11 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         p->minimumWindow = {outer.right - outer.left, outer.bottom - outer.top};
         for (HWND child = GetWindow(window, GW_CHILD); child; child = GetWindow(child, GW_HWNDNEXT))
         {
+            if(GetDlgCtrlID(child)==IDC_STATUS) continue;
             RECT bounds{}; GetWindowRect(child, &bounds); MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&bounds), 2);
             p->controls.push_back({child, bounds});
         }
-        ConfigureDark(window); Busy(*p, false); return TRUE;
+        ConfigureDark(window); SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
     LRESULT brush = 0;
@@ -646,7 +781,6 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 int id = GetDlgCtrlID(control.first);
                 if (id == IDC_LIST) { r.right += dx; r.bottom += dy; }
                 else if (id == IDC_LEFT || id == IDC_RIGHT) r.right += dx;
-                else if (id == IDC_STATUS) { r.top += dy; r.bottom += dy; r.right += dx; }
                 else if (id == IDC_RECOVERY_ROOT) { r.top += dy; r.bottom += dy; r.right += dx; }
                 else if (id == IDC_SAVE_ORIGINALS) { r.top += dy; r.bottom += dy; r.left += dx; r.right += dx; }
                 else if (id == IDC_RECOVERY_LABEL) { r.top += dy; r.bottom += dy; }
@@ -656,6 +790,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
             }
         }
+        SizeStatus(window);
         return TRUE;
     case WM_TIMER: Status(*p); return TRUE;
     case Done:
@@ -663,22 +798,26 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if (p->validating) { p->result = std::move(p->checkedResult); p->validating = false; }
         if (p->copying) {
             p->copying=false; p->hasCopyReport=true; p->result.stale=true; p->result.snapshot.reset();
+            Status(*p);
             for (const auto& path:{p->left,p->right}) NotifyPath(path);
             if (!p->closing) { if (p->failed) Message(window,IDS_COPY_FAILED); else CopySummary(*p); }
         }
         if (p->saving) {
             p->saving=false; p->hasRecoveryReport=true; p->result.stale=true; p->result.snapshot.reset();
+            Status(*p);
             if (!p->recoveryReport.runDirectory.empty()) NotifyPath(p->recoveryRoot);
             if (!p->closing) { if (p->failed) Message(window,IDS_SAVE_FAILED); else RecoverySummary(*p); }
         }
         if(p->overwriting) {
             p->overwriting=false; p->hasOverwriteReport=true; p->result.stale=true; p->result.snapshot.reset();
+            Status(*p);
             for(const auto& path:{p->left,p->right}) NotifyPath(path);
             if(!p->overwriteReport.recovery.runDirectory.empty()) NotifyPath(ControlText(window,IDC_RECOVERY_ROOT));
             if(!p->closing) { if(p->failed) Message(window,IDS_OVERWRITE_FAILED); else OverwriteSummary(*p); }
         }
         if(p->deleting) {
             p->deleting=false; p->hasDeleteReport=true; p->result.stale=true; p->result.snapshot.reset();
+            Status(*p);
             NotifyPath(p->right);
             if(!p->deleteReport.recovery.runDirectory.empty()) NotifyPath(ControlText(window,IDC_RECOVERY_ROOT));
             if(!p->closing) { if(p->failed) Message(window,IDS_DELETE_FAILED); else DeleteSummary(*p); }
@@ -713,7 +852,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         switch (LOWORD(w))
         {
         case IDC_COMPARE: Start(*p); return TRUE;
-        case IDC_STOP: p->Stop(); return TRUE;
+        case IDC_STOP: p->Stop(); Status(*p); return TRUE;
         case IDCANCEL: SendMessageW(window, WM_CLOSE, 0, 0); return TRUE;
         case IDC_APPLY: ValidatePreview(*p, Preview::Intent::Apply); return TRUE;
         case IDC_SUMMARY: ValidatePreview(*p, Preview::Intent::Summary); return TRUE;
@@ -866,7 +1005,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     general = entry->GetSalamanderGeneral();
     language = entry->LoadLanguageModule(entry->GetParentWindow(), "Directory Synchronization");
     if (!language) return nullptr;
-    INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES}; InitCommonControlsEx(&controls);
+    INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES}; InitCommonControlsEx(&controls);
     ConfigureDark(nullptr);
     entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION, "0.1", "Copyright (c) 2026 Open Salamander Authors",
                               general->LoadStr(language, IDS_DESCRIPTION), "DirectorySync");
