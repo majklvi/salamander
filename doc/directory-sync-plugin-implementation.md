@@ -1,5 +1,7 @@
 # Directory Synchronization: první etapa
 
+Nové [ověření chyb nedostatku místa](directory-sync-plugin-copy-space.md): 743 copy assertions Debug/Release x64. Reakce na chyby 112/39 prošla řízeným testem; skutečně zaplněný svazek a odpovídající GUI běh zůstávají neověřené kvůli oprávnění k připojení VHD. Produkční kód se neměnil.
+
 Dokončeno [nucené Release při kopírování/Verify a běžné ukončení hostitele](directory-sync-plugin-copy-unload.md): 547 lifecycle kontrol Debug/Release x64 a GUI přerušení přenosu před ukončením aplikace. Bez změny produkčního kódu. Níže uvedené menší počty a neprovedené případy popisují stav jednotlivých starších etap.
 
 Navazující [došetření UI Automation a dokončené GUI Stop/Close](directory-sync-plugin-ui-automation.md) uzavírá běžný GUI případ na aktuální binárce; velké UIA průchody zůstávají odděleným známým omezením.

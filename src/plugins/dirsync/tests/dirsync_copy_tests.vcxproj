@@ -38,7 +38,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="copy_tests.cpp" /><ClCompile Include="..\engine.cpp" /><ClCompile Include="..\copy.cpp" />
+    <ClCompile Include="copy_tests.cpp" /><ClCompile Include="..\engine.cpp" /><ClCompile Include="copy_space_faults.cpp" />
   </ItemGroup>
   <ItemGroup>
 

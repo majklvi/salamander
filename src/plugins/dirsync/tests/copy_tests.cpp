@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "../copy.h"
+#include "copy_space_faults.h"
 #include <sddl.h>
 #include <iostream>
 #include <stdexcept>
@@ -55,7 +56,7 @@ struct Fixture {
         WIN32_FIND_DATAW d{}; HANDLE f=FindFirstFileW((ApiPath(dir)+L"\\.dirsync-*").c_str(),&d);
         bool absent=f==INVALID_HANDLE_VALUE; if(!absent) FindClose(f); Check(absent,"no unreported staging left");
     }
-    ~Fixture() { SetCopyHook({}); Cleanup(root); RemoveDirectoryW(ApiPath(root).c_str()); }
+    ~Fixture() { SetCopyHook({}); dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::None,0,1); Cleanup(root); RemoveDirectoryW(ApiPath(root).c_str()); }
 };
 void Acl(const std::wstring& path,const wchar_t* text) {
     PSECURITY_DESCRIPTOR sd=nullptr; Check(ConvertStringSecurityDescriptorToSecurityDescriptorW(text,SDDL_REVISION_1,&sd,nullptr)!=FALSE,"SDDL");
@@ -204,8 +205,52 @@ void AfterPublication() {
     Check(!report.items[0].published && f.progress.verified>0 && f.progress.verified<2*1024*1024,"Verify interrupted before reading entire file");
     Check(GetFileAttributesW(ApiPath(f.right+L"\\a").c_str())==INVALID_FILE_ATTRIBUTES,"partial Verify never publishes"); f.NoStaging(f.right);
 }
+void DiskSpace() {
+    using dirsync_test::SpaceFault;
+    for(auto fault:{SpaceFault::Reserve,SpaceFault::MainData,SpaceFault::NamedStream,SpaceFault::RetainStage,SpaceFault::Publish}) {
+        for(DWORD error:{DWORD(ERROR_DISK_FULL),DWORD(ERROR_HANDLE_DISK_FULL)}) {
+            Fixture f; const bool prior=fault!=SpaceFault::Reserve;
+            const std::string data(8*1024*1024,'F');
+            if(prior) { Put(f.left+L"\\0-done","DONE"); Put(f.left+L"\\0-done:note","DONE-ADS"); }
+            Put(f.left+L"\\a",fault==SpaceFault::NamedStream?"MAIN":data);
+            Put(f.left+L"\\a:漢字",fault==SpaceFault::NamedStream?data:"ADS"); Put(f.left+L"\\z-next","NEXT");
+            auto plan=f.Scan(); dirsync_test::SetSpaceFault(fault,error,prior?2:1);
+            auto report=f.Run(plan); const size_t index=prior?1:0;
+            Check(dirsync_test::SpaceFaultReached(),"disk-full fault reached requested I/O boundary");
+            dirsync_test::ReleaseSpaceFault();
+            Check(!report.stale && !report.cancelled && !f.cancel,"disk full is failure, not cancellation or stale plan");
+            Check(report.items.size()==index+2 && report.items[index].status==CopyStatus::Failed && report.items[index].error==error,"disk-full OS error preserved");
+            Check(!report.items[index].published && report.items[index+1].status==CopyStatus::NotStarted,"disk full does not publish or start next file");
+            Check(GetFileAttributesW(ApiPath(f.right+L"\\a").c_str())==INVALID_FILE_ATTRIBUTES &&
+                GetFileAttributesW(ApiPath(f.right+L"\\z-next").c_str())==INVALID_FILE_ATTRIBUTES,"disk-full targets absent");
+            Check(f.progress.completed==index,"only earlier verified copies count as complete");
+            if(fault==SpaceFault::MainData || fault==SpaceFault::NamedStream || fault==SpaceFault::RetainStage)
+                Check(f.progress.copied>1024*1024 && f.progress.copied<8*1024*1024 && f.progress.verified==24,
+                    "partial transfer reports bytes without verifying incomplete file");
+            if(prior) Check(report.items[0].status==CopyStatus::Copied && Read(f.right+L"\\0-done")=="DONE" &&
+                Read(f.right+L"\\0-done:note")=="DONE-ADS","completed main data and ADS survive disk full");
+            if(fault==SpaceFault::RetainStage) {
+                const auto& stage=report.items[index].remainingStage;
+                Check(!stage.empty() && ApiPath(stage).rfind(ApiPath(f.right)+L"\\.dirsync-",0)==0,"blocked cleanup reports owned stage path");
+                auto partial=Read(stage); Check(!partial.empty() && partial.size()<data.size(),"retained stage contains real partial main data");
+                Check(DeleteFileW(ApiPath(stage).c_str())!=FALSE,"remove only owned retained fixture after releasing lock");
+            } else Check(report.items[index].remainingStage.empty(),"disk-full staging cleanup succeeded");
+            f.NoStaging(f.right);
+            Check(Read(f.left+L"\\a")== (fault==SpaceFault::NamedStream?"MAIN":data) &&
+                Read(f.left+L"\\a:漢字")== (fault==SpaceFault::NamedStream?data:"ADS"),"source main and ADS unchanged after disk full");
+            HANDLE source=CreateFileW(ApiPath(f.left+L"\\a").c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+            Check(source!=INVALID_HANDLE_VALUE,"disk-full source handles released"); if(source!=INVALID_HANDLE_VALUE) CloseHandle(source);
+            dirsync_test::SetSpaceFault(SpaceFault::None,0,1);
+            f.progress.copied=0; f.progress.verified=0; f.progress.completed=0;
+            auto retry=f.Run(f.Scan());
+            Check(retry.items.size()==2 && retry.items[0].status==CopyStatus::Copied && retry.items[1].status==CopyStatus::Copied,"fresh compare and retry succeeds after space fault removed");
+            Check(Read(f.right+L"\\a")==Read(f.left+L"\\a") && Read(f.right+L"\\a:漢字")==Read(f.left+L"\\a:漢字") &&
+                Read(f.right+L"\\z-next")=="NEXT","retry copies exact main data and ADS"); f.NoStaging(f.right);
+        }
+    }
+}
 }
 int main() {
-    try { Success(); Scope(); Boundaries(); Paths(); AfterPublication(); std::cout<<checks<<" copy assertions passed\n"; return 0; }
+    try { Success(); Scope(); Boundaries(); Paths(); AfterPublication(); DiskSpace(); std::cout<<checks<<" copy assertions passed\n"; return 0; }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }
 }

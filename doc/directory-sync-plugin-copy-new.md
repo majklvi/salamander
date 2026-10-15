@@ -1,5 +1,7 @@
 # Directory Synchronization: kopie pouze do nových cílů
 
+Nové [ověření chyb nedostatku místa](directory-sync-plugin-copy-space.md): 743 copy assertions Debug/Release x64. Jde o řízené chyby WinAPI s reálnými částečnými staging daty; skutečně zaplněný svazek se kvůli oprávnění k připojení VHD netestoval.
+
 Dokončeno [nucené Release při kopírování/Verify a běžné ukončení hostitele](directory-sync-plugin-copy-unload.md): 547 lifecycle kontrol Debug/Release x64 a GUI přerušení přenosu před ukončením aplikace. Bez změny produkčního kódu.
 
 Navazující [došetření UI Automation a dokončené GUI Stop/Close](directory-sync-plugin-ui-automation.md) uzavírá běžný GUI případ na aktuální binárce; velké UIA průchody zůstávají odděleným známým omezením.
