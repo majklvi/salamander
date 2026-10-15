@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "../copy.h"
 #include "../recovery.h"
+#include "../overwrite.h"
 #include "copy_space_faults.h"
 #include <sddl.h>
 #include <winioctl.h>
@@ -75,9 +76,10 @@ struct Fixture {
     }
     ~Fixture() { SetCopyHook({}); SetRecoveryLogHook({}); dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::None,0,1); Cleanup(root); RemoveDirectoryW(ApiPath(root).c_str()); }
 };
-void Acl(const std::wstring& path,const wchar_t* text) {
+void Acl(const std::wstring& path,const wchar_t* text,bool protect=true) {
     PSECURITY_DESCRIPTOR sd=nullptr; Check(ConvertStringSecurityDescriptorToSecurityDescriptorW(text,SDDL_REVISION_1,&sd,nullptr)!=FALSE,"SDDL");
-    BOOL ok=SetFileSecurityW(ApiPath(path).c_str(),DACL_SECURITY_INFORMATION|PROTECTED_DACL_SECURITY_INFORMATION,sd);
+    BOOL ok=SetFileSecurityW(ApiPath(path).c_str(),DACL_SECURITY_INFORMATION|
+        (protect?PROTECTED_DACL_SECURITY_INFORMATION:UNPROTECTED_DACL_SECURITY_INFORMATION),sd);
     LocalFree(sd); Check(ok!=FALSE,"fixture DACL");
 }
 std::wstring Dacl(const std::wstring& path) {
@@ -384,6 +386,150 @@ void RecoveryPaths() {
     auto both=Save(f,plan,root,rows);
     Check(both.complete && both.items.size()==2 && both.items[0].saved!=both.items[1].saved && Read(both.items[1].saved)=="OLD TWO","same basename in separate directories maps without collisions");
 }
+Result OverwritePlan(Fixture& f) {
+    auto plan=f.Scan();
+    for(auto& row:plan.rows) if(row.hasLeft && row.hasRight && !row.left.directory && !row.right.directory) row.action=Action::CopyRight;
+    return plan;
+}
+OverwriteReport Replace(Fixture& f,const Result& plan,bool keep,const std::wstring& root,const std::vector<size_t>& selected={}) {
+    auto rows=selected; if(rows.empty()) for(size_t i=0;i<plan.rows.size();++i) rows.push_back(i);
+    return OverwriteFiles(plan,rows,keep,root,f.cancel,f.checking,f.progress);
+}
+void OverwriteSuccess() {
+    for(bool keep:{false,true}) for(bool protectedAcl:{false,true}) {
+        Fixture f; auto recovery=f.root+L"\\recovery"; f.Dir(recovery);
+        Put(f.left+L"\\a","NEW MAIN"); Put(f.left+L"\\a:new-only","NEW ADS"); Put(f.left+L"\\a:漢字","NEW SHARED");
+        Put(f.right+L"\\a","OLD MAIN"); Put(f.right+L"\\a:old-only","OLD ADS"); Put(f.right+L"\\a:漢字","OLD SHARED");
+        Acl(f.right+L"\\a",protectedAcl?L"D:P(A;;FA;;;OW)(A;;FR;;;BU)":L"D:(A;;FA;;;OW)(A;;FR;;;BU)",protectedAcl);
+        Acl(f.left+L"\\a",L"D:P(A;;FA;;;OW)(A;;FR;;;WD)");
+        auto targetAcl=Dacl(f.right+L"\\a"),sourceAcl=Dacl(f.left+L"\\a"); Check(targetAcl!=sourceAcl,"distinct source and target policies");
+        Check((targetAcl.rfind(L"D:P",0)==0)==protectedAcl,"fixture actually tests protected and unprotected DACLs");
+        Check(SetFileAttributesW(ApiPath(f.right+L"\\a").c_str(),FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM)!=FALSE,"old hidden and system flags");
+        Check(CreateHardLinkW(ApiPath(f.root+L"\\alias").c_str(),ApiPath(f.right+L"\\a").c_str(),nullptr)!=FALSE,"old target alias");
+        Check(SetFileAttributesW(ApiPath(f.left+L"\\a").c_str(),FILE_ATTRIBUTE_READONLY|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM)!=FALSE,"new selected flags");
+        Put(f.left+L"\\b","OLD LEFT"); Put(f.right+L"\\b","NEW RIGHT");
+        Acl(f.left+L"\\b",L"D:P(A;;FA;;;OW)(A;;FR;;;BU)"); auto reverseAcl=Dacl(f.left+L"\\b");
+        Acl(f.right+L"\\b",L"D:P(A;;FA;;;OW)(A;;FR;;;WD)");
+        Put(f.left+L"\\new","OMIT NEW"); Put(f.right+L"\\extra","OMIT EXTRA");
+        auto plan=OverwritePlan(f); uint64_t expectedTime=0;
+        for(auto& row:plan.rows) { if(row.path==L"b") row.action=Action::CopyLeft; if(row.path==L"a") expectedTime=row.left.time; if(row.path==L"extra") row.action=Action::DeleteRight; }
+        auto report=Replace(f,plan,keep,keep?recovery:L"invalid-unused-recovery-path");
+        if(report.error) std::cerr<<"overwrite success error "<<report.error<<"\n";
+        Check(report.complete && !report.error && report.items.size()==2 && report.omitted==2,"overwrites only visible existing file proposals");
+        for(const auto& item:report.items) Check(item.status==CopyStatus::Copied && item.published,"overwrite completes after publication");
+        Check(Read(f.right+L"\\a")=="NEW MAIN" && Read(f.right+L"\\a:new-only")=="NEW ADS" && Read(f.right+L"\\a:漢字")=="NEW SHARED","new target has exact new data and ADS");
+        Check(GetFileAttributesW(ApiPath(f.right+L"\\a:old-only").c_str())==INVALID_FILE_ATTRIBUTES,"old-only ADS is not merged into replacement");
+        Check(Read(f.left+L"\\b")=="NEW RIGHT" && Read(f.left+L"\\a")=="NEW MAIN","reverse overwrite and source preserved");
+        Check(Dacl(f.right+L"\\a")==targetAcl && Dacl(f.right+L"\\a")!=sourceAcl,"original protected or inherited target DACL retained");
+        Check(Dacl(f.left+L"\\b")==reverseAcl && Dacl(f.left+L"\\b")!=Dacl(f.right+L"\\b"),"reverse overwrite keeps left target permissions");
+        Check(Read(f.root+L"\\alias")=="OLD MAIN" && Read(f.root+L"\\alias:old-only")=="OLD ADS" && Read(f.root+L"\\alias:漢字")=="OLD SHARED","other old hardlink data and ADS unaffected");
+        Check(Dacl(f.root+L"\\alias")==targetAcl && GetFileAttributesW(ApiPath(f.root+L"\\alias").c_str())==(FILE_ATTRIBUTE_ARCHIVE|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM),"other hardlink permissions and attributes unchanged");
+        HANDLE h=CreateFileW(ApiPath(f.right+L"\\a").c_str(),FILE_READ_ATTRIBUTES,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);
+        FILETIME time{}; Check(h!=INVALID_HANDLE_VALUE && GetFileTime(h,nullptr,nullptr,&time),"replacement time handle"); CloseHandle(h);
+        Check(((uint64_t(time.dwHighDateTime)<<32)|time.dwLowDateTime)==expectedTime,"replacement mtime matches source");
+        Check((GetFileAttributesW(ApiPath(f.right+L"\\a").c_str())&(FILE_ATTRIBUTE_READONLY|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM))==
+            (FILE_ATTRIBUTE_READONLY|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM),"replacement selected source flags");
+        Check(Read(f.right+L"\\extra")=="OMIT EXTRA" && GetFileAttributesW(ApiPath(f.right+L"\\new").c_str())==INVALID_FILE_ATTRIBUTES,"no delete or new-file action executed");
+        Check(f.progress.completed==(keep?4u:2u),"progress counts recovery and replacement transfers");
+        if(keep) {
+            Check(report.recovery.complete && report.recovery.items.size()==2 && !report.journal.empty(),"verified recovery completes before replacements");
+            Check(Read(report.recovery.items[0].saved)=="OLD MAIN" && Read(report.recovery.items[0].saved+L":old-only")=="OLD ADS" &&
+                Read(report.recovery.items[0].saved+L":漢字")=="OLD SHARED" && Read(report.recovery.items[1].saved)=="OLD LEFT","recovery preserves only original target content");
+            auto log=Read(report.journal); Check(log.find("\"operation\":\"overwrite\"")!=std::string::npos && log.find("\"status\":\"replaced\"")!=std::string::npos &&
+                log.find("\"status\":\"complete\"")!=std::string::npos,"overwrite results and completion separately logged");
+            auto restored=f.root+L"\\restored-old";
+            Check(CopyFileW(ApiPath(report.recovery.items[0].saved).c_str(),ApiPath(restored).c_str(),TRUE)!=FALSE &&
+                Read(restored)=="OLD MAIN" && Read(restored+L":old-only")=="OLD ADS","manual restore original to unused name");
+        } else Check(report.recovery.items.empty() && report.recovery.journal.empty() && report.journal.empty(),"disabled recovery needs no folder or persistent journal");
+        f.NoStaging(f.left); f.NoStaging(f.right);
+    }
+}
+void OverwriteFailures() {
+    for(bool keep:{false,true}) for(int mode=0;mode<16;++mode) {
+        if(!keep && (mode==3 || mode==12 || mode==13)) continue;
+        Fixture f; auto recovery=f.root+L"\\recovery"; f.Dir(recovery);
+        Put(f.left+L"\\a",std::string(2*1024*1024,'N')); Put(f.left+L"\\a:new","NEW ADS");
+        Put(f.right+L"\\a","OLD"); Put(f.right+L"\\a:old","OLD ADS"); Put(f.left+L"\\b","NEW B"); Put(f.right+L"\\b","OLD B");
+        Acl(f.right+L"\\a",L"D:P(A;;FA;;;OW)(A;;FR;;;BU)");
+        if(mode==1) Check(SetFileAttributesW(ApiPath(f.right+L"\\a").c_str(),FILE_ATTRIBUTE_READONLY)!=FALSE,"read-only target fixture");
+        const DWORD originalAttributes=GetFileAttributesW(ApiPath(f.right+L"\\a").c_str());
+        auto plan=OverwritePlan(f); HANDLE lock=INVALID_HANDLE_VALUE; bool injected=false,published=false;
+        if(mode==0) Put(f.right+L"\\a","CHANGED",false);
+        if(mode==2) { lock=CreateFileW(ApiPath(f.right+L"\\a").c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr); Check(lock!=INVALID_HANDLE_VALUE,"exclusive overwrite target lock"); }
+        if(mode==7) dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::Publish,ERROR_DISK_FULL,keep?3:1);
+        if(mode==15) dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::MainData,ERROR_DISK_FULL,keep?3:1);
+        SetCopyHook([&](CopyPhase phase,const std::wstring& path) {
+            bool replacement=path.rfind(f.right+L"\\",0)==0;
+            if(phase==CopyPhase::Published && replacement) published=true;
+            if(injected) return;
+            if(mode==3 && !replacement && phase==CopyPhase::Copying && f.progress.copied>0) { injected=true; f.cancel=true; }
+            if(mode==4 && replacement && phase==CopyPhase::Copying && f.progress.copied>(keep?8u:0u)) { injected=true; f.cancel=true; }
+            if(mode==5 && replacement && phase==CopyPhase::Verifying && f.progress.verified>(keep?32u:0u)) { injected=true; f.cancel=true; }
+            if(mode==6 && replacement && phase==CopyPhase::Verifying) { injected=true; Put(path,"BAD",false); }
+            if(mode==8 && replacement && phase==CopyPhase::Publishing) { injected=true; Put(f.right+L"\\a","CHANGED",false); }
+            if(mode==9 && replacement && phase==CopyPhase::Publishing) { injected=true; Acl(f.right+L"\\a",L"D:P(A;;FA;;;OW)(A;;FR;;;WD)"); }
+            if(mode==10 && replacement && phase==CopyPhase::Published) { injected=true; Acl(path,L"D:P(D;;0x100;;;WD)(A;;FA;;;OW)"); }
+            if(mode==11 && replacement && phase==CopyPhase::Published) { injected=true; f.cancel=true; }
+            if(mode==14 && replacement && phase==CopyPhase::Preparing) { injected=true; Acl(path,L"D:P(D;;0x40000;;;WD)(A;;FA;;;OW)"); }
+        });
+        if(mode==12 || mode==13) SetRecoveryLogHook([&](const std::wstring& line)->DWORD {
+            if((mode==12 && line.find(L"\"event\":\"planned\"")!=std::wstring::npos && line.find(L"\"target\":")!=std::wstring::npos) ||
+               (mode==13 && published && line.find(L"\"event\":\"result\"")!=std::wstring::npos)) { injected=true; return ERROR_WRITE_FAULT; } return 0;
+        });
+        auto report=Replace(f,plan,keep,recovery); SetCopyHook({}); SetRecoveryLogHook({});
+        if(lock!=INVALID_HANDLE_VALUE) CloseHandle(lock);
+        Check(!report.complete && (report.error || report.stale || report.cancelled),"overwrite error never reported complete");
+        Check(Read(f.right+L"\\b")=="OLD B" && !report.items[1].published,"later file not replaced after error or Stop");
+        const bool changed=mode==0 || mode==8; const bool replaced=mode==10 || mode==11 || mode==13;
+        if(mode==10) Acl(f.right+L"\\a",L"D:P(A;;FA;;;OW)");
+        Check(Read(f.right+L"\\a")== (changed?"CHANGED":replaced?std::string(2*1024*1024,'N'):"OLD"),"pre-publication errors retain original; post-publication outcomes explicit");
+        Check(Read(f.left+L"\\a")==std::string(2*1024*1024,'N'),"overwrite errors never change source");
+        if(!replaced) Check(Read(f.right+L"\\a:old")=="OLD ADS","old ADS survive failed replacement");
+        if(mode==0) Check(report.stale,"changed target invalidates preview");
+        if(mode==2) Check(report.stale || report.error==ERROR_SHARING_VIOLATION || report.error==ERROR_ACCESS_DENIED,"exclusively locked target refuses overwrite");
+        if(mode==1) Check(report.error==ERROR_ACCESS_DENIED && report.recovery.items.empty() &&
+            GetFileAttributesW(ApiPath(f.right+L"\\a").c_str())==originalAttributes,"read-only target refused without clearing attributes or backing up");
+        if(mode==3) Check(injected && report.recovery.cancelled && report.items[0].status==CopyStatus::NotStarted,"backup Stop prevents all overwrites");
+        if(mode==4 || mode==5) Check(injected && report.cancelled && !report.items[0].published,"Stop during replacement copy or Verify prevents publication");
+        if(mode==7) Check(dirsync_test::SpaceFaultReached() && report.error==ERROR_DISK_FULL,"publish error preserved without removing original");
+        if(mode==15) Check(dirsync_test::SpaceFaultReached() && report.error==ERROR_DISK_FULL,"partial overwrite transfer disk full preserves original");
+        if(mode==8 || mode==9) Check(injected && report.error==ERROR_FILE_INVALID,"observed target data or DACL change prevents replacement");
+        if(mode==10) Check(injected && report.items[0].published && report.items[0].status==CopyStatus::Failed,"post-publication failure reports replacement left in place");
+        if(mode==11) Check(injected && report.items[0].status==CopyStatus::Copied && report.items[1].status==CopyStatus::Cancelled,"late Stop preserves completed replacement and prevents next");
+        if(mode==12 || mode==13) Check(injected && report.journalError==ERROR_WRITE_FAULT &&
+            Read(report.journal).find("\"event\":\"end\"")==std::string::npos,"execution log write failure leaves incomplete run and stops batch");
+        if(mode==14) Check(injected && report.error==ERROR_ACCESS_DENIED && !report.items[0].published,"required target DACL failure prevents publication");
+        if(keep && mode>=4) Check(report.recovery.complete && Read(report.recovery.items[0].saved)=="OLD" && Read(report.recovery.items[0].saved+L":old")=="OLD ADS","original recovery remains usable after overwrite failure");
+        f.NoStaging(f.right);
+    }
+    Fixture f; auto root=f.root+L"\\missing-recovery";
+    Put(f.left+L"\\a","NEW"); Put(f.right+L"\\a","OLD"); auto report=Replace(f,OverwritePlan(f),true,root);
+    Check(!report.complete && report.error && Read(f.right+L"\\a")=="OLD" && !report.items[0].published,"unavailable recovery folder prevents overwrite");
+    Fixture backup; auto recovery=backup.root+L"\\recovery"; backup.Dir(recovery);
+    Put(backup.left+L"\\a","NEW A"); Put(backup.right+L"\\a","OLD A"); Put(backup.left+L"\\b","NEW B"); Put(backup.right+L"\\b",std::string(2*1024*1024,'O'));
+    dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::MainData,ERROR_DISK_FULL,2);
+    auto incomplete=Replace(backup,OverwritePlan(backup),true,recovery);
+    Check(dirsync_test::SpaceFaultReached() && !incomplete.complete && incomplete.error==ERROR_DISK_FULL,"second original cannot be fully saved");
+    Check(incomplete.items[0].status==CopyStatus::NotStarted && incomplete.items[1].status==CopyStatus::NotStarted &&
+        Read(backup.right+L"\\a")=="OLD A" && Read(backup.right+L"\\b")==std::string(2*1024*1024,'O'),"incomplete recovery set prevents every overwrite");
+    Check(!incomplete.recovery.complete && incomplete.recovery.items[0].logged && Read(incomplete.recovery.items[0].saved)=="OLD A","completed earlier recovery retained without replacing its original");
+}
+void OverwritePaths() {
+    for(bool keep:{false,true}) {
+        Fixture f; auto a=f.left,b=f.right,recovery=f.root+L"\\recovery-漢字"; f.Dir(recovery);
+        for(int i=0;i<5;++i) { auto part=L"\\漢字-"+std::wstring(40,L'階')+std::to_wstring(i); a+=part; b+=part; f.Dir(a); f.Dir(b); }
+        auto name=L"\\"+std::wstring(180,L'x')+L"-😀.txt";
+        Put(a+name,"NEW"); Put(a+name+L":nový","NEW ADS"); Put(b+name,""); Put(b+name+L":starý","OLD ADS");
+        auto report=Replace(f,OverwritePlan(f),keep,recovery);
+        Check(report.complete && report.items.size()==1 && report.items[0].target.size()>260,"overwrite long Unicode paths and basename");
+        Check(Read(b+name)=="NEW" && Read(b+name+L":nový")=="NEW ADS","long replacement data and ADS");
+        if(keep) Check(Read(report.recovery.items[0].saved).empty() && Read(report.recovery.items[0].saved+L":starý")=="OLD ADS","long empty original and old ADS retained");
+    }
+    Fixture f; auto root=f.root+L"\\recovery"; f.Dir(root);
+    Put(f.left+L"\\a","NEW A"); Put(f.right+L"\\a","OLD A"); Put(f.left+L"\\b","NEW B"); Put(f.right+L"\\b","OLD B");
+    auto selected=Replace(f,OverwritePlan(f),true,root,{0,0,size_t(-1)});
+    Check(selected.complete && selected.items.size()==1 && Read(f.right+L"\\a")=="NEW A" && Read(f.right+L"\\b")=="OLD B","only frozen visible rows replaced and duplicates ignored");
+}
 void DiskSpace() {
     using dirsync_test::SpaceFault;
     for(auto fault:{SpaceFault::Reserve,SpaceFault::MainData,SpaceFault::NamedStream,SpaceFault::RetainStage,SpaceFault::Publish}) {
@@ -431,6 +577,7 @@ void DiskSpace() {
 }
 int main() {
     try { Success(); Scope(); ModifyOnlyDestination(); Boundaries(); Paths(); AfterPublication(); DiskSpace();
-        RecoverySuccess(); RecoveryFailures(); RecoveryPaths(); std::cout<<checks<<" copy/recovery assertions passed\n"; return 0; }
+        RecoverySuccess(); RecoveryFailures(); RecoveryPaths(); OverwriteSuccess(); OverwriteFailures(); OverwritePaths();
+        std::cout<<checks<<" copy/recovery/overwrite assertions passed\n"; return 0; }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }
 }

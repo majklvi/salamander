@@ -1,5 +1,7 @@
 # Directory Synchronization: kopie pouze do nových cílů
 
+**Nová etapa:** přidán samostatný příkaz [Overwrite files podle D4/D5](directory-sync-plugin-overwrite.md). Copy new files dál přepis nevykoná. Aktuální společná evidence: 2 663 kontrol adaptéru a 1 029 lifecycle kontrol Debug/Release x64, 1 213 layout kontrol. Níže uvedená copy-only omezení popisují tehdejší etapu, mazání zůstává neimplementované.
+
 **Navazující stav:** implementováno [uchování původních cílových souborů do vlastní složky obnovy](directory-sync-plugin-recovery.md) s jednoduchým JSONL protokolem. Aktuálně 1 281 společných copy/recovery kontrol a 725 lifecycle kontrol v Debug i Release x64. Níže uvedené počty a zmínky o neimplementované obnově popisují starší copy-only etapu; přepisy a mazání zůstávají neimplementované.
 
 Dokončen [skutečný NTFS VHD test nedostatku místa](directory-sync-plugin-vhd-results.md), včetně GUI chyby 112 a nového pokusu. Opraven nadbytečný zápis zděděné DACL při právech Modify; aktuálně 766 copy assertions Debug/Release x64.

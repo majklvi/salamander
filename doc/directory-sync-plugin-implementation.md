@@ -1,5 +1,7 @@
 # Directory Synchronization: první etapa
 
+**Nová etapa:** implementovány [přepisy podle D4/D5](directory-sync-plugin-overwrite.md), s volitelnou obnovou, stagingem, Verify, zachováním cílové DACL a Stop. Dokončeny GUI přepisy ON/OFF, souhrny, nové Compare a panelový refresh; také force Release při Copy/Verify a běžné ukončení zahájené během přenosu. Aktuálně 2 663 společných kontrol adaptéru a 1 577 lifecycle kontrol Debug/Release x64, 1 213 layout kontrol. Starší rozsah níže je historický; mazání/SMB/SDK změny nadále nejsou součástí implementace.
+
 **Navazující stav:** implementováno [samostatné uchování originálů s protokolem](directory-sync-plugin-recovery.md), bez přepisů či mazání. Aktuálně 1 281 společných copy/recovery kontrol, 725 lifecycle kontrol v Debug i Release x64 a 1 174 kontrol rozšířeného dialogu. Níže zůstává historický popis první etapy.
 
 Dokončen [skutečný NTFS VHD test nedostatku místa](directory-sync-plugin-vhd-results.md), včetně GUI chyby 112 a nového pokusu. Opraven nadbytečný zápis zděděné DACL při právech Modify; aktuálně 766 copy assertions Debug/Release x64. Dřívější zmínky o neprovedeném skutečném testu popisují stav tehdejších etap.

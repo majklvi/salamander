@@ -1,5 +1,7 @@
 # Directory Synchronization: mapování jádra a nejmenšího adaptéru
 
+**Nová etapa:** implementovány [přepisy existujících souborů](directory-sync-plugin-overwrite.md), se zapamatovanou volbou obnovy a zachováním původní cílové DACL. Bez mazání, SMB testů a změn SDK/hostitele. Níže jsou oddělené historické návrhy a předchozí etapy.
+
 **Aktuální navazující etapa:** implementováno [samostatné uchování originálů a JSONL protokol](directory-sync-plugin-recovery.md) nad stejným přenosem jako nové kopie. Originály se nemění; přepis ani mazání nejsou implementované. Níže uvedené budoucí kroky zůstávají návrhem.
 
 Následný pokyn uživatele doplnil zapamatovanou volbu uchování originálů (výchozí zapnuto, lze vypnout). Níže uvedená povinná obnova před přepisem/mazáním předpokládá zapnutou volbu; budoucí executor musí vypnutí respektovat a uvést v potvrzení. Ostatní běžné kontroly a D5 cíle platí dál.

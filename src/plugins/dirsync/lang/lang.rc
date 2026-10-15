@@ -27,7 +27,7 @@ BEGIN
     CONTROL "&Empty folders", IDC_EMPTY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 452, 67, 100, 12
     DEFPUSHBUTTON "&Compare", IDC_COMPARE, 8, 86, 70, 16
     PUSHBUTTON "S&top", IDC_STOP, 86, 86, 60, 16
-    LTEXT "New copies and recovery copies only. No overwrites or deletions.", -1, 157, 89, 440, 12
+    LTEXT "Copy new files, overwrite files, or save originals. No deletions.", -1, 157, 89, 440, 12
     CONTROL "E&qual", IDC_EQUAL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 112, 60, 12
     CONTROL "&Different", IDC_DIFFERENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 72, 112, 68, 12
     CONTROL "Si&ngle-sided", IDC_SINGLE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 148, 112, 85, 12
@@ -39,6 +39,7 @@ BEGIN
     PUSHBUTTON "Apply to selected ro&ws", IDC_APPLY, 162, 305, 110, 16
     PUSHBUTTON "Plan summar&y", IDC_SUMMARY, 280, 305, 90, 16
     PUSHBUTTON "Copy new files...", IDC_COPY_NEW, 378, 305, 115, 16
+    PUSHBUTTON "Overwrite files...", IDC_OVERWRITE, 501, 305, 101, 16
     CONTROL "&Keep originals (before overwrites/deletions)", IDC_KEEP_ORIGINALS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 330, 240, 12
     LTEXT "Recovery copies use additional disk space.", IDC_RECOVERY_SPACE, 260, 331, 342, 10
     LTEXT "Recovery folder:", IDC_RECOVERY_LABEL, 8, 354, 74, 10
@@ -49,6 +50,18 @@ BEGIN
 END
 STRINGTABLE
 BEGIN
+    IDS_OVERWRITE_PROGRESS "Backup/overwrite: transfer %llu of %llu; copied %llu bytes; Verify read %llu bytes; complete %llu"
+    IDS_OVERWRITE_AGAIN "Overwrite run finished. Inspect the result and compare again before any further action."
+    IDS_OVERWRITE_EMPTY "No visible copy proposal has an existing supported file on both sides. Nothing to overwrite."
+    IDS_OVERWRITE_CONFIRM "Overwrite existing target files for %llu visible copy proposals?\n\nNew main data: %llu bytes (ADS are additional).\nOriginal main data: %llu bytes (additional recovery space when enabled).\nOther visible non-skip proposals omitted: %llu.\n\nNew targets and deletions are omitted. Preserves original target permissions; replaces the file name after staging and Verify. Read-only targets are refused without changing their attributes. Stop preserves completed replacements; there is no automatic rollback."
+    IDS_OVERWRITE_ON "Keeping originals: ON. All originals must be independently saved, verified and logged before any overwrite."
+    IDS_OVERWRITE_OFF "Keeping originals: OFF. Overwritten data and old ADS will have NO recovery copy from this run."
+    IDS_OVERWRITE_RESULT "Overwrite result\n\nReplaced and verified: %llu\nErrors/cancelled items: %llu\nNot started: %llu\nOther visible proposals omitted: %llu\n\nCompare again."
+    IDS_OVERWRITE_PUBLISHED_ERROR "The replacement was published, but final checks failed. It remains in place. Inspect the target and any recovery copy."
+    IDS_OVERWRITE_FAILED "The overwrite worker failed. Some files may have been replaced. Inspect both trees and any recovery folder before retrying."
+    IDS_OVERWRITE_RECOVERY "Original copies verified and logged: %llu of %llu"
+    IDS_OVERWRITE_INCOMPLETE "The run is incomplete. Completed replacements remain; inspect the result and any manifests."
+    IDS_OVERWRITE_RECOVERY_ERROR "Preserving an original failed; no overwrites were started."
     IDS_SETTINGS_FAILED "The recovery setting could not be saved. It remains in effect for this session only."
     IDS_RECOVERY_DISABLED "Keeping originals is disabled. Enable Keep originals to create recovery copies."
     IDS_RECOVERY_SPACE_ON "Recovery copies use additional disk space."
@@ -63,7 +76,7 @@ BEGIN
     IDS_SAVE_FAILED "The recovery worker failed. Originals remain unchanged. Inspect the recovery folder and manifest before retrying."
     IDS_SAVE_PUBLISHED_ERROR "The recovery copy was published, but final checks failed. Inspect it before restoring."
     IDS_NAME "Directory Synchronization"
-    IDS_DESCRIPTION "Compare Windows folders and review actions. Copy files to new targets or save independent recovery copies of original targets, with staging and verification. Overwrites and deletions are not supported."
+    IDS_DESCRIPTION "Compare Windows folders and review actions. Copy new files, overwrite existing files with optional recovery copies, or separately save originals. Uses staging and verification. Deletions are not supported."
     IDS_MENU "Directory synchronization..."
     IDS_INPUT_ERROR "Both panels must contain Windows folders with complete paths and decodable selected names. The current SDK cannot provide a usable input for these panels."
     IDS_SCAN "Scanning: %llu entries; compared: %llu"
@@ -73,7 +86,7 @@ BEGIN
     IDS_DONE "Complete: %llu rows; visible: %llu; hidden: %llu; blocked/conflicts: %llu"
     IDS_CANCELLED "Cancelled. Partial results contain no actionable proposals."
     IDS_FAILED "Comparison failed. Results have been discarded."
-    IDS_SUMMARY "Proposals only. Use Copy new files for a separate confirmation; overwrites and deletions cannot be executed.\n\nVisible proposed copies to right: %llu (%llu bytes)\nVisible proposed copies to left: %llu (%llu bytes)\nVisible proposed deletions on right: %llu\nVisible unresolved: %llu\nBlocked/conflicts (all rows): %llu\nHidden rows: %llu"
+    IDS_SUMMARY "Proposals only. Copy new files and Overwrite files each require a separate confirmation. Deletions cannot be executed.\n\nVisible proposed copies to right: %llu (%llu bytes)\nVisible proposed copies to left: %llu (%llu bytes)\nVisible proposed deletions on right: %llu\nVisible unresolved: %llu\nBlocked/conflicts (all rows): %llu\nHidden rows: %llu"
     IDS_COPY_PROGRESS "Copy/check: file %llu of %llu; copied %llu bytes; Verify read %llu bytes; complete %llu"
     IDS_COPY_AGAIN "Copy run finished. Compare again before any further action."
     IDS_COPY_EMPTY "No visible file action has a missing target. Existing targets, deletions, empty-folder actions and unresolved items cannot be executed."
@@ -85,7 +98,7 @@ BEGIN
     IDS_COPY_STOPPED "Stopped. Completed new files remain in place."
     IDS_COPY_FAILED "The copy worker failed. Completed files may remain. Compare again and inspect the destination before retrying."
     IDS_SELECT_ROW "Select one or more rows first. Blocked and conflicting rows cannot receive actions."
-    IDS_HELP "Choose the two Windows folders and Compare. Only selected uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nChange actions on selected rows and review Plan summary. Only visible actions enter that summary; blocked/conflicting rows always stay visible. Copy new files executes only visible file copies with missing targets after a separate confirmation. Existing targets, deletions and empty-folder actions are omitted.\n\nKeep originals is enabled by default and can be switched off. This setting and the recovery folder are remembered for this plugin. Disabling it creates no recovery copies and leaves existing backups in place. Overwrites and deletions are still unavailable in this version.\n\nSave originals separately saves original target files for visible copy proposals with an existing file on both sides. Enter an existing recovery folder outside both compared trees. This creates independent verified copies and a manifest; originals remain unchanged and no proposal is executed. Permissions inherit from the recovery folder.\n\nData and metadata are verified; Stop preserves completed files. Compare again after either run."
+    IDS_HELP "Choose the two Windows folders and Compare. Only selected uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nChange actions on selected rows and review Plan summary. Only visible actions enter that summary; blocked/conflicting rows always stay visible. Copy new files executes only visible file copies with missing targets after a separate confirmation. Existing targets, deletions and empty-folder actions are omitted.\n\nKeep originals is enabled by default and can be switched off. This setting and the recovery folder are remembered for this plugin. Disabling it creates no recovery copies and leaves existing backups in place. Deletions are unavailable in this version.\n\nOverwrite files separately confirms replacement of visible existing-file targets. The confirmation states whether recovery is ON or OFF. When ON, all original targets must first be saved and verified outside both trees. When OFF, overwritten data and old ADS have no recovery copy from this run. Replacements keep original target permissions. Read-only targets are refused. Stop leaves completed replacements in place.\n\nSave originals separately saves original target files for visible copy proposals with an existing file on both sides. Enter an existing recovery folder outside both compared trees. This creates independent verified copies and a manifest; originals remain unchanged and no proposal is executed. Permissions inherit from the recovery folder.\n\nData and metadata are verified; Stop preserves completed files. Compare again after either run."
     220 "Relative path"
     221 "Left size"
     222 "Left modified"

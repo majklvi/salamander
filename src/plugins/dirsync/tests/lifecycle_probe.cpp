@@ -13,6 +13,7 @@ std::atomic<bool> copyBoundary{false};
 INT_PTR CALLBACK EmptyDialog(HWND,UINT,WPARAM,LPARAM) { return FALSE; }
 bool RecoveryLogged()
 {
+    if(probe->overwriting) return !probe->overwriteReport.keepOriginals || probe->overwriteReport.recovery.complete;
     return !probe->saving || (!probe->recoveryReport.journalError && !probe->recoveryReport.complete &&
         std::all_of(probe->recoveryReport.items.begin(),probe->recoveryReport.items.end(),
             [](const dirsync::RecoveryItem& item) { return item.logged; }));
@@ -78,7 +79,8 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
     } catch(...) { settings=previous; return 0; }
 }
 // Drive the real Stop/Close handlers without accessibility enumeration timing.
-// Test-only mode bits: 1 = Verify, 2 = interrupt after one completed file, 4 = save originals.
+// Test-only mode bits: 1 = Verify, 2 = after one completed file, 4 = save originals,
+// 8 = overwrite, 16 = disable overwrite recovery.
 extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,const wchar_t* right,BOOL mode)
 {
     try {
@@ -86,7 +88,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,
         probe=std::make_unique<Preview>(); probe->left=left; probe->right=right;
         probe->result=dirsync::Compare(left,right,probe->options,probe->cancel,probe->progress);
         if(probe->result.rows.size()!=((mode&2)?3u:2u)) { probe.reset(); return FALSE; }
-        if(mode&4) {
+        if(mode&(4|8)) {
             for(auto& row:probe->result.rows) row.action=dirsync::Action::CopyRight;
             probe->recoveryRoot=probe->left.substr(0,probe->left.find_last_of(L'\\'))+L"\\recovery";
         }
@@ -95,7 +97,9 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,
         probe->window=CreateDialogIndirectParamW(GetModuleHandleW(nullptr),&dialog.dialog,nullptr,EmptyDialog,0);
         if(!probe->window) { probe.reset(); return FALSE; }
         SetWindowLongPtrW(probe->window,DWLP_USER,reinterpret_cast<LONG_PTR>(probe.get()));
-        copyBoundary=false; finished=false; active=probe.get(); probe->saving=(mode&4)!=0; probe->copying=!probe->saving; probe->running=true;
+        copyBoundary=false; finished=false; active=probe.get(); probe->saving=(mode&4)!=0;
+        probe->overwriting=(mode&8)!=0; probe->copying=!probe->saving && !probe->overwriting; probe->running=true;
+        probe->transferCount=probe->overwriting && !(mode&16)?probe->result.rows.size():0;
         probe->worker=std::thread([mode] {
             try {
                 dirsync::SetCopyHook([mode,stage=std::wstring{},copiedBase=uint64_t{0},verifiedBase=uint64_t{0}]
@@ -103,7 +107,8 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,
                     if(phase==dirsync::CopyPhase::Copying && stage!=path) {
                         stage=path; copiedBase=probe->copyProgress.copied.load(); verifiedBase=probe->copyProgress.verified.load();
                     }
-                    if((mode&2) && !probe->copyProgress.completed) return;
+                    if((mode&2) && probe->copyProgress.completed<=probe->transferCount) return;
+                    if((mode&8) && path.rfind(probe->right+L"\\",0)!=0) return;
                     bool reached=(mode&1) ? phase==dirsync::CopyPhase::Verifying && probe->copyProgress.verified>verifiedBase :
                         phase==dirsync::CopyPhase::Copying && probe->copyProgress.copied>copiedBase;
                     if(!reached || copyBoundary.exchange(true)) return;
@@ -111,7 +116,11 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,
                     while(!probe->cancel && GetTickCount64()<deadline) Sleep(1);
                 });
                 std::vector<size_t> rows{0,1}; if(mode&2) rows.push_back(2);
-                if(mode&4) {
+                if(mode&8) {
+                    probe->overwriteReport=dirsync::OverwriteFiles(probe->result,rows,!(mode&16),probe->recoveryRoot,probe->cancel,probe->progress,probe->copyProgress);
+                    probe->copyReport.cancelled=probe->overwriteReport.cancelled;
+                    probe->copyReport.items=probe->overwriteReport.items;
+                } else if(mode&4) {
                     probe->recoveryReport=dirsync::SaveOriginals(probe->result,rows,probe->recoveryRoot,probe->cancel,probe->progress,probe->copyProgress);
                     probe->copyReport.cancelled=probe->recoveryReport.cancelled;
                     for(const auto& item:probe->recoveryReport.items) probe->copyReport.items.push_back(item.copy);
@@ -128,7 +137,9 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeCopyStatus()
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeCopyRelease(BOOL force)
 {
     if(!probe) return plugin.Release(nullptr,force)?1u:0u;
-    const size_t completed=static_cast<size_t>(probe->copyProgress.completed.load());
+    const size_t backups=probe->overwriting?static_cast<size_t>(probe->transferCount):0;
+    const size_t total=static_cast<size_t>(probe->copyProgress.completed.load());
+    const size_t completed=total>backups?total-backups:0;
     unsigned status=plugin.Release(nullptr,force)?1u:0u;
     if(!force) return status;
     if(probe->cancel && !probe->worker.joinable() && finished && !probe->failed) status|=2;
@@ -140,7 +151,7 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeCopyRelease(BOOL force)
     for(size_t i=0;i<completed && preserved;++i)
         preserved=r.items[i].status==dirsync::CopyStatus::Copied && r.items[i].published;
     if(preserved && !r.items[completed].published && r.items[completed].remainingStage.empty()) status|=8;
-    if(probe->copyProgress.completed==completed) status|=16;
+    if(probe->copyProgress.completed==completed+backups) status|=16;
     if(IsWindow(probe->window)) DestroyWindow(probe->window);
     probe->window=nullptr; active=nullptr; probe.reset();
     return status;
@@ -157,7 +168,8 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeCopyCancel(BOOL close)
     const auto& r=probe->copyReport;
     if(RecoveryLogged() && r.cancelled && r.items.size()==2 && r.items[0].status==dirsync::CopyStatus::Cancelled &&
        r.items[1].status==dirsync::CopyStatus::NotStarted) status|=8;
-    if(r.items.size()==2 && !r.items[0].published && r.items[0].remainingStage.empty() && !probe->copyProgress.completed) status|=16;
+    if(r.items.size()==2 && !r.items[0].published && r.items[0].remainingStage.empty() &&
+        probe->copyProgress.completed==(probe->overwriting?probe->transferCount:0)) status|=16;
     DestroyWindow(probe->window); probe->window=nullptr; active=nullptr; probe.reset();
     return status;
 }
@@ -192,7 +204,7 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeStatus()
 }
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeRelease(BOOL force)
 {
-    if(probe && (probe->copying || probe->saving)) return ProbeCopyRelease(force);
+    if(probe && (probe->copying || probe->saving || probe->overwriting)) return ProbeCopyRelease(force);
     unsigned status = plugin.Release(nullptr, force) ? 1u : 0u;
     if (force && probe)
     {

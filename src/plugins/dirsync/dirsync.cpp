@@ -6,6 +6,7 @@
 #include "engine.h"
 #include "copy.h"
 #include "recovery.h"
+#include "overwrite.h"
 #include "resource.h"
 #include <thread>
 #include <memory>
@@ -105,7 +106,7 @@ void ConfigureDark(HWND dialog)
 }
 struct Preview
 {
-    enum class Intent { None, Apply, Summary, Copy, Save };
+    enum class Intent { None, Apply, Summary, Copy, Save, Overwrite };
     HWND window = nullptr;
     std::wstring left, right;
     std::wstring panelLeft, panelRight;
@@ -121,10 +122,13 @@ struct Preview
     dirsync::CopyProgress copyProgress;
     dirsync::CopyReport copyReport;
     dirsync::RecoveryReport recoveryReport;
+    dirsync::OverwriteReport overwriteReport;
     std::wstring recoveryRoot;
     std::vector<size_t> copyRows;
     bool copying = false, hasCopyReport = false;
     bool saving = false, hasRecoveryReport = false;
+    bool overwriting=false,hasOverwriteReport=false;
+    uint64_t transferCount=0;
     std::thread worker;
     SIZE initialClient{}, minimumWindow{};
     std::vector<std::pair<HWND, RECT>> controls;
@@ -170,9 +174,9 @@ void Status(Preview& p)
     if (p.running)
     {
         wchar_t text[256]{};
-        if (p.copying || p.saving) {
-            swprintf_s(text, Text(p.saving?IDS_SAVE_PROGRESS:IDS_COPY_PROGRESS).c_str(), p.copyProgress.item.load()+1,
-                uint64_t(p.copyRows.size()), p.copyProgress.copied.load(), p.copyProgress.verified.load(),
+        if (p.copying || p.saving || p.overwriting) {
+            swprintf_s(text, Text(p.overwriting?IDS_OVERWRITE_PROGRESS:p.saving?IDS_SAVE_PROGRESS:IDS_COPY_PROGRESS).c_str(), p.copyProgress.item.load()+1,
+                p.overwriting?p.transferCount:uint64_t(p.copyRows.size()), p.copyProgress.copied.load(), p.copyProgress.verified.load(),
                 p.copyProgress.completed.load());
             SetDlgItemTextW(p.window,IDC_STATUS,text); return;
         }
@@ -184,6 +188,7 @@ void Status(Preview& p)
     }
     if (p.hasCopyReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_COPY_AGAIN).c_str()); return; }
     if (p.hasRecoveryReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_SAVE_AGAIN).c_str()); return; }
+    if (p.hasOverwriteReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_OVERWRITE_AGAIN).c_str()); return; }
     if (p.result.stale && !p.result.cancelled)
     { SetDlgItemTextW(p.window, IDC_STATUS, Text(IDS_STALE).c_str()); return; }
     if (p.failed || p.result.cancelled)
@@ -220,7 +225,7 @@ void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
                    IDC_EMPTY, IDC_COMPARE, IDC_ACTION, IDC_APPLY, IDC_SUMMARY, IDC_EQUAL,
-                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS})
+                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS, IDC_OVERWRITE})
         EnableWindow(GetDlgItem(p.window, id), !busy);
     for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL,IDC_SAVE_ORIGINALS})
         EnableWindow(GetDlgItem(p.window,id),!busy && settings.keepOriginals);
@@ -237,6 +242,7 @@ void InvalidatePlan(Preview& p)
     p.result = {}; p.visible.clear(); p.failed = false;
     p.hasCopyReport = false;
     p.hasRecoveryReport = false;
+    p.hasOverwriteReport = false;
     ListView_SetItemCount(GetDlgItem(p.window, IDC_LIST), 0);
     Status(p);
 }
@@ -447,6 +453,75 @@ void SaveOriginals(Preview& p)
         SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_COMPARE)),TRUE);
     }
 }
+void OverwriteSummary(Preview& p)
+{
+    const auto& report=p.overwriteReport;
+    uint64_t copied=0,failed=0,pending=0,recovered=0; std::wstring details;
+    for(const auto& item:report.items) {
+        if(item.status==dirsync::CopyStatus::Copied) ++copied;
+        else if(item.status==dirsync::CopyStatus::NotStarted) ++pending;
+        else ++failed;
+        if(details.empty() && item.error) details=L"\n\n"+item.target+L"\n"+Text(IDS_COPY_ERROR)+Number(item.error)+
+            (item.published?L"\n"+Text(IDS_OVERWRITE_PUBLISHED_ERROR):L"");
+        if(!item.remainingStage.empty()) details+=L"\n"+Text(IDS_COPY_REMAINDER)+item.remainingStage;
+    }
+    for(const auto& item:report.recovery.items) {
+        if(item.copy.status==dirsync::CopyStatus::Copied && item.logged) ++recovered;
+        if(item.copy.error) {
+            details+=L"\n\n"+Text(IDS_OVERWRITE_RECOVERY_ERROR)+L"\n"+item.original+L"\n"+Text(IDS_COPY_ERROR)+Number(item.copy.error);
+            if(!item.copy.remainingStage.empty()) details+=L"\n"+Text(IDS_COPY_REMAINDER)+item.copy.remainingStage;
+            break;
+        }
+    }
+    wchar_t text[1024]{};
+    swprintf_s(text,Text(IDS_OVERWRITE_RESULT).c_str(),copied,failed,pending,uint64_t(report.omitted));
+    auto message=std::wstring(text)+L"\n\n"+Text(report.keepOriginals?IDS_OVERWRITE_ON:IDS_OVERWRITE_OFF);
+    if(report.keepOriginals) {
+        wchar_t recovery[256]{}; swprintf_s(recovery,Text(IDS_OVERWRITE_RECOVERY).c_str(),recovered,uint64_t(report.items.size()));
+        message+=L"\n"+std::wstring(recovery)+L"\n"+report.recovery.journal+L"\n"+report.journal;
+    }
+    if(!report.complete) message+=L"\n"+Text(IDS_OVERWRITE_INCOMPLETE);
+    if(report.error) message+=L"\n"+Text(IDS_COPY_ERROR)+Number(report.error);
+    if(report.stale) message+=L"\n"+Text(IDS_STALE);
+    message+=details;
+    DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OK|MB_ICONINFORMATION);
+}
+void Overwrite(Preview& p)
+{
+    p.copyRows.clear(); uint64_t bytes=0,originalBytes=0,omitted=0;
+    for(size_t i:p.visible) {
+        const auto& row=p.result.rows[i];
+        if(dirsync::IsFileOverwrite(row)) {
+            p.copyRows.push_back(i); bool toRight=row.action==dirsync::Action::CopyRight;
+            bytes+=(toRight?row.left:row.right).size; originalBytes+=(toRight?row.right:row.left).size;
+        } else if(row.action!=dirsync::Action::None) ++omitted;
+    }
+    if(p.copyRows.empty()) { Message(p.window,IDS_OVERWRITE_EMPTY); return; }
+    const bool keep=settings.keepOriginals; const auto root=ControlText(p.window,IDC_RECOVERY_ROOT);
+    if(keep && root.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
+    wchar_t confirm[2048]{};
+    swprintf_s(confirm,Text(IDS_OVERWRITE_CONFIRM).c_str(),uint64_t(p.copyRows.size()),bytes,originalBytes,omitted);
+    auto message=std::wstring(confirm)+L"\n\n"+Text(keep?IDS_OVERWRITE_ON:IDS_OVERWRITE_OFF)+(keep?L"\n"+root:L"");
+    if(DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONWARNING)!=IDOK) return;
+    p.cancel=false; p.failed=false; p.overwriting=true; p.running=true;
+    p.hasCopyReport=p.hasRecoveryReport=p.hasOverwriteReport=false; p.overwriteReport={};
+    p.transferCount=uint64_t(p.copyRows.size())*(keep?2:1);
+    p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
+    p.copyProgress.phase=dirsync::CopyPhase::Checking;
+    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP)),TRUE);
+    try {
+        const auto rows=p.visible;
+        p.worker=std::thread([&p,rows,keep,root]() {
+            try { p.overwriteReport=dirsync::OverwriteFiles(p.result,rows,keep,root,p.cancel,p.progress,p.copyProgress); }
+            catch(...) { p.failed=true; }
+            PostMessageW(p.window,Done,0,0);
+        });
+        SetTimer(p.window,1,150,nullptr);
+    } catch(...) {
+        p.failed=true; p.running=false; p.overwriting=false; Busy(p,false); Status(p);
+        SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_COMPARE)),TRUE);
+    }
+}
 INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
 {
     Preview* p = reinterpret_cast<Preview*>(GetWindowLongPtrW(window, DWLP_USER));
@@ -508,7 +583,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_SAVE_ORIGINALS) { r.top += dy; r.bottom += dy; r.left += dx; r.right += dx; }
                 else if (id == IDC_RECOVERY_LABEL) { r.top += dy; r.bottom += dy; }
                 else if (id == IDC_KEEP_ORIGINALS || id == IDC_RECOVERY_SPACE) { r.top += dy; r.bottom += dy; }
-                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDCANCEL)
+                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDC_OVERWRITE || id == IDCANCEL)
                 { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
             }
@@ -528,6 +603,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             if (!p->recoveryReport.runDirectory.empty()) NotifyPath(p->recoveryRoot);
             if (!p->closing) { if (p->failed) Message(window,IDS_SAVE_FAILED); else RecoverySummary(*p); }
         }
+        if(p->overwriting) {
+            p->overwriting=false; p->hasOverwriteReport=true; p->result.stale=true; p->result.snapshot.reset();
+            for(const auto& path:{p->left,p->right}) NotifyPath(path);
+            if(!p->overwriteReport.recovery.runDirectory.empty()) NotifyPath(ControlText(window,IDC_RECOVERY_ROOT));
+            if(!p->closing) { if(p->failed) Message(window,IDS_OVERWRITE_FAILED); else OverwriteSummary(*p); }
+        }
         if (p->closing) { PersistSettings(window); EndDialog(window, 0); }
         else
         {
@@ -544,6 +625,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (intent == Preview::Intent::Summary) Summary(*p);
                 else if (intent == Preview::Intent::Copy) CopyNew(*p);
                 else if (intent == Preview::Intent::Save) SaveOriginals(*p);
+                else if (intent == Preview::Intent::Overwrite) Overwrite(*p);
             }
         }
         return TRUE;
@@ -562,6 +644,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_SUMMARY: ValidatePreview(*p, Preview::Intent::Summary); return TRUE;
         case IDC_COPY_NEW: ValidatePreview(*p, Preview::Intent::Copy); return TRUE;
         case IDC_SAVE_ORIGINALS: ValidatePreview(*p, Preview::Intent::Save); return TRUE;
+        case IDC_OVERWRITE: ValidatePreview(*p,Preview::Intent::Overwrite); return TRUE;
         case IDC_KEEP_ORIGINALS:
             if(!p->running) { settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS); Busy(*p,false); PersistSettings(window); }
             return TRUE;

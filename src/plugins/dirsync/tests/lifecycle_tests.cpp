@@ -3,6 +3,7 @@
 #define NOMINMAX
 #include <windows.h>
 #include <winioctl.h>
+#include <algorithm>
 #include <string>
 #include <vector>
 #include <iostream>
@@ -24,11 +25,11 @@ struct Fixture
         Dir(root); left=root+L"\\left"; right=root+L"\\right"; Dir(left); Dir(right);
     }
     void Dir(const std::wstring& path) { Check(CreateDirectoryW(path.c_str(),nullptr)!=FALSE,"fixture directory"); directories.push_back(path); }
-    void Data(const std::wstring& path)
+    void Data(const std::wstring& path,BYTE value=42)
     {
         HANDLE f=CreateFileW(path.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);
         Check(f!=INVALID_HANDLE_VALUE,"copy fixture handle"); files.push_back(path);
-        std::vector<BYTE> data(1024*1024,42); DWORD n=0;
+        std::vector<BYTE> data(1024*1024,value); DWORD n=0;
         bool ok=WriteFile(f,data.data(),DWORD(data.size()),&n,nullptr)!=FALSE && n==data.size();
         CloseHandle(f); Check(ok,"copy fixture data");
     }
@@ -109,11 +110,11 @@ void Run(const std::wstring& dll,Fixture& f,bool content)
     }
     std::cout<<(content?"content":"scan")<<": force Release + immediate FreeLibrary passed\n";
 }
-void CopyControls(const std::wstring& dll,bool verify,bool close,bool recovery=false)
+void CopyControls(const std::wstring& dll,bool verify,bool close,bool recovery=false,bool overwrite=false,bool keep=true)
 {
     Fixture f; f.Data(f.left+L"\\a"); f.Data(f.left+L"\\b"); Module module(dll);
-    if(recovery) { f.Data(f.right+L"\\a"); f.Data(f.right+L"\\b"); f.Dir(f.root+L"\\recovery"); }
-    Check(module.copyStart(f.left.c_str(),f.right.c_str(),(verify?1:0)|(recovery?4:0))!=FALSE,"start copy lifecycle worker");
+    if(recovery || overwrite) { f.Data(f.right+L"\\a"); f.Data(f.right+L"\\b"); f.Dir(f.root+L"\\recovery"); }
+    Check(module.copyStart(f.left.c_str(),f.right.c_str(),(verify?1:0)|(recovery?4:0)|(overwrite?8:0)|(keep?0:16))!=FALSE,"start copy lifecycle worker");
     ULONGLONG deadline=GetTickCount64()+3000;
     while(!(module.copyStatus()&1) && GetTickCount64()<deadline) Sleep(1);
     Check(module.copyStatus()==1,"observe active actual copy/Verify callback");
@@ -125,20 +126,26 @@ void CopyControls(const std::wstring& dll,bool verify,bool close,bool recovery=f
         do { if(wcscmp(entry.cFileName,L".") && wcscmp(entry.cFileName,L"..")) empty=false; } while(FindNextFileW(find,&entry));
         FindClose(find);
     }
-    Check(empty!=recovery,"Stop/Close leaves originals or empty new-file destination");
-    if(recovery) f.TrackRecovery(f.root+L"\\recovery");
+    Check(empty!=(recovery || overwrite),"Stop/Close leaves originals or empty new-file destination");
+    if(recovery || overwrite) f.TrackRecovery(f.root+L"\\recovery");
     for(const auto& path:f.files) {
         HANDLE h=CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
         Check(h!=INVALID_HANDLE_VALUE,"source handles released after Stop/Close join"); if(h!=INVALID_HANDLE_VALUE) CloseHandle(h);
     }
     Check(FreeLibrary(module.handle)!=FALSE,"unload after copy Stop/Close"); module.handle=nullptr;
-    std::cout<<(recovery?"recovery ":"")<<(close?"Close":"Stop")<<" during "<<(verify?"Verify":"copy")<<": handlers and join passed\n";
+    std::cout<<(overwrite?(keep?"overwrite with recovery ":"overwrite without recovery "):recovery?"recovery ":"")
+        <<(close?"Close":"Stop")<<" during "<<(verify?"Verify":"copy")<<": handlers and join passed\n";
 }
 void CopyUnload(const std::wstring& dll,int mode)
 {
     Fixture f;
     if(mode&2) { f.Data(f.left+L"\\0-done"); f.Data(f.left+L"\\0-done:note"); }
     f.Data(f.left+L"\\a"); f.Data(f.left+L"\\b"); Module module(dll);
+    if(mode&8) {
+        if(mode&2) { f.Data(f.right+L"\\0-done",17); f.Data(f.right+L"\\0-done:old",17); }
+        f.Data(f.right+L"\\a",17); f.Data(f.right+L"\\a:old",17);
+        f.Data(f.right+L"\\b",17); f.Data(f.right+L"\\b:old",17); f.Dir(f.root+L"\\recovery");
+    }
     Check(module.copyStart(f.left.c_str(),f.right.c_str(),mode)!=FALSE,"start unload copy worker");
     ULONGLONG deadline=GetTickCount64()+3000;
     while(!(module.copyStatus()&1) && GetTickCount64()<deadline) Sleep(1);
@@ -155,14 +162,37 @@ void CopyUnload(const std::wstring& dll,int mode)
     unsigned count=0;
     if(find!=INVALID_HANDLE_VALUE) {
         do { if(wcscmp(entry.cFileName,L".") && wcscmp(entry.cFileName,L"..")) {
-            ++count; Check((mode&2) && !wcscmp(entry.cFileName,L"0-done"),"only completed target remains after unload");
+            ++count; Check((mode&8) ? (!wcscmp(entry.cFileName,L"a") || !wcscmp(entry.cFileName,L"b") ||
+                ((mode&2) && !wcscmp(entry.cFileName,L"0-done"))) : ((mode&2) && !wcscmp(entry.cFileName,L"0-done")),
+                "only originals and completed targets remain after unload");
         } } while(FindNextFileW(find,&entry));
         FindClose(find);
     }
-    Check(count==((mode&2)?1u:0u),"no unpublished target or stage after unload");
+    Check(count==((mode&8)?2u:0u)+((mode&2)?1u:0u),"no unpublished target or stage after unload");
+    if(mode&8) {
+        for(const auto& name:{L"a",L"b"}) for(const auto& stream:{L"",L":old"}) {
+            const auto path=f.right+L"\\"+name+stream;
+            HANDLE h=CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+            Check(h!=INVALID_HANDLE_VALUE,"unreplaced original main/ADS accessible after unload");
+            if(h!=INVALID_HANDLE_VALUE) {
+                std::vector<BYTE> bytes(1024*1024); DWORD read=0;
+                bool ok=ReadFile(h,bytes.data(),DWORD(bytes.size()),&read,nullptr)!=FALSE && read==bytes.size();
+                for(BYTE value:bytes) if(value!=17) ok=false;
+                Check(ok && GetFileSize(h,nullptr)==bytes.size(),"unreplaced original main/ADS unchanged"); CloseHandle(h);
+            }
+        }
+        f.TrackRecovery(f.root+L"\\recovery");
+    }
     if(mode&2) {
+        if(mode&8) {
+            const auto oldStream=f.right+L"\\0-done:old";
+            HANDLE old=CreateFileW(oldStream.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+            const DWORD error=GetLastError(); if(old!=INVALID_HANDLE_VALUE) CloseHandle(old);
+            Check(old==INVALID_HANDLE_VALUE && error==ERROR_FILE_NOT_FOUND,"completed replacement omits old-only ADS");
+            f.files.erase(std::remove(f.files.begin(),f.files.end(),oldStream),f.files.end());
+        }
         for(const auto& suffix:{L"\\0-done",L"\\0-done:note"}) {
-            std::wstring path=f.right+suffix; f.files.push_back(path);
+            std::wstring path=f.right+suffix; if(!(mode&8) || !wcscmp(suffix,L"\\0-done:note")) f.files.push_back(path);
             HANDLE h=CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
             Check(h!=INVALID_HANDLE_VALUE,"completed main/ADS accessible after unload");
             if(h!=INVALID_HANDLE_VALUE) {
@@ -177,7 +207,8 @@ void CopyUnload(const std::wstring& dll,int mode)
         HANDLE h=CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
         Check(h!=INVALID_HANDLE_VALUE,"no handles survive force copy unload"); if(h!=INVALID_HANDLE_VALUE) CloseHandle(h);
     }
-    std::cout<<"force Release during "<<((mode&1)?"Verify":"copy")<<", prior completed="<<((mode&2)?1:0)<<": passed\n";
+    std::cout<<((mode&8)?((mode&16)?"overwrite without recovery ":"overwrite with recovery "):"")
+        <<"force Release during "<<((mode&1)?"Verify":"copy")<<", prior completed="<<((mode&2)?1:0)<<": passed\n";
 }
 }
 int main()
@@ -192,7 +223,9 @@ int main()
         for(int pass=0;pass<3;++pass) { Run(dll,scan,false); Run(dll,content,true); }
         for(bool verify:{false,true}) for(bool close:{false,true}) CopyControls(dll,verify,close);
         for(bool verify:{false,true}) for(bool close:{false,true}) CopyControls(dll,verify,close,true);
+        for(bool keep:{false,true}) for(bool verify:{false,true}) for(bool close:{false,true}) CopyControls(dll,verify,close,false,true,keep);
         for(int mode=0;mode<4;++mode) CopyUnload(dll,mode);
+        for(bool keep:{false,true}) for(int mode=0;mode<4;++mode) CopyUnload(dll,mode|8|(keep?0:16));
         std::cout<<checks<<" lifecycle checks passed\n"; return 0;
     }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }

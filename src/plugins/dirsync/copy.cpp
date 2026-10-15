@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Ordinary Win32 file operations following core worker patterns. New copies only,
-// including independent recovery copies; never replace or delete originals.
+// Ordinary Win32 file operations following core worker patterns: new copies,
+// independent recovery copies and explicitly selected existing-file replacements.
 #include "precomp.h"
 #include "copy.h"
 #include "recovery.h"
+#include "overwrite.h"
 #include <aclapi.h>
 #include <objbase.h>
 #include <algorithm>
@@ -175,7 +176,8 @@ DWORD CALLBACK CopyCallback(LARGE_INTEGER, LARGE_INTEGER transferred, LARGE_INTE
     return c.cancel ? PROGRESS_CANCEL : PROGRESS_CONTINUE;
 }
 void CopyOne(const std::wstring& sourceRoot, const std::wstring& targetRoot, const Row& row,
-             CopyOutcome& outcome, std::atomic<bool>& cancel, CopyProgress& progress)
+             CopyOutcome& outcome, std::atomic<bool>& cancel, CopyProgress& progress,
+             const Entry* original=nullptr,const Security* targetSecurity=nullptr)
 {
     const Entry& expected=row.action==Action::CopyRight ? row.left : row.right;
     const std::wstring source=Join(sourceRoot,row.path), target=Join(targetRoot,row.path);
@@ -190,7 +192,14 @@ void CopyOne(const std::wstring& sourceRoot, const std::wstring& targetRoot, con
     }
     File in(Open(source,GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE)); Need(in.h != INVALID_HANDLE_VALUE);
     if (!Unchanged(expected,Info(in.h))) throw Failure{ERROR_FILE_INVALID};
-    Absent(target); Stop(cancel);
+    auto checkTarget=[&]() {
+        if(!original) { Absent(target); return; }
+        File current(Open(target,FILE_READ_ATTRIBUTES|READ_CONTROL)); Need(current.h!=INVALID_HANDLE_VALUE);
+        if(!Unchanged(*original,Info(current.h)) || SameId(expected,*original) || !targetSecurity || !targetSecurity->Matches(target))
+            throw Failure{ERROR_FILE_INVALID};
+        if(original->attributes & FILE_ATTRIBUTE_READONLY) throw Failure{ERROR_ACCESS_DENIED};
+    };
+    checkTarget(); Stop(cancel);
     try {
         auto parent=target.substr(0,target.find_last_of(L'\\'));
         for (int tries=0; tries<16; ++tries) {
@@ -203,6 +212,7 @@ void CopyOne(const std::wstring& sourceRoot, const std::wstring& targetRoot, con
         }
         if (!owned.identified) throw Failure{ERROR_FILE_EXISTS};
         Security inherited(stage);
+        const Security& desired=targetSecurity?*targetSecurity:inherited;
         Callback callback{cancel,progress,progress.copied.load(),stage};
         Phase(progress,CopyPhase::Copying,stage); Stop(cancel);
         // Destination is our CREATE_NEW reservation, never the user's target.
@@ -210,22 +220,25 @@ void CopyOne(const std::wstring& sourceRoot, const std::wstring& targetRoot, con
         Stop(cancel);
         File staging(Open(stage,GENERIC_READ|FILE_WRITE_ATTRIBUTES)); Need(staging.h!=INVALID_HANDLE_VALUE);
         if (!SameId(owned,Info(staging.h))) throw Failure{ERROR_FILE_INVALID};
+        Phase(progress,CopyPhase::Preparing,stage); Stop(cancel);
         // A normal Modify grant need not include WRITE_DAC. Avoid rewriting an
         // already correct inherited DACL; restore it only if copying changed it.
-        if (!inherited.Matches(stage)) inherited.Apply(stage);
+        if (!desired.Matches(stage)) desired.Apply(stage);
         FILETIME mtime{DWORD(expected.time),DWORD(expected.time>>32)};
         Need(SetFileTime(staging.h,nullptr,nullptr,&mtime));
         Need(SetFileAttributesW(ApiPath(stage).c_str(),(expected.attributes & selectedAttrs)|FILE_ATTRIBUTE_ARCHIVE));
         Phase(progress,CopyPhase::Verifying,stage); Verify(source,stage,cancel,progress);
         auto prepared=Info(staging.h);
-        if (prepared.time!=expected.time || (prepared.attributes & selectedAttrs)!=(expected.attributes & selectedAttrs) || !inherited.Matches(stage))
+        if (prepared.time!=expected.time || (prepared.attributes & selectedAttrs)!=(expected.attributes & selectedAttrs) || !desired.Matches(stage))
             throw Failure{ERROR_INVALID_DATA};
         if (!Unchanged(expected,Info(in.h))) throw Failure{ERROR_FILE_INVALID};
         Phase(progress,CopyPhase::Publishing,stage); Stop(cancel);
-        if (!Unchanged(prepared,Info(staging.h)) || !inherited.Matches(stage)) throw Failure{ERROR_FILE_INVALID};
-        Parents(targetRoot,target,false,cancel); Absent(target);
+        if (!Unchanged(prepared,Info(staging.h)) || !desired.Matches(stage)) throw Failure{ERROR_FILE_INVALID};
+        Parents(targetRoot,target,false,cancel); checkTarget();
         staging.Close();
-        Need(MoveFileExW(ApiPath(stage).c_str(),ApiPath(target).c_str(),0));
+        // Same-volume replacement changes this name, never the old hardlink's data.
+        // There is deliberately no delete/recreate or cross-volume fallback.
+        Need(MoveFileExW(ApiPath(stage).c_str(),ApiPath(target).c_str(),original?MOVEFILE_REPLACE_EXISTING:0));
         outcome.published=true;
         Phase(progress,CopyPhase::Published,target);
         File published(Open(target,FILE_READ_ATTRIBUTES|FILE_WRITE_ATTRIBUTES)); Need(published.h!=INVALID_HANDLE_VALUE);
@@ -233,7 +246,7 @@ void CopyOne(const std::wstring& sourceRoot, const std::wstring& targetRoot, con
         Need(SetFileTime(published.h,nullptr,nullptr,&mtime));
         Need(SetFileAttributesW(ApiPath(target).c_str(),(expected.attributes & selectedAttrs)|FILE_ATTRIBUTE_ARCHIVE));
         auto final=Info(published.h);
-        if (final.time!=expected.time || (final.attributes & selectedAttrs)!=(expected.attributes & selectedAttrs) || !inherited.Matches(target))
+        if (final.time!=expected.time || (final.attributes & selectedAttrs)!=(expected.attributes & selectedAttrs) || !desired.Matches(target))
             throw Failure{ERROR_INVALID_DATA};
         outcome.status=CopyStatus::Copied; progress.completed.fetch_add(1); return;
     } catch (...) {
@@ -340,10 +353,9 @@ void RecoveryLine(HANDLE journal,const std::wstring& line)
     if (written!=bytes.size()) throw Failure{ERROR_WRITE_FAULT};
     Need(FlushFileBuffers(journal));
 }
-std::wstring RecoveryOutcomeLine(size_t index,const RecoveryItem& item)
+std::wstring OutcomeLine(size_t index,const CopyOutcome& c,const wchar_t* completed=L"saved")
 {
-    const auto& c=item.copy;
-    const wchar_t* status=c.status==CopyStatus::Copied?L"saved":c.status==CopyStatus::Failed?L"failed":
+    const wchar_t* status=c.status==CopyStatus::Copied?completed:c.status==CopyStatus::Failed?L"failed":
         c.status==CopyStatus::Cancelled?L"cancelled":L"not_started";
     return L"{\"event\":\"result\",\"item\":"+std::to_wstring(index+1)+L",\"status\":"+Json(status)+
         L",\"error\":"+std::to_wstring(c.error)+L",\"published\":"+(c.published?L"true":L"false")+
@@ -413,10 +425,10 @@ RecoveryReport SaveOriginals(Result snapshot,const std::vector<size_t>& visible,
                 report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
                 item.copy.status=report.cancelled?CopyStatus::Cancelled:CopyStatus::Failed;
             } catch (...) { item.copy.error=report.error=ERROR_NOT_ENOUGH_MEMORY; item.copy.status=CopyStatus::Failed; }
-            append(RecoveryOutcomeLine(n,item)); item.logged=true;
+            append(OutcomeLine(n,item.copy)); item.logged=true;
             if (item.copy.status!=CopyStatus::Copied) { ++n; break; }
         }
-        for (;n<report.items.size();++n) { append(RecoveryOutcomeLine(n,report.items[n])); report.items[n].logged=true; }
+        for (;n<report.items.size();++n) { append(OutcomeLine(n,report.items[n].copy)); report.items[n].logged=true; }
         append(L"{\"event\":\"end\",\"status\":"+Json(report.error?(report.cancelled?L"cancelled":L"failed"):L"complete")+L"}");
         report.complete=!report.error;
     } catch (const Failure& failure) {
@@ -424,6 +436,81 @@ RecoveryReport SaveOriginals(Result snapshot,const std::vector<size_t>& visible,
         report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
     }
     catch (...) { report.error=ERROR_NOT_ENOUGH_MEMORY; }
+    Phase(progress,CopyPhase::Finished,L""); return report;
+}
+bool IsFileOverwrite(const Row& row) { return IsOriginalToSave(row); }
+OverwriteReport OverwriteFiles(Result snapshot,const std::vector<size_t>& visible,bool keepOriginals,
+    const std::wstring& recoveryRoot,std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress)
+{
+    OverwriteReport report; report.keepOriginals=keepOriginals;
+    std::wstring left,right; File journal;
+    try {
+        std::set<size_t> unique; std::vector<size_t> selected;
+        for(size_t i:visible) {
+            if(i>=snapshot.rows.size() || !unique.insert(i).second) continue;
+            const auto& row=snapshot.rows[i];
+            if(IsFileOverwrite(row)) { report.items.push_back({i}); selected.push_back(i); }
+            else if(row.action!=Action::None) ++report.omitted;
+        }
+        if(report.items.empty()) return report;
+        if(!SnapshotRoots(snapshot,left,right) || !Revalidate(snapshot,cancel,checking)) {
+            report.stale=true; report.cancelled=cancel.load(); return report;
+        }
+        for(auto& item:report.items) {
+            const auto& row=snapshot.rows[item.row]; bool toRight=row.action==Action::CopyRight;
+            item.target=Join(toRight?right:left,row.path);
+            // Do not change attributes on a read-only original or its other aliases.
+            if((toRight?row.right:row.left).attributes & FILE_ATTRIBUTE_READONLY) {
+                item.status=CopyStatus::Failed; item.error=ERROR_ACCESS_DENIED; throw Failure{item.error};
+            }
+        }
+        if(keepOriginals) {
+            report.recovery=SaveOriginals(snapshot,selected,recoveryRoot,cancel,checking,progress);
+            if(!report.recovery.complete || report.recovery.items.size()!=report.items.size() ||
+                !std::all_of(report.recovery.items.begin(),report.recovery.items.end(),
+                    [](const RecoveryItem& item) { return item.logged && item.copy.status==CopyStatus::Copied; })) {
+                report.stale=report.recovery.stale; report.cancelled=report.recovery.cancelled;
+                report.error=report.recovery.error?report.recovery.error:ERROR_INVALID_DATA;
+                return report;
+            }
+            report.journal=Join(report.recovery.runDirectory,L"overwrite.jsonl");
+            journal.h=Open(report.journal,GENERIC_WRITE,FILE_SHARE_READ,CREATE_NEW); Need(journal.h!=INVALID_HANDLE_VALUE);
+        }
+        auto append=[&](const std::wstring& line) {
+            if(!keepOriginals) return;
+            try { RecoveryLine(journal.h,line); }
+            catch(const Failure& failure) { report.journalError=failure.error; throw; }
+        };
+        append(L"{\"event\":\"run\",\"schema\":1,\"operation\":\"overwrite\",\"keepOriginals\":true,\"left\":"+
+            Json(left)+L",\"right\":"+Json(right)+L",\"recoveryManifest\":"+Json(report.recovery.journal)+L"}");
+        for(size_t n=0;n<report.items.size();++n) {
+            const auto& item=report.items[n]; const auto& row=snapshot.rows[item.row]; bool toRight=row.action==Action::CopyRight;
+            append(L"{\"event\":\"planned\",\"item\":"+std::to_wstring(n+1)+L",\"source\":"+Json(Join(toRight?left:right,row.path))+
+                L",\"target\":"+Json(item.target)+L",\"saved\":"+Json(keepOriginals?report.recovery.items[n].saved:L"")+L"}");
+        }
+        size_t n=0;
+        for(;n<report.items.size();++n) {
+            auto& item=report.items[n]; const auto& row=snapshot.rows[item.row]; bool toRight=row.action==Action::CopyRight;
+            progress.item=n+(keepOriginals?report.items.size():0);
+            try {
+                Stop(cancel); Security originalSecurity(item.target);
+                const Entry& original=toRight?row.right:row.left;
+                CopyOne(toRight?left:right,toRight?right:left,row,item,cancel,progress,&original,&originalSecurity);
+            } catch(const Failure& failure) {
+                item.error=report.error=failure.error;
+                report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
+                item.status=report.cancelled?CopyStatus::Cancelled:CopyStatus::Failed;
+            } catch(...) { item.error=report.error=ERROR_NOT_ENOUGH_MEMORY; item.status=CopyStatus::Failed; }
+            append(OutcomeLine(n,item,L"replaced"));
+            if(item.status!=CopyStatus::Copied) { ++n; break; }
+        }
+        for(;n<report.items.size();++n) append(OutcomeLine(n,report.items[n],L"replaced"));
+        append(L"{\"event\":\"end\",\"status\":"+Json(report.error?(report.cancelled?L"cancelled":L"failed"):L"complete")+L"}");
+        report.complete=!report.error;
+    } catch(const Failure& failure) {
+        report.error=failure.error;
+        report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
+    } catch(...) { report.error=ERROR_NOT_ENOUGH_MEMORY; }
     Phase(progress,CopyPhase::Finished,L""); return report;
 }
 CopyReport CopyNewFiles(Result snapshot,const std::vector<size_t>& visible,std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress)
