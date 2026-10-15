@@ -1,5 +1,7 @@
 # Kopie do nových cílů: nedostatek místa
 
+Pro další skutečný běh je připraven [postup izolovaného NTFS VHD a potřebných oprávnění](directory-sync-plugin-vhd-runbook.md). Postup zatím nebyl proveden a nemění níže uvedené výsledky.
+
 15. října 2026. Pouze syntetická místní data. Bez přepisů existujících cílů, mazání uživatelských položek, SMB testů a změn SDK nebo hostitele. Navazuje na [první kopírovací etapu](directory-sync-plugin-copy-new.md) a [ověření uvolnění pluginu](directory-sync-plugin-copy-unload.md).
 
 ## Rozsah a omezení skutečného svazku
