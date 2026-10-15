@@ -80,16 +80,17 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
 }
 // Drive the real Stop/Close handlers without accessibility enumeration timing.
 // Test-only mode bits: 1 = Verify, 2 = after one completed file, 4 = save originals,
-// 8 = overwrite, 16 = disable overwrite recovery.
+// 8 = overwrite, 16 = disable recovery, 32 = deletion, 64 = deletion backup.
 extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,const wchar_t* right,BOOL mode)
 {
     try {
         if(probe) return FALSE;
         probe=std::make_unique<Preview>(); probe->left=left; probe->right=right;
+        probe->options.asymmetric=(mode&32)!=0;
         probe->result=dirsync::Compare(left,right,probe->options,probe->cancel,probe->progress);
         if(probe->result.rows.size()!=((mode&2)?3u:2u)) { probe.reset(); return FALSE; }
-        if(mode&(4|8)) {
-            for(auto& row:probe->result.rows) row.action=dirsync::Action::CopyRight;
+        if(mode&(4|8|32)) {
+            if(!(mode&32)) for(auto& row:probe->result.rows) row.action=dirsync::Action::CopyRight;
             probe->recoveryRoot=probe->left.substr(0,probe->left.find_last_of(L'\\'))+L"\\recovery";
         }
         struct Template { DLGTEMPLATE dialog; WORD menu=0,cls=0,title=0; } dialog{};
@@ -98,8 +99,9 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,
         if(!probe->window) { probe.reset(); return FALSE; }
         SetWindowLongPtrW(probe->window,DWLP_USER,reinterpret_cast<LONG_PTR>(probe.get()));
         copyBoundary=false; finished=false; active=probe.get(); probe->saving=(mode&4)!=0;
-        probe->overwriting=(mode&8)!=0; probe->copying=!probe->saving && !probe->overwriting; probe->running=true;
-        probe->transferCount=probe->overwriting && !(mode&16)?probe->result.rows.size():0;
+        probe->overwriting=(mode&8)!=0; probe->deleting=(mode&32)!=0;
+        probe->copying=!probe->saving && !probe->overwriting && !probe->deleting; probe->running=true;
+        probe->transferCount=(probe->overwriting || probe->deleting) && !(mode&16)?probe->result.rows.size():0;
         probe->worker=std::thread([mode] {
             try {
                 dirsync::SetCopyHook([mode,stage=std::wstring{},copiedBase=uint64_t{0},verifiedBase=uint64_t{0}]
@@ -111,12 +113,15 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,
                     if((mode&8) && path.rfind(probe->right+L"\\",0)!=0) return;
                     bool reached=(mode&1) ? phase==dirsync::CopyPhase::Verifying && probe->copyProgress.verified>verifiedBase :
                         phase==dirsync::CopyPhase::Copying && probe->copyProgress.copied>copiedBase;
+                    if((mode&32) && !(mode&64)) reached=phase==dirsync::CopyPhase::Deleting;
                     if(!reached || copyBoundary.exchange(true)) return;
                     ULONGLONG deadline=GetTickCount64()+5000;
                     while(!probe->cancel && GetTickCount64()<deadline) Sleep(1);
                 });
                 std::vector<size_t> rows{0,1}; if(mode&2) rows.push_back(2);
-                if(mode&8) {
+                if(mode&32) {
+                    probe->deleteReport=dirsync::DeleteFiles(probe->result,rows,!(mode&16),probe->recoveryRoot,probe->cancel,probe->progress,probe->copyProgress);
+                } else if(mode&8) {
                     probe->overwriteReport=dirsync::OverwriteFiles(probe->result,rows,!(mode&16),probe->recoveryRoot,probe->cancel,probe->progress,probe->copyProgress);
                     probe->copyReport.cancelled=probe->overwriteReport.cancelled;
                     probe->copyReport.items=probe->overwriteReport.items;
@@ -134,6 +139,31 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeCopyStart(const wchar_t* left,
 }
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeCopyStatus()
 { return (copyBoundary?1u:0u) | (finished?2u:0u); }
+// Same real dialog handlers and Release contract, with deletion-specific reports.
+extern "C" __declspec(dllexport) unsigned WINAPI ProbeDeleteFinish(unsigned mode)
+{
+    if(!probe || !probe->deleting) return 0;
+    unsigned status=0; const bool force=(mode&128)!=0,prior=(mode&2)!=0,backup=(mode&64)!=0;
+    if(force) {
+        if(!plugin.Release(nullptr,FALSE) && !probe->cancel && !finished) status|=1;
+        if(plugin.Release(nullptr,TRUE)) status|=2;
+    } else {
+        DialogBody(probe->window,(mode&256)?WM_CLOSE:WM_COMMAND,(mode&256)?0:IDC_STOP,0);
+        if(probe->cancel) status|=1;
+        if(probe->closing==((mode&256)!=0)) status|=2;
+        probe->Join();
+    }
+    if(!probe->worker.joinable() && finished && !probe->failed) status|=4;
+    const auto& r=probe->deleteReport; size_t at=prior?1:0;
+    bool ok=r.cancelled && !r.complete && r.items.size()==at+2;
+    if(backup) ok=ok && r.recovery.cancelled && r.items[0].status==dirsync::DeleteStatus::NotStarted;
+    else ok=ok && (!r.keepOriginals || r.recovery.complete) && r.items[at].status==dirsync::DeleteStatus::Cancelled;
+    if(ok && r.items[at+1].status==dirsync::DeleteStatus::NotStarted && !r.items[at].removed && !r.items[at+1].removed) status|=8;
+    if((!prior || (r.items[0].status==dirsync::DeleteStatus::Deleted && r.items[0].removed)) &&
+        probe->copyProgress.completed==(backup?0:probe->transferCount+at)) status|=16;
+    DestroyWindow(probe->window); probe->window=nullptr; active=nullptr; probe.reset();
+    return status;
+}
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeCopyRelease(BOOL force)
 {
     if(!probe) return plugin.Release(nullptr,force)?1u:0u;
@@ -204,6 +234,11 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeStatus()
 }
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeRelease(BOOL force)
 {
+    if(probe && probe->deleting) {
+        unsigned status=plugin.Release(nullptr,force)?1u:0u;
+        if(force) { DestroyWindow(probe->window); active=nullptr; probe.reset(); }
+        return status;
+    }
     if(probe && (probe->copying || probe->saving || probe->overwriting)) return ProbeCopyRelease(force);
     unsigned status = plugin.Release(nullptr, force) ? 1u : 0u;
     if (force && probe)

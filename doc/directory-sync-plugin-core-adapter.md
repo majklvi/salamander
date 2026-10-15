@@ -1,5 +1,7 @@
 # Directory Synchronization: mapování jádra a nejmenšího adaptéru
 
+**Aktuální stav:** implementováno [asymetrické mazání souborů s volitelnou obnovou](directory-sync-plugin-delete.md), 3 380 kontrol adaptéru a 2 343 lifecycle kontrol Debug/Release x64. Mazání složek, SMB testy a změny SDK/hostitele nejsou součástí. Níže zůstává historie předchozích etap.
+
 **Nová etapa:** implementovány [přepisy existujících souborů](directory-sync-plugin-overwrite.md), se zapamatovanou volbou obnovy a zachováním původní cílové DACL. Bez mazání, SMB testů a změn SDK/hostitele. Níže jsou oddělené historické návrhy a předchozí etapy.
 
 **Aktuální navazující etapa:** implementováno [samostatné uchování originálů a JSONL protokol](directory-sync-plugin-recovery.md) nad stejným přenosem jako nové kopie. Originály se nemění; přepis ani mazání nejsou implementované. Níže uvedené budoucí kroky zůstávají návrhem.

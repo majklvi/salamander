@@ -1,5 +1,7 @@
 # Directory Synchronization: uchování originálů a jednoduchý protokol
 
+**Aktuální stav:** implementováno [asymetrické mazání souborů s volitelnou obnovou](directory-sync-plugin-delete.md), 3 380 kontrol adaptéru a 2 343 lifecycle kontrol Debug/Release x64. Mazání složek, SMB testy a změny SDK/hostitele nejsou součástí. Níže zůstává historie předchozích etap.
+
 **Navazující stav:** na nový pokyn uživatele implementovány [přepisy podle D4/D5](directory-sync-plugin-overwrite.md), které při ON používají právě tuto obnovu a při OFF ji vynechají. Aktuální společné testy: 2 663 kontrol adaptéru, 1 029 lifecycle kontrol Debug/Release x64, 1 213 layout kontrol. Níže je samostatně zachován rozsah a evidence předchozí etapy; její tvrzení o neimplementovaných přepisech jsou historická. Mazání, SMB testy a SDK/host změny zůstávají mimo rozsah.
 
 15. října 2026, větev `feature/directory-sync-plugin`, výchozí commit `072b47db`. Implementována samostatná část D4/D5 podle [nejmenšího adaptéru](directory-sync-plugin-core-adapter.md): **uložení nezávislé ověřené kopie původního cílového souboru do složky obnovy**. Původní soubor se nepřejmenovává, nepřepisuje ani nemaže. Tato etapa neprovádí žádný návrh synchronizace; přepisy, mazání, SMB testy a změny SDK/hostitele zůstávají mimo rozsah.

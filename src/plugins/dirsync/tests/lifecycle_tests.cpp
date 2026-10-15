@@ -65,6 +65,8 @@ struct Module
     using CopyCancel=unsigned (WINAPI*)(BOOL);
     HMODULE handle=nullptr; Start start=nullptr; Status status=nullptr; Release release=nullptr;
     Start copyStart=nullptr; Status copyStatus=nullptr; CopyCancel copyCancel=nullptr; Release copyRelease=nullptr;
+    using DeleteFinish=unsigned (WINAPI*)(unsigned);
+    DeleteFinish deleteFinish=nullptr;
     explicit Module(const std::wstring& path)
     {
         handle=LoadLibraryW(path.c_str());
@@ -79,6 +81,8 @@ struct Module
         copyCancel=reinterpret_cast<CopyCancel>(GetProcAddress(handle,"ProbeCopyCancel"));
         copyRelease=reinterpret_cast<Release>(GetProcAddress(handle,"ProbeCopyRelease"));
         Check(copyStart && copyStatus && copyCancel && copyRelease,"copy lifecycle exports");
+        deleteFinish=reinterpret_cast<DeleteFinish>(GetProcAddress(handle,"ProbeDeleteFinish"));
+        Check(deleteFinish!=nullptr,"deletion lifecycle export");
     }
     ~Module() { if(handle) { if(release) release(TRUE); FreeLibrary(handle); } }
 };
@@ -135,6 +139,34 @@ void CopyControls(const std::wstring& dll,bool verify,bool close,bool recovery=f
     Check(FreeLibrary(module.handle)!=FALSE,"unload after copy Stop/Close"); module.handle=nullptr;
     std::cout<<(overwrite?(keep?"overwrite with recovery ":"overwrite without recovery "):recovery?"recovery ":"")
         <<(close?"Close":"Stop")<<" during "<<(verify?"Verify":"copy")<<": handlers and join passed\n";
+}
+void DeleteControls(const std::wstring& dll,unsigned mode)
+{
+    Fixture f; if(mode&2) f.Data(f.right+L"\\0-done",17);
+    f.Data(f.right+L"\\a",17); f.Data(f.right+L"\\a:note",17); f.Data(f.right+L"\\b",17); f.Dir(f.root+L"\\recovery");
+    Module module(dll);
+    Check(module.copyStart(f.left.c_str(),f.right.c_str(),mode|32)!=FALSE,"start actual deletion worker");
+    ULONGLONG deadline=GetTickCount64()+3000;
+    while(!(module.copyStatus()&1) && GetTickCount64()<deadline) Sleep(1);
+    Check(module.copyStatus()==1,"observe deletion or backup callback before cancellation");
+    ULONGLONG start=GetTickCount64();
+    Check(module.deleteFinish(mode)==31,"real deletion Stop/Close/force Release joins and preserves actual report");
+    Check(GetTickCount64()-start<3000,"local deletion cancellation/join within three seconds");
+    if(mode&2) {
+        const auto done=f.right+L"\\0-done";
+        Check(GetFileAttributesW(done.c_str())==INVALID_FILE_ATTRIBUTES,"previous accepted deletion remains deleted");
+        f.files.erase(std::remove(f.files.begin(),f.files.end(),done),f.files.end());
+    }
+    f.TrackRecovery(f.root+L"\\recovery");
+    for(const auto& path:f.files) {
+        HANDLE h=CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+        Check(h!=INVALID_HANDLE_VALUE,"no deletion handles survive join"); if(h!=INVALID_HANDLE_VALUE) CloseHandle(h);
+    }
+    WIN32_FIND_DATAW data{}; HANDLE find=FindFirstFileW((f.right+L"\\.dirsync-*").c_str(),&data);
+    Check(find==INVALID_HANDLE_VALUE,"no deletion staging survives cancellation"); if(find!=INVALID_HANDLE_VALUE) FindClose(find);
+    Check(FreeLibrary(module.handle)!=FALSE,"immediate unload after deletion cancel"); module.handle=nullptr;
+    Check(GetModuleHandleW(dll.c_str())==nullptr,"deletion DLL unmapped");
+    std::cout<<"deletion lifecycle mode "<<mode<<": passed\n";
 }
 void CopyUnload(const std::wstring& dll,int mode)
 {
@@ -226,6 +258,9 @@ int main()
         for(bool keep:{false,true}) for(bool verify:{false,true}) for(bool close:{false,true}) CopyControls(dll,verify,close,false,true,keep);
         for(int mode=0;mode<4;++mode) CopyUnload(dll,mode);
         for(bool keep:{false,true}) for(int mode=0;mode<4;++mode) CopyUnload(dll,mode|8|(keep?0:16));
+        for(bool keep:{false,true}) for(bool prior:{false,true}) for(unsigned control:{0u,128u,256u})
+            DeleteControls(dll,(keep?0u:16u)|(prior?2u:0u)|control);
+        for(bool verify:{false,true}) for(unsigned control:{0u,128u,256u}) DeleteControls(dll,64u|(verify?1u:0u)|control);
         std::cout<<checks<<" lifecycle checks passed\n"; return 0;
     }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }

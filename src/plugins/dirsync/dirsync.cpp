@@ -7,6 +7,7 @@
 #include "copy.h"
 #include "recovery.h"
 #include "overwrite.h"
+#include "delete.h"
 #include "resource.h"
 #include <thread>
 #include <memory>
@@ -106,7 +107,7 @@ void ConfigureDark(HWND dialog)
 }
 struct Preview
 {
-    enum class Intent { None, Apply, Summary, Copy, Save, Overwrite };
+    enum class Intent { None, Apply, Summary, Copy, Save, Overwrite, Delete };
     HWND window = nullptr;
     std::wstring left, right;
     std::wstring panelLeft, panelRight;
@@ -123,11 +124,13 @@ struct Preview
     dirsync::CopyReport copyReport;
     dirsync::RecoveryReport recoveryReport;
     dirsync::OverwriteReport overwriteReport;
+    dirsync::DeleteReport deleteReport;
     std::wstring recoveryRoot;
     std::vector<size_t> copyRows;
     bool copying = false, hasCopyReport = false;
     bool saving = false, hasRecoveryReport = false;
     bool overwriting=false,hasOverwriteReport=false;
+    bool deleting=false,hasDeleteReport=false;
     uint64_t transferCount=0;
     std::thread worker;
     SIZE initialClient{}, minimumWindow{};
@@ -174,9 +177,9 @@ void Status(Preview& p)
     if (p.running)
     {
         wchar_t text[256]{};
-        if (p.copying || p.saving || p.overwriting) {
-            swprintf_s(text, Text(p.overwriting?IDS_OVERWRITE_PROGRESS:p.saving?IDS_SAVE_PROGRESS:IDS_COPY_PROGRESS).c_str(), p.copyProgress.item.load()+1,
-                p.overwriting?p.transferCount:uint64_t(p.copyRows.size()), p.copyProgress.copied.load(), p.copyProgress.verified.load(),
+        if (p.copying || p.saving || p.overwriting || p.deleting) {
+            swprintf_s(text, Text(p.deleting?IDS_DELETE_PROGRESS:p.overwriting?IDS_OVERWRITE_PROGRESS:p.saving?IDS_SAVE_PROGRESS:IDS_COPY_PROGRESS).c_str(), p.copyProgress.item.load()+1,
+                (p.overwriting || p.deleting)?p.transferCount:uint64_t(p.copyRows.size()), p.copyProgress.copied.load(), p.copyProgress.verified.load(),
                 p.copyProgress.completed.load());
             SetDlgItemTextW(p.window,IDC_STATUS,text); return;
         }
@@ -189,6 +192,7 @@ void Status(Preview& p)
     if (p.hasCopyReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_COPY_AGAIN).c_str()); return; }
     if (p.hasRecoveryReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_SAVE_AGAIN).c_str()); return; }
     if (p.hasOverwriteReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_OVERWRITE_AGAIN).c_str()); return; }
+    if (p.hasDeleteReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_DELETE_AGAIN).c_str()); return; }
     if (p.result.stale && !p.result.cancelled)
     { SetDlgItemTextW(p.window, IDC_STATUS, Text(IDS_STALE).c_str()); return; }
     if (p.failed || p.result.cancelled)
@@ -225,7 +229,7 @@ void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
                    IDC_EMPTY, IDC_COMPARE, IDC_ACTION, IDC_APPLY, IDC_SUMMARY, IDC_EQUAL,
-                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS, IDC_OVERWRITE})
+                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS, IDC_OVERWRITE, IDC_DELETE_FILES})
         EnableWindow(GetDlgItem(p.window, id), !busy);
     for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL,IDC_SAVE_ORIGINALS})
         EnableWindow(GetDlgItem(p.window,id),!busy && settings.keepOriginals);
@@ -243,6 +247,7 @@ void InvalidatePlan(Preview& p)
     p.hasCopyReport = false;
     p.hasRecoveryReport = false;
     p.hasOverwriteReport = false;
+    p.hasDeleteReport = false;
     ListView_SetItemCount(GetDlgItem(p.window, IDC_LIST), 0);
     Status(p);
 }
@@ -504,7 +509,7 @@ void Overwrite(Preview& p)
     auto message=std::wstring(confirm)+L"\n\n"+Text(keep?IDS_OVERWRITE_ON:IDS_OVERWRITE_OFF)+(keep?L"\n"+root:L"");
     if(DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONWARNING)!=IDOK) return;
     p.cancel=false; p.failed=false; p.overwriting=true; p.running=true;
-    p.hasCopyReport=p.hasRecoveryReport=p.hasOverwriteReport=false; p.overwriteReport={};
+    p.hasCopyReport=p.hasRecoveryReport=p.hasOverwriteReport=p.hasDeleteReport=false; p.overwriteReport={};
     p.transferCount=uint64_t(p.copyRows.size())*(keep?2:1);
     p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
     p.copyProgress.phase=dirsync::CopyPhase::Checking;
@@ -519,6 +524,69 @@ void Overwrite(Preview& p)
         SetTimer(p.window,1,150,nullptr);
     } catch(...) {
         p.failed=true; p.running=false; p.overwriting=false; Busy(p,false); Status(p);
+        SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_COMPARE)),TRUE);
+    }
+}
+void DeleteSummary(Preview& p)
+{
+    const auto& report=p.deleteReport;
+    uint64_t deleted=0,failed=0,pending=0,recovered=0; std::wstring details;
+    for(const auto& item:report.items) {
+        if(item.status==dirsync::DeleteStatus::Deleted) ++deleted;
+        else if(item.status==dirsync::DeleteStatus::NotStarted) ++pending;
+        else ++failed;
+        if(details.empty() && item.error) details=L"\n\n"+item.target+L"\n"+Text(IDS_COPY_ERROR)+Number(item.error);
+    }
+    for(const auto& item:report.recovery.items) {
+        if(item.copy.status==dirsync::CopyStatus::Copied && item.logged) ++recovered;
+        if(item.copy.error) {
+            details+=L"\n\n"+Text(IDS_DELETE_RECOVERY_ERROR)+L"\n"+item.original+L"\n"+Text(IDS_COPY_ERROR)+Number(item.copy.error);
+            if(!item.copy.remainingStage.empty()) details+=L"\n"+Text(IDS_COPY_REMAINDER)+item.copy.remainingStage;
+            break;
+        }
+    }
+    wchar_t text[1024]{}; swprintf_s(text,Text(IDS_DELETE_RESULT).c_str(),deleted,failed,pending,uint64_t(report.omitted));
+    auto message=std::wstring(text)+L"\n\n"+Text(report.keepOriginals?IDS_DELETE_ON:IDS_DELETE_OFF);
+    if(report.keepOriginals) {
+        wchar_t recovery[256]{}; swprintf_s(recovery,Text(IDS_OVERWRITE_RECOVERY).c_str(),recovered,uint64_t(report.items.size()));
+        message+=L"\n"+std::wstring(recovery)+L"\n"+report.recovery.journal+L"\n"+report.journal;
+    }
+    if(!report.complete) message+=L"\n"+Text(IDS_DELETE_INCOMPLETE);
+    if(report.error) message+=L"\n"+Text(IDS_COPY_ERROR)+Number(report.error);
+    if(report.stale) message+=L"\n"+Text(IDS_STALE);
+    DarkModeMessageBoxW(p.window,(message+details).c_str(),Text(IDS_NAME).c_str(),MB_OK|MB_ICONINFORMATION);
+}
+void DeleteFiles(Preview& p)
+{
+    p.copyRows.clear(); uint64_t bytes=0,omitted=0;
+    if(!dirsync::SnapshotAsymmetric(p.result)) { Message(p.window,IDS_DELETE_EMPTY); return; }
+    for(size_t i:p.visible) {
+        const auto& row=p.result.rows[i];
+        if(dirsync::IsFileDeletion(row)) { p.copyRows.push_back(i); bytes+=row.right.size; }
+        else if(row.action!=dirsync::Action::None) ++omitted;
+    }
+    if(p.copyRows.empty()) { Message(p.window,IDS_DELETE_EMPTY); return; }
+    const bool keep=settings.keepOriginals; const auto root=ControlText(p.window,IDC_RECOVERY_ROOT);
+    if(keep && root.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
+    wchar_t confirm[2048]{}; swprintf_s(confirm,Text(IDS_DELETE_CONFIRM).c_str(),uint64_t(p.copyRows.size()),bytes,omitted);
+    auto message=std::wstring(confirm)+L"\n\n"+Text(keep?IDS_DELETE_ON:IDS_DELETE_OFF)+(keep?L"\n"+root:L"");
+    if(DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONWARNING)!=IDOK) return;
+    p.cancel=false; p.failed=false; p.deleting=true; p.running=true;
+    p.hasCopyReport=p.hasRecoveryReport=p.hasOverwriteReport=p.hasDeleteReport=false; p.deleteReport={};
+    p.transferCount=uint64_t(p.copyRows.size())*(keep?2:1);
+    p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
+    p.copyProgress.phase=dirsync::CopyPhase::Checking;
+    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP)),TRUE);
+    try {
+        const auto rows=p.visible;
+        p.worker=std::thread([&p,rows,keep,root]() {
+            try { p.deleteReport=dirsync::DeleteFiles(p.result,rows,keep,root,p.cancel,p.progress,p.copyProgress); }
+            catch(...) { p.failed=true; }
+            PostMessageW(p.window,Done,0,0);
+        });
+        SetTimer(p.window,1,150,nullptr);
+    } catch(...) {
+        p.failed=true; p.running=false; p.deleting=false; Busy(p,false); Status(p);
         SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_COMPARE)),TRUE);
     }
 }
@@ -582,7 +650,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_RECOVERY_ROOT) { r.top += dy; r.bottom += dy; r.right += dx; }
                 else if (id == IDC_SAVE_ORIGINALS) { r.top += dy; r.bottom += dy; r.left += dx; r.right += dx; }
                 else if (id == IDC_RECOVERY_LABEL) { r.top += dy; r.bottom += dy; }
-                else if (id == IDC_KEEP_ORIGINALS || id == IDC_RECOVERY_SPACE) { r.top += dy; r.bottom += dy; }
+                else if (id == IDC_KEEP_ORIGINALS || id == IDC_RECOVERY_SPACE || id == IDC_DELETE_FILES || id == IDC_DELETE_SCOPE) { r.top += dy; r.bottom += dy; }
                 else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDC_OVERWRITE || id == IDCANCEL)
                 { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
@@ -609,6 +677,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             if(!p->overwriteReport.recovery.runDirectory.empty()) NotifyPath(ControlText(window,IDC_RECOVERY_ROOT));
             if(!p->closing) { if(p->failed) Message(window,IDS_OVERWRITE_FAILED); else OverwriteSummary(*p); }
         }
+        if(p->deleting) {
+            p->deleting=false; p->hasDeleteReport=true; p->result.stale=true; p->result.snapshot.reset();
+            NotifyPath(p->right);
+            if(!p->deleteReport.recovery.runDirectory.empty()) NotifyPath(ControlText(window,IDC_RECOVERY_ROOT));
+            if(!p->closing) { if(p->failed) Message(window,IDS_DELETE_FAILED); else DeleteSummary(*p); }
+        }
         if (p->closing) { PersistSettings(window); EndDialog(window, 0); }
         else
         {
@@ -626,6 +700,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (intent == Preview::Intent::Copy) CopyNew(*p);
                 else if (intent == Preview::Intent::Save) SaveOriginals(*p);
                 else if (intent == Preview::Intent::Overwrite) Overwrite(*p);
+                else if (intent == Preview::Intent::Delete) DeleteFiles(*p);
             }
         }
         return TRUE;
@@ -645,6 +720,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_COPY_NEW: ValidatePreview(*p, Preview::Intent::Copy); return TRUE;
         case IDC_SAVE_ORIGINALS: ValidatePreview(*p, Preview::Intent::Save); return TRUE;
         case IDC_OVERWRITE: ValidatePreview(*p,Preview::Intent::Overwrite); return TRUE;
+        case IDC_DELETE_FILES: ValidatePreview(*p,Preview::Intent::Delete); return TRUE;
         case IDC_KEEP_ORIGINALS:
             if(!p->running) { settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS); Busy(*p,false); PersistSettings(window); }
             return TRUE;
