@@ -1,5 +1,7 @@
 # Directory Synchronization: první etapa
 
+**Souvislý pracovní postup (16. října 2026):** dokončen [GUI průchod porovnání → ruční Skip → nová kopie → přepis s obnovou → mazání souboru s obnovou → závěrečné obsahové porovnání](directory-sync-plugin-workflow.md). Všechny tři operace bez chyb, 37 nezávislých kontrol disku prošlo. Bez změny produkčního kódu; ruční návrhy se po novém Compare zadávají znovu. Ponechaná složka a záměrně nekopírovaný soubor zůstávají očekávanými rozdíly.
+
 **Aktuální stav:** implementováno [asymetrické mazání souborů s volitelnou obnovou](directory-sync-plugin-delete.md), 3 380 kontrol adaptéru a 2 343 lifecycle kontrol Debug/Release x64. Mazání složek, SMB testy a změny SDK/hostitele nejsou součástí. Níže zůstává historie předchozích etap.
 
 **Nová etapa:** implementovány [přepisy podle D4/D5](directory-sync-plugin-overwrite.md), s volitelnou obnovou, stagingem, Verify, zachováním cílové DACL a Stop. Dokončeny GUI přepisy ON/OFF, souhrny, nové Compare a panelový refresh; také force Release při Copy/Verify a běžné ukončení zahájené během přenosu. Aktuálně 2 663 společných kontrol adaptéru a 1 577 lifecycle kontrol Debug/Release x64, 1 213 layout kontrol. Starší rozsah níže je historický; mazání/SMB/SDK změny nadále nejsou součástí implementace.
