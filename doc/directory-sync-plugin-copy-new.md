@@ -1,5 +1,7 @@
 # Directory Synchronization: kopie pouze do nových cílů
 
+**Navazující stav:** implementováno [uchování původních cílových souborů do vlastní složky obnovy](directory-sync-plugin-recovery.md) s jednoduchým JSONL protokolem. Aktuálně 1 281 společných copy/recovery kontrol a 725 lifecycle kontrol v Debug i Release x64. Níže uvedené počty a zmínky o neimplementované obnově popisují starší copy-only etapu; přepisy a mazání zůstávají neimplementované.
+
 Dokončen [skutečný NTFS VHD test nedostatku místa](directory-sync-plugin-vhd-results.md), včetně GUI chyby 112 a nového pokusu. Opraven nadbytečný zápis zděděné DACL při právech Modify; aktuálně 766 copy assertions Debug/Release x64.
 
 Nové [ověření chyb nedostatku místa](directory-sync-plugin-copy-space.md): 743 copy assertions Debug/Release x64. Jde o řízené chyby WinAPI s reálnými částečnými staging daty; skutečně zaplněný svazek se kvůli oprávnění k připojení VHD netestoval.

@@ -1,6 +1,6 @@
 # Synchronizační plugin pro Samandarin
 
-Stav k 15. říjnu 2026: D1–D5 a doplňující pravidla schválená. Na pokyn uživatele implementována [první etapa: kostra, sken, porovnání a náhled bez zápisů](directory-sync-plugin-implementation.md) nad nezměněným SDK Samandarin-0.16. V1–V4 dokládá [protokol TC](directory-sync-plugin-tc-observations.md); V5/V6 mají [technický audit](directory-sync-plugin-sdk.md). Navazujícím pokynem byla implementována pouze [kopie do nových cílů](directory-sync-plugin-copy-new.md); přepisy, uživatelské mazání a obnova D4 zatím nejsou implementované.
+Stav k 15. říjnu 2026: D1–D5 a doplňující pravidla schválená. Na pokyn uživatele implementována [první etapa: kostra, sken, porovnání a náhled bez zápisů](directory-sync-plugin-implementation.md) nad nezměněným SDK Samandarin-0.16. V1–V4 dokládá [protokol TC](directory-sync-plugin-tc-observations.md); V5/V6 mají [technický audit](directory-sync-plugin-sdk.md). Navazujícím pokynem byla implementována [kopie do nových cílů](directory-sync-plugin-copy-new.md) a poté [samostatné uchování původních cílových souborů s jednoduchým protokolem](directory-sync-plugin-recovery.md). Přepisy a uživatelské mazání zůstávají neimplementované; nejde ještě o jejich propojení s D4.
 
 Cílem je plugin pro porovnání a synchronizaci dvou adresářových stromů s pracovním postupem známým z Total Commanderu: **Porovnat → prohlédnout a upravit navržené operace → Synchronizovat**. Uživatel musí před zápisem vidět, co se zkopíruje, přepíše nebo odstraní. Tento dokument vymezuje chování předlohy, navržený rozsah pluginu, bezpečnost operací a rozhodnutí potřebná před zahájením vývoje.
 
@@ -165,6 +165,8 @@ Názvy a cesty mají zůstat v Unicode, bez průchodu přes ztrátové ACP přev
 
 ### Schválená ochrana souborů podle D4
 
+**Doplnění na pokyn uživatele:** uchování originálů je uživatelsky vypnutelné, zejména kvůli objemu velkých úloh. Výchozí stav je zapnutý, plugin si pamatuje zapnutí/vypnutí i obnovovací složku přes existující konfiguraci SDK. Následující požadavky na zálohu před destruktivní operací platí při zapnutém uchování. Při vypnutí se obnova nevytváří a složka obnovy není podmínkou operace; budoucí potvrzení přepisu/mazání musí tento stav jasně uvést. Staging, Verify, D5 vlastnosti cíle a běžné kontroly se tím nevypínají. Vypnutí nemaže již uložené zálohy. Přepisy a mazání stále nejsou implementované.
+
 Profil určí vlastní složku obnovy mimo oba synchronizované stromy. Před přepisem se uchová původní cílový soubor na měněné straně; před odstraněním se uchová odstraňovaná položka. Uspořádání oddělí dvojici kořenů, jednotlivé běhy a levou/pravou stranu a zachová relativní cestu i původní název. Uložené kopie se nesmějí navzájem přepsat kvůli kolizi názvů nebo času běhu.
 
 Pokud je složka obnovy nedostupná, nezapisovatelná nebo nemá dost místa, příslušná destruktivní operace se neprovede. Uchování ani následné selhání přepisu nesmějí ztratit původní soubor. Dočasná kopie a ověření stavu před nahrazením cíle zůstávají samostatnými povinnostmi provedení; celý synchronizační běh není atomická transakce.
@@ -183,7 +185,7 @@ Uživatel schválil pro první verzi variantu A podle projednané tabulky: běž
 | Oprávnění | Nekopírovat vlastnictví, audit ani přístupová oprávnění ze zdroje. Nové soubory mají dědit oprávnění cílové složky, přepsané zachovat existující přístupová oprávnění cíle. Selhání požadovaného zachování není úspěšný přepis. |
 | Symbolické odkazy, junctions a cloudové placeholdery | Viditelně vynechat a chránit odpovídající protějšek před odvozeným mazáním; platí kontroly kořene a rodičů ve V6. Běžný soubor zástupce `.lnk` se kopíruje jako soubor. |
 | Hardlinky | Kopírovat jako nezávislé soubory, bez zachování vazby mezi jmény. Přepis nesmí upravit data ani atributy jiných jmen téhož cílového souboru. Pokud to backend neumí zajistit, operaci zablokovat. Obnovovací kopie musí být nezávislá na původních hardlinkách. |
-| Doplňkové datové proudy ADS | Při kopírování přenést proudy zdroje, pokud je umí zachovat cíl i složka obnovy. Staré cílové proudy uchovat v obnovovací kopii, neslučovat je náhodně do nového cíle. Při nepodporované operaci položku zablokovat a protějšek chránit. Samostatné rozdíly ADS nevyvolají synchronizaci; obsahové porovnání označuje shodu hlavního datového proudu. |
+| Doplňkové datové proudy ADS | Při kopírování přenést proudy zdroje, pokud je umí zachovat cíl a při zapnutém uchování také složka obnovy. Staré cílové proudy při zapnutém uchování uložit v obnovovací kopii, neslučovat je náhodně do nového cíle. Při nepodporované operaci položku zablokovat a protějšek chránit. Samostatné rozdíly ADS nevyvolají synchronizaci; obsahové porovnání označuje shodu hlavního datového proudu. |
 | Šifrování EFS | V první verzi viditelně vynechat operace s EFS na kterékoli dotčené straně, včetně mazání a uchování původního cíle. Nepovolovat tichý přenos do nešifrované podoby. |
 | Komprese a sparse soubory | Zachovat logický obsah, neslibovat stejné úsporné uložení. Předem počítat s potřebným prostorem v cíli i obnově; kopie může zabírat více místa. |
 

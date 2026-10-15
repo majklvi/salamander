@@ -1,5 +1,9 @@
 # Directory Synchronization: provedení a obnova na úrovni jádra
 
+**Aktuální navazující etapa:** implementováno [samostatné uchování originálů a JSONL protokol](directory-sync-plugin-recovery.md), bez následného přepisu či mazání. Nový dokument vymezuje skutečný formát a provedené testy; transakční journal, replay ani automatický rollback se nezavádějí.
+
+Následný pokyn uživatele činí uchování originálů vypnutelným a zapamatovaným nastavením pluginu, výchozí stav zapnutý. Níže uvedené požadavky na obnovu platí pro zapnutou volbu. Vypnutí nesmí vypnout staging/Verify ani běžné kontroly a D5 vlastnosti cíle; pouze nevytváří obnovovací kopii. Budoucí přepis/mazání musí stav bez obnovy uvést v potvrzení. Nejde o povolení jejich implementace v nynější etapě.
+
 
 **Navazující stav (15. října 2026):** na samostatný pokyn uživatele implementována [kopie pouze do nových cílů](directory-sync-plugin-copy-new.md), včetně stagingu, Verify, metadat, průběhu a Stop. Původní návrhové pasáže níže nejsou tvrzením o přepisech či mazání; ty zůstávají neimplementované. SDK/hostitel beze změn, bez SMB testů. Přesné runtime výsledky a odchylku vlastní CREATE_NEW rezervace stagingu uvádí nový protokol.
 

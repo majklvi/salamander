@@ -5,6 +5,7 @@
 #include "precomp.h"
 #include "engine.h"
 #include "copy.h"
+#include "recovery.h"
 #include "resource.h"
 #include <thread>
 #include <memory>
@@ -20,6 +21,41 @@ CSalamanderGeneralAbstract* general = nullptr;
 constexpr UINT Done = WM_APP + 41;
 HBRUSH backgroundBrush = nullptr;
 bool dark = false;
+struct Settings {
+    bool keepOriginals=true;
+    std::wstring recoveryRoot;
+} settings;
+void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
+{
+    settings={};
+    if(!key || !registry) return;
+    DWORD enabled=1,bytes=0;
+    if(registry->GetValue(key,"KeepOriginals",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
+        settings.keepOriginals=enabled!=0;
+    // Explicit UTF-16 binary avoids the legacy SDK's byte-string/ACP boundary.
+    if(registry->GetSize(key,"RecoveryRootUtf16",REG_BINARY,bytes) && bytes>=sizeof(wchar_t) &&
+        bytes<=32760*sizeof(wchar_t) && bytes%sizeof(wchar_t)==0) {
+        std::vector<wchar_t> value(bytes/sizeof(wchar_t));
+        if(registry->GetValue(key,"RecoveryRootUtf16",REG_BINARY,value.data(),bytes) && value.back()==0 &&
+            std::find(value.begin(),value.end()-1,L'\0')==value.end()-1 &&
+            WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,value.data(),-1,nullptr,0,nullptr,nullptr)>0)
+            settings.recoveryRoot=value.data();
+    }
+}
+bool StoreSettings(HKEY key,CSalamanderRegistryAbstract* registry)
+{
+    if(!key || !registry || settings.recoveryRoot.size()>=32760) return false;
+    DWORD enabled=settings.keepOriginals?1:0;
+    bool mode=registry->SetValue(key,"KeepOriginals",REG_DWORD,&enabled,sizeof(enabled))!=FALSE;
+    bool path=registry->SetValue(key,"RecoveryRootUtf16",REG_BINARY,settings.recoveryRoot.c_str(),
+        DWORD((settings.recoveryRoot.size()+1)*sizeof(wchar_t)))!=FALSE;
+    return mode && path;
+}
+void WINAPI SettingsCallback(BOOL load,HKEY key,CSalamanderRegistryAbstract* registry,void* param)
+{
+    if(load) LoadSettings(key,registry);
+    else *static_cast<bool*>(param)=StoreSettings(key,registry);
+}
 std::wstring Text(int id)
 {
     const wchar_t* value = nullptr;
@@ -28,6 +64,22 @@ std::wstring Text(int id)
 }
 void Message(HWND parent, int id)
 { DarkModeMessageBoxW(parent, Text(id).c_str(), Text(IDS_NAME).c_str(), MB_OK | MB_ICONINFORMATION); }
+void PersistSettings(HWND parent)
+{
+    bool saved=false;
+    general->CallLoadOrSaveConfiguration(FALSE,SettingsCallback,&saved);
+    if(!saved) Message(parent,IDS_SETTINGS_FAILED);
+}
+void NotifyPath(const std::wstring& path)
+{
+    // Snapshot paths are wide; preserve UTF-8 at the existing SDK boundary.
+    int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path.c_str(),-1,nullptr,0,nullptr,nullptr);
+    if(n>0) {
+        std::vector<char> encoded(static_cast<size_t>(n));
+        if(WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path.c_str(),-1,encoded.data(),n,nullptr,nullptr))
+            general->PostChangeOnPathNotification(encoded.data(),TRUE);
+    }
+}
 std::wstring ControlText(HWND dialog, int id)
 {
     HWND edit = GetDlgItem(dialog, id);
@@ -53,7 +105,7 @@ void ConfigureDark(HWND dialog)
 }
 struct Preview
 {
-    enum class Intent { None, Apply, Summary, Copy };
+    enum class Intent { None, Apply, Summary, Copy, Save };
     HWND window = nullptr;
     std::wstring left, right;
     std::wstring panelLeft, panelRight;
@@ -68,8 +120,11 @@ struct Preview
     dirsync::Progress progress;
     dirsync::CopyProgress copyProgress;
     dirsync::CopyReport copyReport;
+    dirsync::RecoveryReport recoveryReport;
+    std::wstring recoveryRoot;
     std::vector<size_t> copyRows;
     bool copying = false, hasCopyReport = false;
+    bool saving = false, hasRecoveryReport = false;
     std::thread worker;
     SIZE initialClient{}, minimumWindow{};
     std::vector<std::pair<HWND, RECT>> controls;
@@ -115,8 +170,8 @@ void Status(Preview& p)
     if (p.running)
     {
         wchar_t text[256]{};
-        if (p.copying) {
-            swprintf_s(text, Text(IDS_COPY_PROGRESS).c_str(), p.copyProgress.item.load()+1,
+        if (p.copying || p.saving) {
+            swprintf_s(text, Text(p.saving?IDS_SAVE_PROGRESS:IDS_COPY_PROGRESS).c_str(), p.copyProgress.item.load()+1,
                 uint64_t(p.copyRows.size()), p.copyProgress.copied.load(), p.copyProgress.verified.load(),
                 p.copyProgress.completed.load());
             SetDlgItemTextW(p.window,IDC_STATUS,text); return;
@@ -128,6 +183,7 @@ void Status(Preview& p)
         SetDlgItemTextW(p.window, IDC_STATUS, text); return;
     }
     if (p.hasCopyReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_COPY_AGAIN).c_str()); return; }
+    if (p.hasRecoveryReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_SAVE_AGAIN).c_str()); return; }
     if (p.result.stale && !p.result.cancelled)
     { SetDlgItemTextW(p.window, IDC_STATUS, Text(IDS_STALE).c_str()); return; }
     if (p.failed || p.result.cancelled)
@@ -164,8 +220,11 @@ void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
                    IDC_EMPTY, IDC_COMPARE, IDC_ACTION, IDC_APPLY, IDC_SUMMARY, IDC_EQUAL,
-                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW})
+                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS})
         EnableWindow(GetDlgItem(p.window, id), !busy);
+    for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL,IDC_SAVE_ORIGINALS})
+        EnableWindow(GetDlgItem(p.window,id),!busy && settings.keepOriginals);
+    SetDlgItemTextW(p.window,IDC_RECOVERY_SPACE,Text(settings.keepOriginals?IDS_RECOVERY_SPACE_ON:IDS_RECOVERY_SPACE_OFF).c_str());
     EnableWindow(GetDlgItem(p.window, IDC_SELECTED), !busy && !p.options.selection.empty());
     bool locked = Checked(p.window, IDC_SELECTED);
     EnableWindow(GetDlgItem(p.window, IDC_LEFT), !busy && !locked);
@@ -177,6 +236,7 @@ void InvalidatePlan(Preview& p)
     if (p.running) return;
     p.result = {}; p.visible.clear(); p.failed = false;
     p.hasCopyReport = false;
+    p.hasRecoveryReport = false;
     ListView_SetItemCount(GetDlgItem(p.window, IDC_LIST), 0);
     Status(p);
 }
@@ -332,6 +392,61 @@ void CopyNew(Preview& p)
         SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_COMPARE)),TRUE);
     }
 }
+void RecoverySummary(Preview& p)
+{
+    uint64_t copied=0,failed=0,pending=0,logged=0; std::wstring details;
+    for (const auto& item:p.recoveryReport.items) {
+        if (item.copy.status==dirsync::CopyStatus::Copied) ++copied;
+        else if (item.copy.status==dirsync::CopyStatus::NotStarted) ++pending;
+        else ++failed;
+        if (item.logged) ++logged;
+        if (details.empty() && item.copy.error)
+            details=L"\n\n"+item.original+L"\n"+item.saved+L"\n"+Text(IDS_COPY_ERROR)+Number(item.copy.error)+
+                (item.copy.published?L"\n"+Text(IDS_SAVE_PUBLISHED_ERROR):L"");
+        if (!item.copy.remainingStage.empty()) details+=L"\n"+Text(IDS_COPY_REMAINDER)+item.copy.remainingStage;
+    }
+    wchar_t text[1024]{};
+    swprintf_s(text,Text(IDS_SAVE_RESULT).c_str(),copied,failed,pending,logged,uint64_t(p.recoveryReport.omitted));
+    std::wstring message=std::wstring(text)+p.recoveryReport.journal;
+    if (!p.recoveryReport.complete) message+=L"\n"+Text(IDS_SAVE_INCOMPLETE);
+    if (p.recoveryReport.error) message+=L"\n"+Text(IDS_COPY_ERROR)+Number(p.recoveryReport.error);
+    if (p.recoveryReport.stale) message+=L"\n"+Text(IDS_STALE);
+    message+=details;
+    DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OK|MB_ICONINFORMATION);
+}
+void SaveOriginals(Preview& p)
+{
+    if(!settings.keepOriginals) { Message(p.window,IDS_RECOVERY_DISABLED); return; }
+    p.recoveryRoot=ControlText(p.window,IDC_RECOVERY_ROOT);
+    if (p.recoveryRoot.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
+    p.copyRows.clear(); uint64_t bytes=0,omitted=0;
+    for (size_t i:p.visible) {
+        const auto& r=p.result.rows[i];
+        if (dirsync::IsOriginalToSave(r)) { p.copyRows.push_back(i); bytes+=(r.action==dirsync::Action::CopyRight?r.right:r.left).size; }
+        else if (r.action!=dirsync::Action::None) ++omitted;
+    }
+    if (p.copyRows.empty()) { Message(p.window,IDS_SAVE_EMPTY); return; }
+    wchar_t confirm[2048]{};
+    swprintf_s(confirm,Text(IDS_SAVE_CONFIRM).c_str(),uint64_t(p.copyRows.size()),bytes,omitted);
+    auto message=std::wstring(confirm)+p.recoveryRoot;
+    if (DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONQUESTION)!=IDOK) return;
+    p.cancel=false; p.failed=false; p.saving=true; p.running=true; p.hasCopyReport=false; p.hasRecoveryReport=false;
+    p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
+    p.copyProgress.phase=dirsync::CopyPhase::Checking; p.recoveryReport={};
+    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP)),TRUE);
+    try {
+        const auto rows=p.visible; const auto root=p.recoveryRoot;
+        p.worker=std::thread([&p,rows,root]() {
+            try { p.recoveryReport=dirsync::SaveOriginals(p.result,rows,root,p.cancel,p.progress,p.copyProgress); }
+            catch (...) { p.failed=true; }
+            PostMessageW(p.window,Done,0,0);
+        });
+        SetTimer(p.window,1,150,nullptr);
+    } catch (...) {
+        p.failed=true; p.running=false; p.saving=false; Busy(p,false); Status(p);
+        SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_COMPARE)),TRUE);
+    }
+}
 INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
 {
     Preview* p = reinterpret_cast<Preview*>(GetWindowLongPtrW(window, DWLP_USER));
@@ -340,6 +455,9 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         p = reinterpret_cast<Preview*>(l); p->window = window;
         SetWindowLongPtrW(window, DWLP_USER, reinterpret_cast<LONG_PTR>(p));
         SetDlgItemTextW(window, IDC_LEFT, p->left.c_str()); SetDlgItemTextW(window, IDC_RIGHT, p->right.c_str());
+        SendDlgItemMessageW(window,IDC_RECOVERY_ROOT,EM_SETLIMITTEXT,32759,0);
+        SetDlgItemTextW(window,IDC_RECOVERY_ROOT,settings.recoveryRoot.c_str());
+        CheckDlgButton(window,IDC_KEEP_ORIGINALS,settings.keepOriginals?BST_CHECKED:BST_UNCHECKED);
         SetDlgItemTextW(window, IDC_MASK, L"*.*");
         CheckDlgButton(window, IDC_RECURSIVE, BST_CHECKED);
         CheckDlgButton(window, IDC_SELECTED, p->options.selection.empty() ? BST_UNCHECKED : BST_CHECKED);
@@ -386,6 +504,10 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 if (id == IDC_LIST) { r.right += dx; r.bottom += dy; }
                 else if (id == IDC_LEFT || id == IDC_RIGHT) r.right += dx;
                 else if (id == IDC_STATUS) { r.top += dy; r.bottom += dy; r.right += dx; }
+                else if (id == IDC_RECOVERY_ROOT) { r.top += dy; r.bottom += dy; r.right += dx; }
+                else if (id == IDC_SAVE_ORIGINALS) { r.top += dy; r.bottom += dy; r.left += dx; r.right += dx; }
+                else if (id == IDC_RECOVERY_LABEL) { r.top += dy; r.bottom += dy; }
+                else if (id == IDC_KEEP_ORIGINALS || id == IDC_RECOVERY_SPACE) { r.top += dy; r.bottom += dy; }
                 else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDCANCEL)
                 { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
@@ -398,16 +520,15 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if (p->validating) { p->result = std::move(p->checkedResult); p->validating = false; }
         if (p->copying) {
             p->copying=false; p->hasCopyReport=true; p->result.stale=true; p->result.snapshot.reset();
-            // Snapshot paths were decoded on entry; preserve their UTF-8 encoding for SDK notifications.
-            for (const auto& path:{p->left,p->right}) {
-                int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path.c_str(),-1,nullptr,0,nullptr,nullptr);
-                if (n>0) { std::vector<char> encoded(static_cast<size_t>(n));
-                    if (WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path.c_str(),-1,encoded.data(),n,nullptr,nullptr))
-                        general->PostChangeOnPathNotification(encoded.data(),TRUE); }
-            }
+            for (const auto& path:{p->left,p->right}) NotifyPath(path);
             if (!p->closing) { if (p->failed) Message(window,IDS_COPY_FAILED); else CopySummary(*p); }
         }
-        if (p->closing) EndDialog(window, 0);
+        if (p->saving) {
+            p->saving=false; p->hasRecoveryReport=true; p->result.stale=true; p->result.snapshot.reset();
+            if (!p->recoveryReport.runDirectory.empty()) NotifyPath(p->recoveryRoot);
+            if (!p->closing) { if (p->failed) Message(window,IDS_SAVE_FAILED); else RecoverySummary(*p); }
+        }
+        if (p->closing) { PersistSettings(window); EndDialog(window, 0); }
         else
         {
             HWND focused = GetFocus();
@@ -422,12 +543,13 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 if (intent == Preview::Intent::Apply) Apply(*p);
                 else if (intent == Preview::Intent::Summary) Summary(*p);
                 else if (intent == Preview::Intent::Copy) CopyNew(*p);
+                else if (intent == Preview::Intent::Save) SaveOriginals(*p);
             }
         }
         return TRUE;
     case WM_CLOSE:
         if (p->running) { p->closing = true; p->Stop(); }
-        else EndDialog(window, 0);
+        else { PersistSettings(window); EndDialog(window, 0); }
         return TRUE;
     case WM_SETTINGCHANGE: case WM_THEMECHANGED: ConfigureDark(window); return TRUE;
     case WM_COMMAND:
@@ -439,6 +561,13 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_APPLY: ValidatePreview(*p, Preview::Intent::Apply); return TRUE;
         case IDC_SUMMARY: ValidatePreview(*p, Preview::Intent::Summary); return TRUE;
         case IDC_COPY_NEW: ValidatePreview(*p, Preview::Intent::Copy); return TRUE;
+        case IDC_SAVE_ORIGINALS: ValidatePreview(*p, Preview::Intent::Save); return TRUE;
+        case IDC_KEEP_ORIGINALS:
+            if(!p->running) { settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS); Busy(*p,false); PersistSettings(window); }
+            return TRUE;
+        case IDC_RECOVERY_ROOT:
+            if(HIWORD(w)==EN_CHANGE && !p->running) settings.recoveryRoot=ControlText(window,IDC_RECOVERY_ROOT);
+            return TRUE;
         case IDC_EQUAL: case IDC_DIFFERENT: case IDC_SINGLE: case IDC_TORIGHT: case IDC_TOLEFT:
             if (!p->running) Filter(*p); return TRUE;
         case IDC_SELECTED:
@@ -546,8 +675,10 @@ public:
         if (backgroundBrush) { DeleteObject(backgroundBrush); backgroundBrush = nullptr; }
         return TRUE;
     }
-    void WINAPI LoadConfiguration(HWND, HKEY, CSalamanderRegistryAbstract*) override {}
-    void WINAPI SaveConfiguration(HWND, HKEY, CSalamanderRegistryAbstract*) override {}
+    void WINAPI LoadConfiguration(HWND, HKEY key, CSalamanderRegistryAbstract* registry) override
+    { try { LoadSettings(key,registry); } catch(...) { settings={}; } }
+    void WINAPI SaveConfiguration(HWND, HKEY key, CSalamanderRegistryAbstract* registry) override
+    { StoreSettings(key,registry); }
     void WINAPI Configuration(HWND) override {}
     void WINAPI Connect(HWND, CSalamanderConnectAbstract* connect) override
     { connect->AddMenuItem(-1, general->LoadStr(language, IDS_MENU), 0, 1, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL); }
@@ -578,7 +709,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (!language) return nullptr;
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES}; InitCommonControlsEx(&controls);
     ConfigureDark(nullptr);
-    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), 0, "0.1", "Copyright (c) 2026 Open Salamander Authors",
+    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION, "0.1", "Copyright (c) 2026 Open Salamander Authors",
                               general->LoadStr(language, IDS_DESCRIPTION), "DirectorySync");
     return &plugin;
 }

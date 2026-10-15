@@ -1,14 +1,17 @@
 // SPDX-FileCopyrightText: 2026 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Ordinary Win32 file operations following core worker patterns. Copy-new only.
+// Ordinary Win32 file operations following core worker patterns. New copies only,
+// including independent recovery copies; never replace or delete originals.
 #include "precomp.h"
 #include "copy.h"
+#include "recovery.h"
 #include <aclapi.h>
 #include <objbase.h>
 #include <algorithm>
 #include <map>
 #include <set>
 #include <stdexcept>
+#include <cstdio>
 
 namespace dirsync {
 namespace {
@@ -258,6 +261,170 @@ bool IsNewFileCopy(const Row& r)
     if (r.action==Action::CopyRight && r.hasLeft && !r.hasRight) e=&r.left;
     if (r.action==Action::CopyLeft && r.hasRight && !r.hasLeft) e=&r.right;
     return e && e->identified && !e->directory && !e->error && !Unsupported(e->attributes) && Relative(r.path);
+}
+bool IsOriginalToSave(const Row& r)
+{
+    if (r.state==State::Blocked || r.state==State::Conflict || !r.hasLeft || !r.hasRight ||
+        (r.action!=Action::CopyLeft && r.action!=Action::CopyRight) || !Relative(r.path)) return false;
+    for (const Entry* e:{&r.left,&r.right})
+        if (!e->identified || e->directory || e->error || Unsupported(e->attributes)) return false;
+    return true;
+}
+namespace {
+// A journal failure must never be mistaken for a completed recovery record.
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
+thread_local std::function<DWORD(const std::wstring&)> recoveryLogHook;
+#endif
+std::wstring RecoveryCanonical(const std::wstring& path,std::atomic<bool>& cancel)
+{
+    Parents(path,Join(path,L"root-check"),false,cancel);
+    File directory(Open(path,FILE_READ_ATTRIBUTES)); Need(directory.h!=INVALID_HANDLE_VALUE);
+    DWORD n=GetFinalPathNameByHandleW(directory.h,nullptr,0,VOLUME_NAME_DOS); Need(n!=0);
+    std::vector<wchar_t> buffer(size_t(n)+1);
+    DWORD used=GetFinalPathNameByHandleW(directory.h,buffer.data(),DWORD(buffer.size()),VOLUME_NAME_DOS);
+    Need(used && used<buffer.size());
+    std::wstring result;
+    if (!NormalizeRoot(std::wstring(buffer.data(),used),result)) throw Failure{ERROR_INVALID_NAME};
+    return result;
+}
+bool RecoveryWithin(const std::wstring& root,const std::wstring& path)
+{
+    return path.size()>=root.size() && CompareStringOrdinal(root.c_str(),int(root.size()),path.c_str(),int(root.size()),TRUE)==CSTR_EQUAL &&
+        (path.size()==root.size() || root.back()==L'\\' || path[root.size()]==L'\\');
+}
+void RecoveryDirectory(const std::wstring& path,std::atomic<bool>& cancel)
+{
+    Stop(cancel);
+    if (!CreateDirectoryW(ApiPath(path).c_str(),nullptr) && GetLastError()!=ERROR_ALREADY_EXISTS) throw Failure{GetLastError()};
+    Parents(path,Join(path,L"directory-check"),false,cancel);
+}
+std::wstring RecoveryPair(const std::wstring& left,const std::wstring& right)
+{
+    auto text=left+L"\n"+right; CharUpperBuffW(&text[0],DWORD(text.size()));
+    uint64_t hash=14695981039346656037ULL;
+    for (wchar_t c:text) { hash^=uint16_t(c); hash*=1099511628211ULL; }
+    wchar_t token[32]{}; swprintf_s(token,L"pair-%016llx",hash); return token;
+}
+std::wstring RecoveryRun(const std::wstring& pair,std::atomic<bool>& cancel)
+{
+    for (int i=0;i<16;++i) {
+        Stop(cancel); GUID guid{}; if (CoCreateGuid(&guid)!=S_OK) throw Failure{ERROR_GEN_FAILURE};
+        wchar_t token[48]{}; if (!StringFromGUID2(guid,token,int(std::size(token)))) throw Failure{ERROR_GEN_FAILURE};
+        auto run=Join(pair,L"run-"+std::wstring(token));
+        if (CreateDirectoryW(ApiPath(run).c_str(),nullptr)) return run;
+        if (GetLastError()!=ERROR_ALREADY_EXISTS) throw Failure{GetLastError()};
+    }
+    throw Failure{ERROR_FILE_EXISTS};
+}
+std::wstring Json(const std::wstring& value)
+{
+    std::wstring out=L"\"";
+    for (wchar_t c:value) {
+        if (c==L'"' || c==L'\\') { out+=L'\\'; out+=c; }
+        else if (c<32) { wchar_t escape[8]{}; swprintf_s(escape,L"\\u%04x",unsigned(c)); out+=escape; }
+        else out+=c;
+    }
+    return out+L"\"";
+}
+void RecoveryLine(HANDLE journal,const std::wstring& line)
+{
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
+    if (recoveryLogHook) { DWORD error=recoveryLogHook(line); if (error) throw Failure{error}; }
+#endif
+    auto text=line+L"\n";
+    int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.c_str(),int(text.size()),nullptr,0,nullptr,nullptr);
+    if (!n) throw Failure{GetLastError()};
+    std::vector<char> bytes(static_cast<size_t>(n));
+    Need(WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.c_str(),int(text.size()),bytes.data(),n,nullptr,nullptr)!=0);
+    DWORD written=0; Need(WriteFile(journal,bytes.data(),DWORD(bytes.size()),&written,nullptr));
+    if (written!=bytes.size()) throw Failure{ERROR_WRITE_FAULT};
+    Need(FlushFileBuffers(journal));
+}
+std::wstring RecoveryOutcomeLine(size_t index,const RecoveryItem& item)
+{
+    const auto& c=item.copy;
+    const wchar_t* status=c.status==CopyStatus::Copied?L"saved":c.status==CopyStatus::Failed?L"failed":
+        c.status==CopyStatus::Cancelled?L"cancelled":L"not_started";
+    return L"{\"event\":\"result\",\"item\":"+std::to_wstring(index+1)+L",\"status\":"+Json(status)+
+        L",\"error\":"+std::to_wstring(c.error)+L",\"published\":"+(c.published?L"true":L"false")+
+        L",\"remainingStage\":"+Json(c.remainingStage)+L"}";
+}
+}
+#if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
+void SetRecoveryLogHook(std::function<DWORD(const std::wstring&)> callback) { recoveryLogHook=std::move(callback); }
+#endif
+RecoveryReport SaveOriginals(Result snapshot,const std::vector<size_t>& visible,const std::wstring& recoveryRoot,
+    std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress)
+{
+    RecoveryReport report; std::wstring left,right;
+    File journal;
+    try {
+        std::set<size_t> unique;
+        for (size_t i:visible) {
+            if (i>=snapshot.rows.size() || !unique.insert(i).second) continue;
+            const auto& row=snapshot.rows[i];
+            if (IsOriginalToSave(row)) { RecoveryItem item; item.row=i; item.right=row.action==Action::CopyRight; report.items.push_back(std::move(item)); }
+            else if (row.action!=Action::None) ++report.omitted;
+        }
+        if (report.items.empty()) return report;
+        if (!SnapshotRoots(snapshot,left,right) || !Revalidate(snapshot,cancel,checking)) {
+            report.stale=true; report.cancelled=cancel.load(); return report;
+        }
+        std::wstring root;
+        if (!NormalizeRoot(recoveryRoot,root)) throw Failure{ERROR_INVALID_NAME};
+        root=RecoveryCanonical(root,cancel);
+        for (const auto& input:{RecoveryCanonical(left,cancel),RecoveryCanonical(right,cancel)})
+            if (RecoveryWithin(root,input) || RecoveryWithin(input,root)) throw Failure{ERROR_INVALID_PARAMETER};
+        auto pair=Join(root,RecoveryPair(RecoveryCanonical(left,cancel),RecoveryCanonical(right,cancel)));
+        RecoveryDirectory(pair,cancel); report.runDirectory=RecoveryRun(pair,cancel);
+        File run(Open(report.runDirectory,FILE_READ_ATTRIBUTES)); Need(run.h!=INVALID_HANDLE_VALUE); const Entry runId=Info(run.h); run.Close();
+        report.journal=Join(report.runDirectory,L"manifest.jsonl");
+        journal.h=Open(report.journal,GENERIC_WRITE,FILE_SHARE_READ,CREATE_NEW); Need(journal.h!=INVALID_HANDLE_VALUE);
+        auto append=[&](const std::wstring& line) {
+            try { RecoveryLine(journal.h,line); }
+            catch (const Failure& failure) { report.journalError=failure.error; throw; }
+        };
+        append(L"{\"event\":\"run\",\"schema\":1,\"operation\":\"save_originals_only\",\"left\":"+
+            Json(left)+L",\"right\":"+Json(right)+L",\"runDirectory\":"+Json(report.runDirectory)+L"}");
+        for (size_t n=0;n<report.items.size();++n) {
+            auto& item=report.items[n]; const auto& row=snapshot.rows[item.row];
+            const auto& entry=item.right?row.right:row.left;
+            item.original=Join(item.right?right:left,row.path);
+            auto side=Join(report.runDirectory,item.right?L"right":L"left"); RecoveryDirectory(side,cancel);
+            auto operation=Join(side,std::to_wstring(n+1)); RecoveryDirectory(operation,cancel);
+            auto data=Join(operation,L"data"); RecoveryDirectory(data,cancel);
+            item.saved=Join(data,row.path); item.copy.row=item.row; item.copy.target=item.saved;
+            append(L"{\"event\":\"planned\",\"item\":"+std::to_wstring(n+1)+L",\"side\":"+
+                Json(item.right?L"right":L"left")+L",\"relative\":"+Json(row.path)+L",\"original\":"+Json(item.original)+
+                L",\"saved\":"+Json(item.saved)+L",\"size\":"+std::to_wstring(entry.size)+L",\"mtime\":"+
+                std::to_wstring(entry.time)+L",\"attributes\":"+std::to_wstring(entry.attributes)+L"}");
+        }
+        size_t n=0;
+        for (;n<report.items.size();++n) {
+            auto& item=report.items[n]; const auto& row=snapshot.rows[item.row]; progress.item=n;
+            try {
+                Stop(cancel); File currentRun(Open(report.runDirectory,FILE_READ_ATTRIBUTES)); Need(currentRun.h!=INVALID_HANDLE_VALUE);
+                if (!SameId(runId,Info(currentRun.h))) throw Failure{ERROR_FILE_INVALID};
+                Row original; original.path=row.path; original.hasLeft=true; original.left=item.right?row.right:row.left; original.action=Action::CopyRight;
+                auto data=item.saved.substr(0,item.saved.size()-row.path.size()-1);
+                CopyOne(item.right?right:left,data,original,item.copy,cancel,progress);
+            } catch (const Failure& failure) {
+                item.copy.error=failure.error; report.error=failure.error;
+                report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
+                item.copy.status=report.cancelled?CopyStatus::Cancelled:CopyStatus::Failed;
+            } catch (...) { item.copy.error=report.error=ERROR_NOT_ENOUGH_MEMORY; item.copy.status=CopyStatus::Failed; }
+            append(RecoveryOutcomeLine(n,item)); item.logged=true;
+            if (item.copy.status!=CopyStatus::Copied) { ++n; break; }
+        }
+        for (;n<report.items.size();++n) { append(RecoveryOutcomeLine(n,report.items[n])); report.items[n].logged=true; }
+        append(L"{\"event\":\"end\",\"status\":"+Json(report.error?(report.cancelled?L"cancelled":L"failed"):L"complete")+L"}");
+        report.complete=!report.error;
+    } catch (const Failure& failure) {
+        report.error=failure.error;
+        report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
+    }
+    catch (...) { report.error=ERROR_NOT_ENOUGH_MEMORY; }
+    Phase(progress,CopyPhase::Finished,L""); return report;
 }
 CopyReport CopyNewFiles(Result snapshot,const std::vector<size_t>& visible,std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress)
 {

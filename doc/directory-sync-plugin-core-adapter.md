@@ -1,5 +1,9 @@
 # Directory Synchronization: mapování jádra a nejmenšího adaptéru
 
+**Aktuální navazující etapa:** implementováno [samostatné uchování originálů a JSONL protokol](directory-sync-plugin-recovery.md) nad stejným přenosem jako nové kopie. Originály se nemění; přepis ani mazání nejsou implementované. Níže uvedené budoucí kroky zůstávají návrhem.
+
+Následný pokyn uživatele doplnil zapamatovanou volbu uchování originálů (výchozí zapnuto, lze vypnout). Níže uvedená povinná obnova před přepisem/mazáním předpokládá zapnutou volbu; budoucí executor musí vypnutí respektovat a uvést v potvrzení. Ostatní běžné kontroly a D5 cíle platí dál.
+
 
 **Navazující stav (15. října 2026):** na samostatný pokyn uživatele implementována [kopie pouze do nových cílů](directory-sync-plugin-copy-new.md), včetně stagingu, Verify, metadat, průběhu a Stop. Původní návrhové pasáže níže nejsou tvrzením o přepisech či mazání; ty zůstávají neimplementované. SDK/hostitel beze změn, bez SMB testů. Přesné runtime výsledky a odchylku vlastní CREATE_NEW rezervace stagingu uvádí nový protokol.
 

@@ -1,8 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 #include "../copy.h"
+#include "../recovery.h"
 #include "copy_space_faults.h"
 #include <sddl.h>
+#include <winioctl.h>
 #include <iostream>
 #include <stdexcept>
 using namespace dirsync;
@@ -47,6 +49,21 @@ struct Fixture {
         left=root+L"\\left"; right=root+L"\\right"; Dir(left); Dir(right);
     }
     void Dir(const std::wstring& p) { Check(CreateDirectoryW(ApiPath(p).c_str(),nullptr)!=FALSE,"fixture dir"); }
+    // Same ordinary junction fixture as engine_tests.cpp; no privilege changes.
+    void Junction(const std::wstring& path,const std::wstring& target) {
+        Dir(path); std::wstring substitute=L"\\??\\"+target;
+        std::vector<unsigned char> buffer(16+(substitute.size()+1+target.size()+1)*sizeof(wchar_t));
+        struct Header { DWORD tag; WORD length,reserved,subOffset,subLength,printOffset,printLength; };
+        auto* header=reinterpret_cast<Header*>(buffer.data()); header->tag=IO_REPARSE_TAG_MOUNT_POINT;
+        header->length=WORD(buffer.size()-8); header->subLength=WORD(substitute.size()*sizeof(wchar_t));
+        header->printOffset=WORD((substitute.size()+1)*sizeof(wchar_t)); header->printLength=WORD(target.size()*sizeof(wchar_t));
+        memcpy(buffer.data()+16,substitute.c_str(),(substitute.size()+1)*sizeof(wchar_t));
+        memcpy(buffer.data()+16+header->printOffset,target.c_str(),(target.size()+1)*sizeof(wchar_t));
+        HANDLE h=CreateFileW(ApiPath(path).c_str(),GENERIC_WRITE,0,nullptr,OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OPEN_REPARSE_POINT,nullptr);
+        Check(h!=INVALID_HANDLE_VALUE,"recovery junction handle"); DWORD returned=0;
+        bool ok=DeviceIoControl(h,FSCTL_SET_REPARSE_POINT,buffer.data(),DWORD(buffer.size()),nullptr,0,&returned,nullptr)!=FALSE;
+        CloseHandle(h); Check(ok,"recovery junction fixture");
+    }
     Result Scan(bool asymmetric=false) { Options o; o.asymmetric=asymmetric; return Compare(left,right,o,cancel,checking); }
     CopyReport Run(Result r,const std::vector<size_t>& selected={}) {
         std::vector<size_t> rows=selected; if(rows.empty()) for(size_t i=0;i<r.rows.size();++i) rows.push_back(i);
@@ -56,7 +73,7 @@ struct Fixture {
         WIN32_FIND_DATAW d{}; HANDLE f=FindFirstFileW((ApiPath(dir)+L"\\.dirsync-*").c_str(),&d);
         bool absent=f==INVALID_HANDLE_VALUE; if(!absent) FindClose(f); Check(absent,"no unreported staging left");
     }
-    ~Fixture() { SetCopyHook({}); dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::None,0,1); Cleanup(root); RemoveDirectoryW(ApiPath(root).c_str()); }
+    ~Fixture() { SetCopyHook({}); SetRecoveryLogHook({}); dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::None,0,1); Cleanup(root); RemoveDirectoryW(ApiPath(root).c_str()); }
 };
 void Acl(const std::wstring& path,const wchar_t* text) {
     PSECURITY_DESCRIPTOR sd=nullptr; Check(ConvertStringSecurityDescriptorToSecurityDescriptorW(text,SDDL_REVISION_1,&sd,nullptr)!=FALSE,"SDDL");
@@ -226,6 +243,147 @@ void AfterPublication() {
     Check(!report.items[0].published && f.progress.verified>0 && f.progress.verified<2*1024*1024,"Verify interrupted before reading entire file");
     Check(GetFileAttributesW(ApiPath(f.right+L"\\a").c_str())==INVALID_FILE_ATTRIBUTES,"partial Verify never publishes"); f.NoStaging(f.right);
 }
+Result RecoveryPlan(Fixture& f) {
+    auto plan=f.Scan(true);
+    for(auto& row:plan.rows) if(row.hasLeft && row.hasRight && !row.left.directory && !row.right.directory)
+        row.action=Action::CopyRight;
+    return plan;
+}
+RecoveryReport Save(Fixture& f,const Result& plan,const std::wstring& root,const std::vector<size_t>& selected={}) {
+    auto rows=selected; if(rows.empty()) for(size_t i=0;i<plan.rows.size();++i) rows.push_back(i);
+    return SaveOriginals(plan,rows,root,f.cancel,f.checking,f.progress);
+}
+void RecoverySuccess() {
+    Fixture f; auto root=f.root+L"\\obnova-漢字"; f.Dir(root);
+    Put(f.left+L"\\a","NEW"); Put(f.right+L"\\a","ORIGINAL"); Put(f.right+L"\\a:note","OLD ADS");
+    Put(f.right+L"\\a:漢字",""); Put(f.left+L"\\b","LEFT OLD"); Put(f.right+L"\\b","NEW RIGHT");
+    Put(f.left+L"\\new","NOT COPIED"); Put(f.right+L"\\delete","NOT DELETED");
+    Acl(f.right+L"\\a",L"D:P(A;;FA;;;OW)(A;;FR;;;WD)"); auto originalAcl=Dacl(f.right+L"\\a");
+    Check(SetFileAttributesW(ApiPath(f.right+L"\\a").c_str(),FILE_ATTRIBUTE_READONLY|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM)!=FALSE,"original recovery flags");
+    auto plan=RecoveryPlan(f); for(auto& row:plan.rows) if(row.path==L"b") row.action=Action::CopyLeft;
+    auto report=Save(f,plan,root);
+    if(report.error) std::cerr<<"recovery error "<<report.error<<"\n";
+    Check(report.complete && !report.error && report.items.size()==2 && report.omitted==2,"only existing file copy proposals saved");
+    Check(report.items[0].right && !report.items[1].right,"save target side in both directions");
+    for(const auto& item:report.items) Check(item.logged && item.copy.status==CopyStatus::Copied && item.copy.published,"saved outcomes durably logged");
+    Check(Read(report.items[0].saved)=="ORIGINAL" && Read(report.items[0].saved+L":note")=="OLD ADS" && Read(report.items[0].saved+L":漢字").empty(),"recovery exact main and full ADS set");
+    Check(Read(report.items[1].saved)=="LEFT OLD","reverse saves left original, not proposed source");
+    Check(Read(f.left+L"\\a")=="NEW" && Read(f.right+L"\\a")=="ORIGINAL" && Read(f.left+L"\\b")=="LEFT OLD" && Read(f.right+L"\\b")=="NEW RIGHT","all originals unchanged");
+    Check(Read(f.right+L"\\delete")=="NOT DELETED" && GetFileAttributesW(ApiPath(f.right+L"\\new").c_str())==INVALID_FILE_ATTRIBUTES,"delete and new-file proposals not executed");
+    Check(Dacl(f.right+L"\\a")==originalAcl,"original permissions unchanged");
+    Put(root+L"\\reference","ACL"); Check(Dacl(report.items[0].saved)==Dacl(root+L"\\reference"),"recovery inherits recovery permissions");
+    Check((GetFileAttributesW(ApiPath(report.items[0].saved).c_str()) & (FILE_ATTRIBUTE_READONLY|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM))==
+        (FILE_ATTRIBUTE_READONLY|FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM),"recovery retains selected flags");
+    auto log=Read(report.journal);
+    Check(log.find("\"schema\":1")!=std::string::npos && log.find("\"operation\":\"save_originals_only\"")!=std::string::npos &&
+        log.find("\"status\":\"complete\"")!=std::string::npos && log.back()=='\n',"versioned JSONL run and complete record");
+    Check(log.find("\"original\":")!=std::string::npos && log.find("\"saved\":")!=std::string::npos && log.find("\"mtime\":")!=std::string::npos,"journal includes restoration mapping and metadata");
+    auto again=Save(f,plan,root);
+    Check(again.complete && again.runDirectory!=report.runDirectory && Read(report.items[0].saved)=="ORIGINAL","repeated run never collides with old recovery");
+    auto restored=f.root+L"\\restored";
+    Check(CopyFileW(ApiPath(report.items[0].saved).c_str(),ApiPath(restored).c_str(),TRUE)!=FALSE &&
+        Read(restored)=="ORIGINAL" && Read(restored+L":note")=="OLD ADS","ordinary manual restore to new name preserves data and ADS");
+    // Recovery is independent even when the original has other hardlink names.
+    Fixture link; auto recovery=link.root+L"\\recovery"; link.Dir(recovery);
+    Put(link.left+L"\\a","NEW"); Put(link.right+L"\\a","OLD");
+    Check(CreateHardLinkW(ApiPath(link.root+L"\\alias").c_str(),ApiPath(link.right+L"\\a").c_str(),nullptr)!=FALSE,"recovery hardlink fixture");
+    auto independent=Save(link,RecoveryPlan(link),recovery); Check(independent.complete,"hardlink original saved");
+    Put(link.root+L"\\alias","MOD",false); Check(Read(independent.items[0].saved)=="OLD","recovery copy independent of original aliases");
+}
+void RecoveryFailures() {
+    for(int mode=0;mode<14;++mode) {
+        Fixture f; auto root=f.root+L"\\recovery"; f.Dir(root);
+        Put(f.left+L"\\a","NEW"); Put(f.right+L"\\a",std::string(2*1024*1024,'O')); Put(f.right+L"\\a:note","OLD ADS");
+        Put(f.left+L"\\b","NEW B"); Put(f.right+L"\\b","OLD B"); auto plan=RecoveryPlan(f);
+        bool injected=false;
+        if(mode==0) root=f.right; // inside compared tree
+        if(mode==1) root=f.root; // ancestor of compared trees
+        if(mode==2) root+=L"\\missing";
+        if(mode==3) Put(f.left+L"\\a","CHANGED",false);
+        if(mode==4) Acl(root,L"D:P(D;OICI;0x2;;;WD)(A;OICI;FA;;;OW)");
+        HANDLE lock=INVALID_HANDLE_VALUE;
+        if(mode==10) {
+            lock=CreateFileW(ApiPath(f.right+L"\\a").c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+            Check(lock!=INVALID_HANDLE_VALUE,"exclusive original lock");
+        }
+        if(mode==11) { auto alias=f.root+L"\\junction"; f.Junction(alias,root); root=alias; }
+        if(mode==5 || mode==6 || mode==7 || mode==12) SetCopyHook([&](CopyPhase phase,const std::wstring& stage) {
+            if(injected) return;
+            if((mode==5 && phase==CopyPhase::Copying && f.progress.copied>0) ||
+                (mode==6 && phase==CopyPhase::Verifying && f.progress.verified>0)) { injected=true; f.cancel=true; }
+            if(mode==7 && phase==CopyPhase::Verifying) { injected=true; Put(stage,"CORRUPT",false); }
+            if(mode==12 && phase==CopyPhase::Published) { injected=true; Acl(stage,L"D:P(D;;0x100;;;WD)(A;;FA;;;OW)"); }
+        });
+        if(mode==8) dirsync_test::SetSpaceFault(dirsync_test::SpaceFault::MainData,ERROR_DISK_FULL,1);
+        if(mode==9) SetRecoveryLogHook([&](const std::wstring& line)->DWORD {
+            if(line.find(L"\"event\":\"result\"")!=std::wstring::npos) { injected=true; return ERROR_DISK_FULL; } return 0;
+        });
+        if(mode==13) SetRecoveryLogHook([](const std::wstring& line)->DWORD {
+            return line.find(L"\"event\":\"planned\"")==std::wstring::npos?0:ERROR_WRITE_FAULT;
+        });
+        auto report=Save(f,plan,root); SetCopyHook({}); SetRecoveryLogHook({});
+        if(lock!=INVALID_HANDLE_VALUE) CloseHandle(lock);
+        if(mode==4) Acl(root,L"D:P(A;OICI;FA;;;OW)");
+        if(mode==12 && report.items[0].copy.published) Acl(report.items[0].saved,L"D:P(A;OICI;FA;;;OW)");
+        Check(!report.complete && (report.error || report.stale),"failed recovery never complete");
+        Check(Read(f.right+L"\\a")==std::string(2*1024*1024,'O') && Read(f.right+L"\\a:note")=="OLD ADS" && Read(f.right+L"\\b")=="OLD B","recovery failure leaves original data and ADS untouched");
+        Check(report.items.size()==2 && report.items[1].copy.status==CopyStatus::NotStarted,"failure prevents next recovery copy");
+        if(mode<4) Check(report.journal.empty(),"invalid root or stale snapshot creates no log");
+        if(mode==3) Check(report.stale,"source change invalidates complete proposal snapshot");
+        if(mode==5 || mode==6) Check(injected && report.cancelled && report.items[0].copy.status==CopyStatus::Cancelled,"Stop interrupts real transfer or Verify");
+        if(mode==7) Check(injected && report.items[0].copy.status==CopyStatus::Failed && !report.items[0].copy.published,"corrupt staging never published");
+        if(mode==8) Check(dirsync_test::SpaceFaultReached() && report.error==ERROR_DISK_FULL,"recovery partial disk-full failure preserved");
+        if(mode==9) Check(injected && report.journalError==ERROR_DISK_FULL && report.items[0].copy.status==CopyStatus::Copied && !report.items[0].logged &&
+            Read(report.items[0].saved)==std::string(2*1024*1024,'O') && Read(report.journal).find("\"event\":\"end\"")==std::string::npos,"journal failure preserves saved file but rejects completed recovery");
+        if(mode==10) Check(report.stale || report.error==ERROR_SHARING_VIOLATION,"locked original refused");
+        if(mode==11) Check(report.journal.empty(),"reparse recovery root rejected before writes");
+        if(mode==12) Check(injected && report.items[0].copy.published && report.items[0].copy.status==CopyStatus::Failed &&
+            report.items[0].logged && report.error==ERROR_ACCESS_DENIED && Read(report.items[0].saved)==std::string(2*1024*1024,'O') &&
+            Read(report.journal).find("\"status\":\"failed\"")!=std::string::npos,"post-publication metadata failure retains recovery and logs failure");
+        if(mode==13) Check(report.journalError==ERROR_WRITE_FAULT && !report.items[0].copy.published &&
+            report.items[0].copy.status==CopyStatus::NotStarted,"planned log must be written before any recovery copy");
+        if(mode>=5 && mode<=8) Check(report.items[0].logged && report.items[1].logged && !report.journalError &&
+            Read(report.journal).find("\"status\":\"complete\"")==std::string::npos,"ordinary failure/cancellation logged including not-started items");
+        if(mode>=5 && mode<=8) f.NoStaging(report.items[0].saved.substr(0,report.items[0].saved.find_last_of(L'\\')));
+    }
+    Fixture f; auto root=f.root+L"\\recovery"; f.Dir(root);
+    Put(f.left+L"\\a","NEW"); Put(f.right+L"\\a","ORIGINAL A"); Put(f.left+L"\\b","NEW"); Put(f.right+L"\\b","ORIGINAL B");
+    SetCopyHook([&](CopyPhase phase,const std::wstring&) { if(phase==CopyPhase::Published) f.cancel=true; });
+    auto report=Save(f,RecoveryPlan(f),root); SetCopyHook({});
+    Check(report.cancelled && report.items[0].copy.status==CopyStatus::Copied && report.items[0].logged &&
+        report.items[1].copy.status==CopyStatus::Cancelled,"Stop after publication retains completed logged original");
+    Check(Read(report.items[0].saved)=="ORIGINAL A" && Read(f.right+L"\\a")=="ORIGINAL A" && Read(f.right+L"\\b")=="ORIGINAL B","Stop leaves originals and prior saved file intact");
+}
+void RecoveryPaths() {
+    for(bool longUtf16:{false,true}) {
+        Fixture f; auto a=f.left,b=f.right,root=f.root;
+        for(int i=0;i<(longUtf16?5:2);++i) {
+            auto part=L"\\"+std::wstring(35,L'階')+std::to_wstring(i); a+=part; b+=part; root+=part; f.Dir(a); f.Dir(b); f.Dir(root);
+        }
+        auto name=longUtf16?L"\\"+std::wstring(170,L'x')+L"-漢字-😀.txt":L"\\file.txt";
+        Put(a+name,"NEW"); Put(b+name,"OLD"); Put(b+name+L":žluťoučký","ADS");
+        auto plan=RecoveryPlan(f); auto report=Save(f,plan,root);
+        if(report.error) std::cerr<<"recovery path error "<<report.error<<"\n";
+        Check(report.complete && report.items.size()==1,"recovery long and Unicode paths");
+        Check(Read(report.items[0].saved)=="OLD" && Read(report.items[0].saved+L":žluťoučký")=="ADS" && Read(b+name)=="OLD","long recovery exact original and ADS");
+        auto bytes=Read(report.journal);
+        Check(MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,bytes.data(),int(bytes.size()),nullptr,0)>0,"manifest valid UTF-8");
+        Check(WideCharToMultiByte(CP_UTF8,0,root.c_str(),-1,nullptr,0,nullptr,nullptr)>260,"recovery path exceeds MAX_PATH in UTF-8");
+        if(longUtf16) Check(report.items[0].saved.size()>260,"saved full UTF-16 path exceeds MAX_PATH");
+    }
+    Fixture f; auto root=f.root+L"\\recovery"; f.Dir(root);
+    for(const auto& folder:{L"one",L"two"}) {
+        auto a=f.left+L"\\"+folder,b=f.right+L"\\"+folder; f.Dir(a); f.Dir(b);
+        Put(a+L"\\漢字.txt","NEW"); Put(b+L"\\漢字.txt",folder==std::wstring(L"one")?"": "OLD TWO");
+    }
+    auto plan=RecoveryPlan(f); std::vector<size_t> rows;
+    for(size_t i=0;i<plan.rows.size();++i) if(IsOriginalToSave(plan.rows[i])) rows.push_back(i);
+    Check(rows.size()==2,"nested originals fixture");
+    auto report=Save(f,plan,root,{rows[0],rows[0],size_t(-1)});
+    Check(report.complete && report.items.size()==1 && Read(report.items[0].saved).empty(),"visible selection deduplicated; empty original retained");
+    auto both=Save(f,plan,root,rows);
+    Check(both.complete && both.items.size()==2 && both.items[0].saved!=both.items[1].saved && Read(both.items[1].saved)=="OLD TWO","same basename in separate directories maps without collisions");
+}
 void DiskSpace() {
     using dirsync_test::SpaceFault;
     for(auto fault:{SpaceFault::Reserve,SpaceFault::MainData,SpaceFault::NamedStream,SpaceFault::RetainStage,SpaceFault::Publish}) {
@@ -272,6 +430,7 @@ void DiskSpace() {
 }
 }
 int main() {
-    try { Success(); Scope(); ModifyOnlyDestination(); Boundaries(); Paths(); AfterPublication(); DiskSpace(); std::cout<<checks<<" copy assertions passed\n"; return 0; }
+    try { Success(); Scope(); ModifyOnlyDestination(); Boundaries(); Paths(); AfterPublication(); DiskSpace();
+        RecoverySuccess(); RecoveryFailures(); RecoveryPaths(); std::cout<<checks<<" copy/recovery assertions passed\n"; return 0; }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }
 }
