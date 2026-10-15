@@ -1,5 +1,7 @@
 # Kopie do nových cílů: Stop/Close a chyby po publikaci
 
+Navazující [došetření UI Automation a dokončené GUI Stop/Close](directory-sync-plugin-ui-automation.md) uzavírá běžný GUI případ na aktuální binárce; velké UIA průchody zůstávají odděleným známým omezením.
+
 15. října 2026. Navazuje na [první etapu kopírování](directory-sync-plugin-copy-new.md). Pouze syntetická místní NTFS data; bez přepisů, mazání uživatelských položek, SMB a změn SDK nebo hostitele.
 
 ## Nativní výsledky
@@ -37,7 +39,7 @@ GUI automatizace vykazovala timeouty a opožděné vstupy. Diagnostické snímky
 
 První soukromá instance byla normálně zavřena. Druhá zůstala po dokončené kopii v modálním souhrnu nereagující; po ověření PID/cesty, všech 4 000 cílů a nepřítomnosti stagingu byla ukončena pouze tato testovací instance. Její konfigurace byla obnovena ze zálohy. Původní tři instalované instance (PID 692, 3820, 17148) zůstaly spuštěné. Ukončení po dokončení není test hard kill během kopie ani crash recovery.
 
-## Zbývá
+## Otevřené body před navazujícím došetřením
 
 Datová část přerušení, skutečné handlery a Join a zachování cíle při konečné chybě prošly v uvedeném rozsahu. Produkční změny pouze zpřístupňují nové testovací checkpointy; funkční oprava adaptéru nebyla potřebná. Přepisy, mazání a D4 zůstávají mimo tuto etapu.
 
