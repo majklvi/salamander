@@ -51,18 +51,16 @@ BEGIN
     PUSHBUTTON "Close", IDCANCEL, 532, 404, 70, 16
     CONTROL "", IDC_STATUS, "msctls_statusbar32", SBARS_SIZEGRIP | SBARS_TOOLTIPS, 0, 430, 610, 16
 END
-IDD_INFORMATION DIALOGEX 0, 0, 570, 352
+IDD_INFORMATION DIALOGEX 0, 0, 300, 188
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MAXIMIZEBOX
 CAPTION "Directory Synchronization"
 FONT 8, "MS Shell Dlg"
 BEGIN
-    CONTROL "", IDC_INFO_TABLE, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 8, 8, 554, 150
-    LTEXT "Selected &value (select and copy):", IDC_INFO_VALUE_LABEL, 8, 166, 554, 10
-    EDITTEXT IDC_INFO_VALUE, 8, 180, 554, 42, ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
-    LTEXT "&Notes:", IDC_INFO_NOTES_LABEL, 8, 230, 554, 10
-    EDITTEXT IDC_INFO_NOTES, 8, 244, 554, 74, ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
-    PUSHBUTTON "&Continue", IDOK, 404, 328, 76, 16
-    DEFPUSHBUTTON "Cancel", IDCANCEL, 488, 328, 74, 16
+    CONTROL "", IDC_INFO_TABLE, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 286, 84
+    LTEXT "&Notes:", IDC_INFO_NOTES_LABEL, 7, 96, 286, 8
+    EDITTEXT IDC_INFO_NOTES, 7, 107, 286, 54, ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
+    PUSHBUTTON "&Continue", IDOK, 137, 167, 76, 14
+    DEFPUSHBUTTON "Cancel", IDCANCEL, 219, 167, 74, 14
 END
 STRINGTABLE
 BEGIN
@@ -77,9 +75,9 @@ BEGIN
     IDS_UI_OVERWRITE_RESULT "Overwrite result"
     IDS_UI_DELETE_CONFIRM "Confirm file deletion"
     IDS_UI_DELETE_RESULT "File deletion result"
-    IDS_UI_FILES "Eligible visible files"
-    IDS_UI_BYTES "New main data (bytes; ADS additional)"
-    IDS_UI_ORIGINAL_BYTES "Original main data (bytes; ADS additional)"
+    IDS_UI_FILES "Files"
+    IDS_UI_BYTES "New main data (bytes)"
+    IDS_UI_ORIGINAL_BYTES "Original main data (bytes)"
     IDS_UI_OMITTED "Other visible proposals omitted"
     IDS_UI_COPIED "Copied and verified"
     IDS_UI_REPLACED "Replaced and verified"
@@ -90,14 +88,18 @@ BEGIN
     IDS_UI_RECOVERY "Keep originals"
     IDS_UI_ON "ON"
     IDS_UI_OFF "OFF - no recovery copy from this run"
-    IDS_UI_RECOVERED "Originals verified and logged / selected"
+    IDS_UI_RECOVERED "Originals saved / selected"
     IDS_UI_MANIFEST "Recovery manifest"
     IDS_UI_JOURNAL "Execution journal"
     IDS_UI_COPY_POLICY "Copies data, the supported ADS set and metadata, then verifies them. Files inherit destination permissions. Required parent folders may be created. Existing targets are never replaced. Stop preserves completed files; empty created parents may remain."
     IDS_UI_SAVE_POLICY "Creates independent, verified copies and a manifest in an existing recovery folder outside both trees. Originals remain unchanged; no proposal is executed. Recovery copies inherit the recovery folder permissions. Stop preserves completed copies."
     IDS_UI_OVERWRITE_POLICY "New targets and deletions are omitted. Replaces existing file names after staging and verification, preserving original target permissions. Read-only targets are refused without attribute changes. Stop preserves completed replacements; there is no automatic rollback."
     IDS_UI_DELETE_POLICY "Only visible Delete on right proposals for right-only files in asymmetric mode are eligible. Folders are never removed, even when empty. The Recycle Bin is not used. Read-only files are refused without attribute changes. Stop preserves completed deletions; there is no automatic rollback."
-    IDS_UI_RESULT_NOTE "Inspect this result, then Compare again before another operation. Select a table row to read and copy its complete value below."
+    IDS_UI_RESULT_NOTE "Inspect the result, then Compare again before another operation. Ctrl+C copies a selected value; Ctrl+Shift+C copies the full summary."
+    IDS_UI_COPY_VALUE "Copy &value\tCtrl+C"
+    IDS_UI_COPY_ALL "Copy &all\tCtrl+Shift+C"
+    IDS_UI_CLIPBOARD_ERROR "Could not copy the text to the clipboard."
+    IDS_UI_ADS_NOTE "Byte counts exclude alternate data streams (ADS)."
     IDS_UI_PLAN_NOTE "Proposals only. Copy new files, Overwrite files and Delete files each require a separate confirmation. Only right-only files can be deleted in asymmetric mode; folders are kept. Copy counts and bytes include both new and existing targets."
     IDS_UI_TO_RIGHT "Copies to right (count / main bytes)"
     IDS_UI_TO_LEFT "Copies to left (count / main bytes)"

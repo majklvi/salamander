@@ -9,6 +9,7 @@
 #include "overwrite.h"
 #include "delete.h"
 #include "resource.h"
+#include "spl_gui.h"
 #include <thread>
 #include <memory>
 #include <algorithm>
@@ -20,6 +21,7 @@ namespace
 {
 HINSTANCE instance = nullptr, language = nullptr;
 CSalamanderGeneralAbstract* general = nullptr;
+CSalamanderGUIAbstract* gui = nullptr;
 constexpr UINT Done = WM_APP + 41;
 HBRUSH backgroundBrush = nullptr;
 bool dark = false;
@@ -131,9 +133,81 @@ std::wstring EditLines(const std::wstring& text)
 void InformationColumns(HWND window)
 {
     HWND list=GetDlgItem(window,IDC_INFO_TABLE); RECT r{}; GetClientRect(list,&r);
-    RECT units{0,0,195,0}; MapDialogRect(window,&units);
+    RECT units{0,0,145,0}; MapDialogRect(window,&units);
     ListView_SetColumnWidth(list,0,units.right);
     ListView_SetColumnWidth(list,1,std::max(80,int(r.right-units.right)-GetSystemMetrics(SM_CXVSCROLL)-4));
+}
+void CompactInformation(HWND window,const Information& info)
+{
+    RECT units{7,5,0,96};MapDialogRect(window,&units);
+    const int margin=units.left,gap=units.top;
+    HWND list=GetDlgItem(window,IDC_INFO_TABLE),notes=GetDlgItem(window,IDC_INFO_NOTES);
+    RECT listBox{},header{},item{},label{},button{},client{},outer{};
+    GetWindowRect(list,&listBox);GetWindowRect(ListView_GetHeader(list),&header);
+    ListView_GetItemRect(list,0,&item,LVIR_BOUNDS);
+    int rowHeight=std::max(1,int(item.bottom-item.top));
+    int tableHeight=int(header.bottom-header.top)+rowHeight*int(std::min(size_t(10),std::max(size_t(1),info.rows.size())))+4;
+    GetWindowRect(GetDlgItem(window,IDC_INFO_NOTES_LABEL),&label);
+    GetWindowRect(GetDlgItem(window,IDOK),&button);
+    int width=int(listBox.right-listBox.left);
+    HDC dc=GetDC(notes);auto font=SelectObject(dc,reinterpret_cast<HFONT>(SendMessageW(notes,WM_GETFONT,0,0)));
+    RECT text{0,0,width-GetSystemMetrics(SM_CXVSCROLL)-8,0};
+    DrawTextW(dc,info.notes.c_str(),int(info.notes.size()),&text,DT_CALCRECT|DT_WORDBREAK|DT_NOPREFIX|DT_EDITCONTROL);
+    TEXTMETRICW metrics{};GetTextMetricsW(dc,&metrics);SelectObject(dc,font);ReleaseDC(notes,dc);
+    int notesHeight=std::min(int(units.bottom),std::max(int(metrics.tmHeight)*2+6,int(text.bottom)+8));
+    int labelY=margin+tableHeight+gap,notesY=labelY+int(label.bottom-label.top)+2;
+    int buttonY=notesY+notesHeight+gap;
+    MoveWindow(list,margin,margin,width,tableHeight,FALSE);
+    MoveWindow(GetDlgItem(window,IDC_INFO_NOTES_LABEL),margin,labelY,width,int(label.bottom-label.top),FALSE);
+    MoveWindow(notes,margin,notesY,width,notesHeight,FALSE);
+    for(int id:{IDOK,IDCANCEL}) {
+        RECT r{};GetWindowRect(GetDlgItem(window,id),&r);MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&r),2);
+        MoveWindow(GetDlgItem(window,id),r.left,buttonY,r.right-r.left,r.bottom-r.top,FALSE);
+    }
+    GetClientRect(window,&client);GetWindowRect(window,&outer);
+    int height=buttonY+int(button.bottom-button.top)+margin+int(outer.bottom-outer.top-client.bottom);
+    SetWindowPos(window,nullptr,outer.left,outer.top+int(outer.bottom-outer.top-height)/2,
+        outer.right-outer.left,height,SWP_NOZORDER|SWP_NOACTIVATE);
+}
+void CopyInformation(HWND window,const Information& info,bool all)
+{
+    std::wstring text;
+    if(all) {
+        text=Text(info.title)+L"\r\n";
+        for(const auto& row:info.rows) text+=row.first+L"\t"+row.second+L"\r\n";
+        text+=L"\r\n"+EditLines(info.notes);
+    } else {
+        int index=ListView_GetNextItem(GetDlgItem(window,IDC_INFO_TABLE),-1,LVNI_SELECTED);
+        if(index<0 || size_t(index)>=info.rows.size()) return;
+        text=info.rows[size_t(index)].second;
+    }
+    if(!general->CopyTextToClipboardW(text.c_str(),int(text.size()),FALSE,window)) Message(window,IDS_UI_CLIPBOARD_ERROR);
+}
+void InformationMenu(HWND window,const Information& info,LPARAM position)
+{
+    if(!gui) return;
+    HWND list=GetDlgItem(window,IDC_INFO_TABLE);
+    POINT point{static_cast<short>(LOWORD(position)),static_cast<short>(HIWORD(position))};
+    if(position==LPARAM(-1)) {
+        int index=ListView_GetNextItem(list,-1,LVNI_SELECTED);RECT r{};
+        if(index>=0 && ListView_GetItemRect(list,index,&r,LVIR_BOUNDS)) point={r.left,r.bottom};
+        else point={0,0};
+        ClientToScreen(list,&point);
+    } else {
+        LVHITTESTINFO hit{};hit.pt=point;ScreenToClient(list,&hit.pt);
+        int index=ListView_SubItemHitTest(list,&hit);
+        if(index<0) return;
+        ListView_SetItemState(list,index,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+    }
+    MENU_TEMPLATE_ITEM items[]={{MNTT_PB,0,0,0,-1,0,nullptr},
+        {MNTT_IT,IDS_UI_COPY_VALUE,MNTS_B|MNTS_I|MNTS_A,1,-1,0,nullptr},
+        {MNTT_IT,IDS_UI_COPY_ALL,MNTS_B|MNTS_I|MNTS_A,2,-1,0,nullptr},{MNTT_PE,0,0,0,-1,0,nullptr}};
+    auto* menu=gui->CreateMenuPopup();if(!menu) return;
+    DWORD command=0;
+    if(menu->LoadFromTemplate(language,items,nullptr,nullptr,nullptr))
+        command=menu->Track(MENU_TRACK_RETURNCMD|MENU_TRACK_RIGHTBUTTON|MENU_TRACK_NONOTIFY,point.x,point.y,window,nullptr);
+    gui->DestroyMenuPopup(menu);
+    if(command) CopyInformation(window,info,command==2);
 }
 INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
 {
@@ -156,7 +230,7 @@ INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
                 SendMessageW(list,LVM_INSERTITEMW,0,LPARAM(&item));
                 item.iSubItem=1; item.pszText=row.second.data(); SendMessageW(list,LVM_SETITEMTEXTW,i,LPARAM(&item));
             }
-            for(int id:{IDC_INFO_VALUE,IDC_INFO_NOTES}) SendDlgItemMessageW(window,id,EM_SETLIMITTEXT,0x7ffffffe,0);
+            SendDlgItemMessageW(window,IDC_INFO_NOTES,EM_SETLIMITTEXT,0x7ffffffe,0);
             SetDlgItemTextW(window,IDC_INFO_NOTES,EditLines(info->notes).c_str());
             if(!info->confirm) {
                 RECT r{};GetWindowRect(GetDlgItem(window,IDCANCEL),&r);MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&r),2);
@@ -171,6 +245,7 @@ INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
                 SetDlgItemTextW(window,IDOK,Text(label).c_str());
             }
             if(!info->rows.empty()) ListView_SetItemState(list,0,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+            CompactInformation(window,*info);
             RECT client{},outer{}; GetClientRect(window,&client); GetWindowRect(window,&outer);
             info->initial={client.right,client.bottom}; info->minimum={outer.right-outer.left,outer.bottom-outer.top};
             for(HWND child=GetWindow(window,GW_CHILD);child;child=GetWindow(child,GW_HWNDNEXT)) {
@@ -201,11 +276,14 @@ INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
             }
             return TRUE;
         case WM_NOTIFY:
-            if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_INFO_TABLE && reinterpret_cast<NMHDR*>(l)->code==LVN_ITEMCHANGED) {
-                int index=ListView_GetNextItem(GetDlgItem(window,IDC_INFO_TABLE),-1,LVNI_SELECTED);
-                SetDlgItemTextW(window,IDC_INFO_VALUE,index>=0 && size_t(index)<info->rows.size()?EditLines(info->rows[size_t(index)].second).c_str():L"");
+            if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_INFO_TABLE && reinterpret_cast<NMHDR*>(l)->code==LVN_KEYDOWN) {
+                auto* key=reinterpret_cast<NMLVKEYDOWN*>(l);
+                if(key->wVKey=='C' && (GetKeyState(VK_CONTROL)&0x8000)) CopyInformation(window,*info,(GetKeyState(VK_SHIFT)&0x8000)!=0);
             }
-            return TRUE;
+            return FALSE;
+        case WM_CONTEXTMENU:
+            if(reinterpret_cast<HWND>(w)==GetDlgItem(window,IDC_INFO_TABLE)) {InformationMenu(window,*info,l);return TRUE;}
+            break;
         case WM_SETTINGCHANGE: case WM_THEMECHANGED:
             DarkModeApplyTree(window);DarkModeRefreshTitleBar(window);return TRUE;
         case WM_COMMAND:
@@ -218,7 +296,7 @@ INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
 }
 bool InformationBox(HWND parent,int title,InfoRows rows,const std::wstring& notes,bool confirm=false)
 {
-    Information info{title,std::move(rows),notes,confirm,{}, {}, {}};
+    Information info{title,std::move(rows),confirm?Text(IDS_UI_ADS_NOTE)+L"\n\n"+notes:notes,confirm,{}, {}, {}};
     INT_PTR result=DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_INFORMATION),parent,InformationDialog,LPARAM(&info));
     if(result==-1) Message(parent,IDS_FAILED);
     return result==IDOK;
@@ -1003,6 +1081,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (entry->GetVersion() < LAST_VERSION_OF_SALAMANDER) return nullptr;
     SalamanderDebug = entry->GetSalamanderDebug();
     general = entry->GetSalamanderGeneral();
+    gui = entry->GetSalamanderGUI();
     language = entry->LoadLanguageModule(entry->GetParentWindow(), "Directory Synchronization");
     if (!language) return nullptr;
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES}; InitCommonControlsEx(&controls);

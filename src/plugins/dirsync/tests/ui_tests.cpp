@@ -71,10 +71,10 @@ void Test(int dialog)
         }
         if (c.id == IDC_LIST || c.id == IDC_ACTION || c.id == IDC_COMPARE || c.id == IDC_COPY_NEW ||
             c.id == IDC_RECOVERY_ROOT || c.id == IDC_SAVE_ORIGINALS || c.id == IDC_KEEP_ORIGINALS || c.id == IDC_OVERWRITE || c.id == IDC_DELETE_FILES || c.id == IDCANCEL ||
-            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_VALUE || c.id == IDC_INFO_NOTES || c.id == IDOK)
+            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_NOTES || c.id == IDOK)
             Check((c.style & WS_TABSTOP) != 0, "primary controls reachable by Tab");
         if(c.id==IDC_STATUS) Check(c.className==L"msctls_statusbar32", "real native status bar");
-        if(c.id==IDC_INFO_VALUE || c.id==IDC_INFO_NOTES)
+        if(c.id==IDC_INFO_NOTES)
             Check((c.style&ES_READONLY)!=0 && (c.style&ES_MULTILINE)!=0 && (c.style&WS_VSCROLL)!=0,"selectable scrolling read-only details");
         controls.push_back(c);
     }

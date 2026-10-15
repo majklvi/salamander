@@ -1,6 +1,6 @@
 # Directory Synchronization: první etapa
 
-**Rozhraní (16. října 2026):** [nativní status bar a strukturované potvrzovací/výsledkové dialogy](directory-sync-plugin-ui.md). Stav a počítadla mají vlastní části; souhrny tabulku údaj/hodnota, kopírovatelnou úplnou hodnotu a oddělené poznámky. Bez změny zápisových operací nebo SDK.
+**Rozhraní (16. října 2026):** [nativní status bar a strukturované potvrzovací/výsledkové dialogy](directory-sync-plugin-ui.md). Stav a počítadla mají vlastní části; souhrny kompaktní zvětšitelnou tabulku údaj/hodnota a oddělené poznámky. Samostatné pole Selected value bylo odstraněno; kopírování hodnoty/celého souhrnu nabízí Ctrl+C/Ctrl+Shift+C a kontextové menu. Omezení GUI ověření schránky je uvedeno v dokumentaci. Bez změny zápisových operací nebo SDK.
 
 **Souvislý pracovní postup (16. října 2026):** dokončen [GUI průchod porovnání → ruční Skip → nová kopie → přepis s obnovou → mazání souboru s obnovou → závěrečné obsahové porovnání](directory-sync-plugin-workflow.md). Všechny tři operace bez chyb, 37 nezávislých kontrol disku prošlo. Bez změny produkčního kódu; ruční návrhy se po novém Compare zadávají znovu. Ponechaná složka a záměrně nekopírovaný soubor zůstávají očekávanými rozdíly.
 
