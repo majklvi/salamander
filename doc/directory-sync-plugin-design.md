@@ -14,7 +14,7 @@ Uživatel výslovně stanovil jako cíl **úroveň současného jádra Samandari
 
 Závazné minimum, odložené záruky a další krok určuje [aktualizovaný návrh provedení a obnovy](directory-sync-plugin-execution-protocol.md), který nahrazuje dřívější přísnější technické požadavky V6. Pokročilé reparse/ACL/ADS závody, nativní relativní API infrastruktura, transakční journal a fyzické power-loss kampaně nejsou podmínkou zahájení běžného vývoje. Základní bezpečnost cest, zjištěné změny plánu, běžné chyby, Stop a podporované vlastnosti se dál ověřují.
 
-Nynější etapa upravuje pouze návrh a dokumentaci. Doporučené pokračování je malá tabulka mapování existujících postupů jádra a SDK na D4/D5, Unicode/dlouhé cesty a běžné akceptační scénáře. Zápisový executor, SMB testy a změny SDK/hostitele zatím nejsou povoleny.
+Mapování existujících postupů jádra a SDK na D4/D5, Unicode/dlouhé cesty a běžné akceptační scénáře je [zdokumentováno samostatně](directory-sync-plugin-core-adapter.md). Doporučený malý privátní adaptér nad wide Win32 API se nepokouší volat interní worker ani rozšiřovat SDK. Po samostatném pokynu má následovat jen kopie do nového cíle; přepis/mazání později s ověřenou obnovou. Aktuální etapa je pouze dokumentační: zápisový executor, SMB testy a změny SDK/hostitele zatím nejsou povoleny.
 
 ## Vývojová větev a základ
 

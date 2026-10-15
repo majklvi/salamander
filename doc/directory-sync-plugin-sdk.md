@@ -172,7 +172,7 @@ Referenční worker otevírá zdroj i se share WRITE a vytváří nový cíl př
 - Zjištěná změna po skenu, Unicode a dlouhé cesty, nezávislost obnovy na hardlinku a ochrana nepodporovaných položek.
 - SMB ověřit až v samostatné později povolené etapě; současný pokyn jeho testy nepovoluje. SDK a hostitel zůstávají beze změn.
 
-Další souběhové reparse/ACL/ADS sondy, nativní relativní backend, crash replay a důkazy odolnosti vůči výpadku napájení jsou odložené, nikoli blokující předpoklady první verze. Dosavadní experimentální pádová matice se nepřepisuje jako neprovedená, ale nevyžaduje další rozšiřování. Nejbližší krok je úzké technické mapování jádra/SDK podle aktuálního návrhu, zatím bez executoru. V6 zůstává otevřená pro běžné integrační ověření budoucí implementace, ne jako projekt certifikace filesystemu.
+Další souběhové reparse/ACL/ADS sondy, nativní relativní backend, crash replay a důkazy odolnosti vůči výpadku napájení jsou odložené, nikoli blokující předpoklady první verze. Dosavadní experimentální pádová matice se nepřepisuje jako neprovedená, ale nevyžaduje další rozšiřování. Úzké technické mapování jádra/SDK je [dokončeno v samostatném dokumentu](directory-sync-plugin-core-adapter.md), včetně přesných míst workeru, omezení lifetime SDK progressu, kandidátních wide API a běžných testů. Nevznikl executor ani nový runtime důkaz. V6 zůstává otevřená pro běžné integrační ověření budoucí implementace, ne jako projekt certifikace filesystemu.
 
 ### Doplnění z dokončených testů TC V3
 

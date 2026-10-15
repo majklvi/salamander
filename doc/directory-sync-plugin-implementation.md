@@ -173,6 +173,12 @@ Rozpracované necommitnuté concurrency rozšíření sondy bylo odstraněno bez
 
 Doporučený další krok je krátké mapování konkrétních postupů jádra a dostupného SDK na nový cíl / přepis s obnovou / mazání s obnovou, ADS/ACL/atributy, Stop/chyby a Unicode/dlouhé cesty. Výstup má určit nejmenší potřebný pluginový adaptér a běžné akceptační případy. Executor ani SMB testy tím zatím nezačínají.
 
+### Mapování jádra a SDK (15. října 2026)
+
+[Konkrétní tabulka a návrh adaptéru](directory-sync-plugin-core-adapter.md) dokládá DoCopyFile/DoCopyADS/DoCopySecurity/DoDeleteFile/DoDeleteDir, omezení SafeFile, callback lifetime progressu a notifikace změn. Nejmenší doporučené řešení je privátní adaptér nad wide Win32 API: společný přenos do nového souboru, nezávislá obnova, běžné publikování a explicitní výsledky. Přepis na místě z některých větví jádra se nepřebírá kvůli D5 hardlinkům; native protokol sondy také není navrženým backendem.
+
+Navrženy běžné testy T1–T12 a první budoucí etapa pouze s kopiemi do nových cílů. CopyFileExW/MoveFileExW kombinace s D5 se zatím runtime neověřila a není vydávána za výsledek staré sondy. Tato etapa četla zdroje a dokumentaci API; mění jen dokumentaci a atribuci, bez executoru, SMB testů, SDK či testovacího kódu. Kontrola odkazů/diffu není nový runtime test.
+
 ### Zbývající omezení
 
 - Omezení V5 zůstává přijaté: panelový kořen přichází jako bajty, dekódování je UTF-8 nejdříve a ACP při neplatném UTF-8. Ztracenou nebo nejednoznačnou historickou informaci nelze tímto adaptérem zpětně rekonstruovat. Selhání SDK/převodu/otevření musí být viditelné; backend nemá nový obecný limit MAX_PATH. Místní runtime případy výše nezaručují všechny délky, historická ACP jména nebo UNC. Hostitelská navigace dlouhého kořene navíc obsahuje prokázaný pád, který plugin před svým spuštěním nemůže ohlásit.
