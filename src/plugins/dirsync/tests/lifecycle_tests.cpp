@@ -50,7 +50,7 @@ struct Module
     using Release=unsigned (WINAPI*)(BOOL);
     using CopyCancel=unsigned (WINAPI*)(BOOL);
     HMODULE handle=nullptr; Start start=nullptr; Status status=nullptr; Release release=nullptr;
-    Start copyStart=nullptr; Status copyStatus=nullptr; CopyCancel copyCancel=nullptr;
+    Start copyStart=nullptr; Status copyStatus=nullptr; CopyCancel copyCancel=nullptr; Release copyRelease=nullptr;
     explicit Module(const std::wstring& path)
     {
         handle=LoadLibraryW(path.c_str());
@@ -63,7 +63,8 @@ struct Module
         copyStart=reinterpret_cast<Start>(GetProcAddress(handle,"ProbeCopyStart"));
         copyStatus=reinterpret_cast<Status>(GetProcAddress(handle,"ProbeCopyStatus"));
         copyCancel=reinterpret_cast<CopyCancel>(GetProcAddress(handle,"ProbeCopyCancel"));
-        Check(copyStart && copyStatus && copyCancel,"copy lifecycle exports");
+        copyRelease=reinterpret_cast<Release>(GetProcAddress(handle,"ProbeCopyRelease"));
+        Check(copyStart && copyStatus && copyCancel && copyRelease,"copy lifecycle exports");
     }
     ~Module() { if(handle) { if(release) release(TRUE); FreeLibrary(handle); } }
 };
@@ -116,6 +117,51 @@ void CopyControls(const std::wstring& dll,bool verify,bool close)
     Check(FreeLibrary(module.handle)!=FALSE,"unload after copy Stop/Close"); module.handle=nullptr;
     std::cout<<(close?"Close":"Stop")<<" during "<<(verify?"Verify":"copy")<<": handlers and join passed\n";
 }
+void CopyUnload(const std::wstring& dll,int mode)
+{
+    Fixture f;
+    if(mode&2) { f.Data(f.left+L"\\0-done"); f.Data(f.left+L"\\0-done:note"); }
+    f.Data(f.left+L"\\a"); f.Data(f.left+L"\\b"); Module module(dll);
+    Check(module.copyStart(f.left.c_str(),f.right.c_str(),mode)!=FALSE,"start unload copy worker");
+    ULONGLONG deadline=GetTickCount64()+3000;
+    while(!(module.copyStatus()&1) && GetTickCount64()<deadline) Sleep(1);
+    Check(module.copyStatus()==1,"unload interrupts actual copy/Verify callback");
+    Check(module.copyRelease(FALSE)==0,"normal release refuses active copying");
+    Check(module.copyStatus()==1,"refused copy release leaves worker active");
+    ULONGLONG start=GetTickCount64();
+    Check(module.copyRelease(TRUE)==31,"force release joins copy, preserves completed items and cancels rest");
+    Check(GetTickCount64()-start<3000,"copy force release within three seconds");
+    Check(module.copyRelease(TRUE)==1,"repeated force release after copy is safe");
+    Check(FreeLibrary(module.handle)!=FALSE,"immediate unload after copying release"); module.handle=nullptr;
+    Check(GetModuleHandleW(dll.c_str())==nullptr,"copy DLL unmapped after release");
+    WIN32_FIND_DATAW entry{}; HANDLE find=FindFirstFileW((f.right+L"\\*").c_str(),&entry);
+    unsigned count=0;
+    if(find!=INVALID_HANDLE_VALUE) {
+        do { if(wcscmp(entry.cFileName,L".") && wcscmp(entry.cFileName,L"..")) {
+            ++count; Check((mode&2) && !wcscmp(entry.cFileName,L"0-done"),"only completed target remains after unload");
+        } } while(FindNextFileW(find,&entry));
+        FindClose(find);
+    }
+    Check(count==((mode&2)?1u:0u),"no unpublished target or stage after unload");
+    if(mode&2) {
+        for(const auto& suffix:{L"\\0-done",L"\\0-done:note"}) {
+            std::wstring path=f.right+suffix; f.files.push_back(path);
+            HANDLE h=CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+            Check(h!=INVALID_HANDLE_VALUE,"completed main/ADS accessible after unload");
+            if(h!=INVALID_HANDLE_VALUE) {
+                std::vector<BYTE> bytes(1024*1024); DWORD read=0;
+                bool ok=ReadFile(h,bytes.data(),DWORD(bytes.size()),&read,nullptr)!=FALSE && read==bytes.size();
+                for(BYTE value:bytes) if(value!=42) ok=false;
+                Check(ok && GetFileSize(h,nullptr)==bytes.size(),"completed main/ADS bytes preserved"); CloseHandle(h);
+            }
+        }
+    }
+    for(const auto& path:f.files) {
+        HANDLE h=CreateFileW(path.c_str(),GENERIC_READ,0,nullptr,OPEN_EXISTING,0,nullptr);
+        Check(h!=INVALID_HANDLE_VALUE,"no handles survive force copy unload"); if(h!=INVALID_HANDLE_VALUE) CloseHandle(h);
+    }
+    std::cout<<"force Release during "<<((mode&1)?"Verify":"copy")<<", prior completed="<<((mode&2)?1:0)<<": passed\n";
+}
 }
 int main()
 {
@@ -128,6 +174,7 @@ int main()
         Fixture content; content.Sparse(content.left+L"\\same.bin"); content.Sparse(content.right+L"\\same.bin");
         for(int pass=0;pass<3;++pass) { Run(dll,scan,false); Run(dll,content,true); }
         for(bool verify:{false,true}) for(bool close:{false,true}) CopyControls(dll,verify,close);
+        for(int mode=0;mode<4;++mode) CopyUnload(dll,mode);
         std::cout<<checks<<" lifecycle checks passed\n"; return 0;
     }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }

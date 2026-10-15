@@ -1,5 +1,7 @@
 # Directory Synchronization: kopie pouze do nových cílů
 
+Dokončeno [nucené Release při kopírování/Verify a běžné ukončení hostitele](directory-sync-plugin-copy-unload.md): 547 lifecycle kontrol Debug/Release x64 a GUI přerušení přenosu před ukončením aplikace. Bez změny produkčního kódu.
+
 Navazující [došetření UI Automation a dokončené GUI Stop/Close](directory-sync-plugin-ui-automation.md) uzavírá běžný GUI případ na aktuální binárce; velké UIA průchody zůstávají odděleným známým omezením.
 
 Navazující ověření [Stop/Close a chyb po publikaci](directory-sync-plugin-copy-cancellation.md): 375 copy assertions a 429 lifecycle kontrol Debug/Release x64. Nový záznam odděluje úspěšné nativní testy od omezeného GUI měření.

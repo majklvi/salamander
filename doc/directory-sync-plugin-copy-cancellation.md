@@ -1,5 +1,7 @@
 # Kopie do nových cílů: Stop/Close a chyby po publikaci
 
+Další [ověření nuceného uvolnění a ukončení hostitele](directory-sync-plugin-copy-unload.md) rozšiřuje lifecycle sadu na 547 kontrol Debug/Release x64; níže uvedených 429 je výsledek předchozí etapy.
+
 Navazující [došetření UI Automation a dokončené GUI Stop/Close](directory-sync-plugin-ui-automation.md) uzavírá běžný GUI případ na aktuální binárce; velké UIA průchody zůstávají odděleným známým omezením.
 
 15. října 2026. Navazuje na [první etapu kopírování](directory-sync-plugin-copy-new.md). Pouze syntetická místní NTFS data; bez přepisů, mazání uživatelských položek, SMB a změn SDK nebo hostitele.
