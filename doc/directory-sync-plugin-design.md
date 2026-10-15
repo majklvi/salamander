@@ -1,6 +1,6 @@
 # Synchronizační plugin pro Samandarin
 
-Stav k 15. říjnu 2026: D1–D5 a doplňující pravidla schválená. Na pokyn uživatele implementována [první etapa: kostra, sken, porovnání a náhled bez zápisů](directory-sync-plugin-implementation.md) nad nezměněným SDK Samandarin-0.16. V1–V4 dokládá [protokol TC](directory-sync-plugin-tc-observations.md); V5/V6 mají [technický audit](directory-sync-plugin-sdk.md). Zápisový backend zatím není implementován.
+Stav k 15. říjnu 2026: D1–D5 a doplňující pravidla schválená. Na pokyn uživatele implementována [první etapa: kostra, sken, porovnání a náhled bez zápisů](directory-sync-plugin-implementation.md) nad nezměněným SDK Samandarin-0.16. V1–V4 dokládá [protokol TC](directory-sync-plugin-tc-observations.md); V5/V6 mají [technický audit](directory-sync-plugin-sdk.md). Navazujícím pokynem byla implementována pouze [kopie do nových cílů](directory-sync-plugin-copy-new.md); přepisy, uživatelské mazání a obnova D4 zatím nejsou implementované.
 
 Cílem je plugin pro porovnání a synchronizaci dvou adresářových stromů s pracovním postupem známým z Total Commanderu: **Porovnat → prohlédnout a upravit navržené operace → Synchronizovat**. Uživatel musí před zápisem vidět, co se zkopíruje, přepíše nebo odstraní. Tento dokument vymezuje chování předlohy, navržený rozsah pluginu, bezpečnost operací a rozhodnutí potřebná před zahájením vývoje.
 
@@ -14,7 +14,7 @@ Uživatel výslovně stanovil jako cíl **úroveň současného jádra Samandari
 
 Závazné minimum, odložené záruky a další krok určuje [aktualizovaný návrh provedení a obnovy](directory-sync-plugin-execution-protocol.md), který nahrazuje dřívější přísnější technické požadavky V6. Pokročilé reparse/ACL/ADS závody, nativní relativní API infrastruktura, transakční journal a fyzické power-loss kampaně nejsou podmínkou zahájení běžného vývoje. Základní bezpečnost cest, zjištěné změny plánu, běžné chyby, Stop a podporované vlastnosti se dál ověřují.
 
-Mapování existujících postupů jádra a SDK na D4/D5, Unicode/dlouhé cesty a běžné akceptační scénáře je [zdokumentováno samostatně](directory-sync-plugin-core-adapter.md). Doporučený malý privátní adaptér nad wide Win32 API se nepokouší volat interní worker ani rozšiřovat SDK. Po samostatném pokynu má následovat jen kopie do nového cíle; přepis/mazání později s ověřenou obnovou. Aktuální etapa je pouze dokumentační: zápisový executor, SMB testy a změny SDK/hostitele zatím nejsou povoleny.
+Mapování existujících postupů jádra a SDK na D4/D5, Unicode/dlouhé cesty a běžné akceptační scénáře je [zdokumentováno samostatně](directory-sync-plugin-core-adapter.md). Doporučený malý privátní adaptér nad wide Win32 API se nepokouší volat interní worker ani rozšiřovat SDK. Po samostatném pokynu má následovat jen kopie do nového cíle; přepis/mazání později s ověřenou obnovou. Následným pokynem uživatel povolil úzkou copy-only etapu, jejíž [výsledky a meze](directory-sync-plugin-copy-new.md) jsou zdokumentované. Přepisy, mazání, SMB testy a změny SDK/hostitele zatím nejsou povoleny.
 
 ## Vývojová větev a základ
 

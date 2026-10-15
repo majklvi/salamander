@@ -9,7 +9,7 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
 IDD_PREVIEW DIALOGEX 0, 0, 610, 360
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MAXIMIZEBOX
 EXSTYLE WS_EX_APPWINDOW
-CAPTION "Directory Synchronization - Preview"
+CAPTION "Directory Synchronization"
 FONT 8, "MS Shell Dlg"
 BEGIN
     LTEXT "&Left folder:", -1, 8, 9, 52, 10
@@ -27,7 +27,7 @@ BEGIN
     CONTROL "&Empty folders", IDC_EMPTY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 452, 67, 100, 12
     DEFPUSHBUTTON "&Compare", IDC_COMPARE, 8, 86, 70, 16
     PUSHBUTTON "S&top", IDC_STOP, 86, 86, 60, 16
-    LTEXT "Preview only. No files will be copied, overwritten or deleted.", -1, 157, 89, 440, 12
+    LTEXT "Copy new files only. Existing targets and deletions are never executed.", -1, 157, 89, 440, 12
     CONTROL "E&qual", IDC_EQUAL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 112, 60, 12
     CONTROL "&Different", IDC_DIFFERENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 72, 112, 68, 12
     CONTROL "Si&ngle-sided", IDC_SINGLE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 148, 112, 85, 12
@@ -38,25 +38,36 @@ BEGIN
     COMBOBOX IDC_ACTION, 50, 305, 105, 90, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     PUSHBUTTON "Apply to selected ro&ws", IDC_APPLY, 162, 305, 110, 16
     PUSHBUTTON "Plan summar&y", IDC_SUMMARY, 280, 305, 90, 16
+    PUSHBUTTON "Copy new files...", IDC_COPY_NEW, 378, 305, 115, 16
     LTEXT "Ready", IDC_STATUS, 8, 331, 510, 20
     PUSHBUTTON "Close", IDCANCEL, 532, 334, 70, 16
 END
 STRINGTABLE
 BEGIN
     IDS_NAME "Directory Synchronization"
-    IDS_DESCRIPTION "Compare local and SMB folders and review proposed actions. This preview version never writes to either folder."
-    IDS_MENU "Directory synchronization preview..."
+    IDS_DESCRIPTION "Compare Windows folders and review actions. This version can copy files only to new targets, with staging and verification. Overwrites and deletions are not supported."
+    IDS_MENU "Directory synchronization..."
     IDS_INPUT_ERROR "Both panels must contain Windows folders with complete paths and decodable selected names. The current SDK cannot provide a usable input for these panels."
     IDS_SCAN "Scanning: %llu entries; compared: %llu"
     IDS_READING "Comparing content: %llu bytes read (both sides); scanned: %llu; completed pairs: %llu"
     IDS_VALIDATING "Checking preview against current folders: %llu entries"
-    IDS_STALE "This preview is unavailable or has changed. Compare again before reviewing or changing proposals."
+    IDS_STALE "This preview is unavailable or has changed. Compare again before any further action."
     IDS_DONE "Complete: %llu rows; visible: %llu; hidden: %llu; blocked/conflicts: %llu"
     IDS_CANCELLED "Cancelled. Partial results contain no actionable proposals."
     IDS_FAILED "Comparison failed. Results have been discarded."
-    IDS_SUMMARY "Preview only - no operations can be executed.\n\nVisible proposed copies to right: %llu (%llu bytes)\nVisible proposed copies to left: %llu (%llu bytes)\nVisible proposed deletions on right: %llu\nVisible unresolved: %llu\nBlocked/conflicts (all rows): %llu\nHidden rows: %llu"
+    IDS_SUMMARY "Proposals only. Use Copy new files for a separate confirmation; overwrites and deletions cannot be executed.\n\nVisible proposed copies to right: %llu (%llu bytes)\nVisible proposed copies to left: %llu (%llu bytes)\nVisible proposed deletions on right: %llu\nVisible unresolved: %llu\nBlocked/conflicts (all rows): %llu\nHidden rows: %llu"
+    IDS_COPY_PROGRESS "Copy/check: file %llu of %llu; copied %llu bytes; Verify read %llu bytes; complete %llu"
+    IDS_COPY_AGAIN "Copy run finished. Compare again before any further action."
+    IDS_COPY_EMPTY "No visible file action has a missing target. Existing targets, deletions, empty-folder actions and unresolved items cannot be executed."
+    IDS_COPY_CONFIRM "Visible files to copy to NEW targets: %llu.\n\nMain data: %llu bytes (ADS are additional).\nOther visible non-skip proposals omitted: %llu.\n\nCopies and verifies data and supported metadata. Files inherit destination permissions. Required parent folders may be created. Existing targets will never be replaced. Stop preserves completed files; empty created parents may remain."
+    IDS_COPY_RESULT "New-file copy result\n\nCopied and verified: %llu\nErrors/cancelled items: %llu\nNot started: %llu\nOther visible proposals omitted: %llu\n\nCompare again."
+    IDS_COPY_ERROR "Windows error: "
+    IDS_COPY_PUBLISHED_ERROR "The new target was published, but final verification failed. It was left in place."
+    IDS_COPY_REMAINDER "Staging requires manual inspection: "
+    IDS_COPY_STOPPED "Stopped. Completed new files remain in place."
+    IDS_COPY_FAILED "The copy worker failed. Completed files may remain. Compare again and inspect the destination before retrying."
     IDS_SELECT_ROW "Select one or more rows first. Blocked and conflicting rows cannot receive actions."
-    IDS_HELP "Choose the two Windows folders and Compare. Only selected uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nChange actions on selected rows and review Plan summary. Only visible actions enter that summary; blocked/conflicting rows always stay visible. This version only previews and cannot execute changes."
+    IDS_HELP "Choose the two Windows folders and Compare. Only selected uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nChange actions on selected rows and review Plan summary. Only visible actions enter that summary; blocked/conflicting rows always stay visible. Copy new files executes only visible file copies with missing targets after a separate confirmation. Existing targets, deletions and empty-folder actions are omitted. Data and metadata are verified; Stop preserves completed files. Compare again after the run."
     220 "Relative path"
     221 "Left size"
     222 "Left modified"

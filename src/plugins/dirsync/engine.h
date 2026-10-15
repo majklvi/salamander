@@ -72,6 +72,8 @@ Result Compare(const std::wstring& left, const std::wstring& right, const Option
 // Read-only checkpoint, never permission to execute a later filesystem write.
 // Any change/error/cancellation permanently blocks this result until Compare.
 bool Revalidate(Result& result, std::atomic<bool>& cancel, Progress& progress);
+// Internal plugin API; retrieves only the roots belonging to this snapshot.
+bool SnapshotRoots(const Result& result, std::wstring& left, std::wstring& right);
 #ifdef DIRSYNC_ENGINE_TEST
 void SetAfterScanHook(std::function<void()> hook);
 void SetBeforeReadHook(std::function<void()> hook);

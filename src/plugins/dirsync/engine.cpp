@@ -610,6 +610,11 @@ Result Compare(const std::wstring& inputLeft, const std::wstring& inputRight, co
     }
     return result;
 }
+bool SnapshotRoots(const Result& result, std::wstring& left, std::wstring& right)
+{
+    if (!result.snapshot || result.stale || result.cancelled) return false;
+    left = result.snapshot->left; right = result.snapshot->right; return true;
+}
 bool Revalidate(Result& result, std::atomic<bool>& cancel, Progress& progress)
 {
     bool valid = result.snapshot && !result.cancelled && !result.stale && !cancel;

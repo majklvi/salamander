@@ -1,5 +1,8 @@
 # Directory Synchronization: mapování jádra a nejmenšího adaptéru
 
+
+**Navazující stav (15. října 2026):** na samostatný pokyn uživatele implementována [kopie pouze do nových cílů](directory-sync-plugin-copy-new.md), včetně stagingu, Verify, metadat, průběhu a Stop. Původní návrhové pasáže níže nejsou tvrzením o přepisech či mazání; ty zůstávají neimplementované. SDK/hostitel beze změn, bez SMB testů. Přesné runtime výsledky a odchylku vlastní CREATE_NEW rezervace stagingu uvádí nový protokol.
+
 15. října 2026, větev `feature/directory-sync-plugin`, výchozí stav `10a3a1fd`. Jde o čtení zdrojů a návrh, **nikoli implementaci executoru ani nové runtime ověření**. Platí schválená [úroveň současného jádra](directory-sync-plugin-execution-protocol.md) a D4/D5 z [hlavního návrhu](directory-sync-plugin-design.md). SDK, hostitel i read-only plugin zůstávají beze změn; SMB nebylo testováno.
 
 ## Závěr

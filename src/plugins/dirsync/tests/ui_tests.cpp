@@ -69,7 +69,7 @@ void Test()
             if (c.text[j + 1] == L'&') { ++j; continue; }
             Check(keys.insert(wchar_t(towlower(c.text[j + 1]))).second, "unique dialog mnemonic");
         }
-        if (c.id == IDC_LIST || c.id == IDC_ACTION || c.id == IDC_COMPARE || c.id == IDCANCEL)
+        if (c.id == IDC_LIST || c.id == IDC_ACTION || c.id == IDC_COMPARE || c.id == IDC_COPY_NEW || c.id == IDCANCEL)
             Check((c.style & WS_TABSTOP) != 0, "primary controls reachable by Tab");
         controls.push_back(c);
     }

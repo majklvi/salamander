@@ -1,5 +1,8 @@
 # Directory Synchronization: provedení a obnova na úrovni jádra
 
+
+**Navazující stav (15. října 2026):** na samostatný pokyn uživatele implementována [kopie pouze do nových cílů](directory-sync-plugin-copy-new.md), včetně stagingu, Verify, metadat, průběhu a Stop. Původní návrhové pasáže níže nejsou tvrzením o přepisech či mazání; ty zůstávají neimplementované. SDK/hostitel beze změn, bez SMB testů. Přesné runtime výsledky a odchylku vlastní CREATE_NEW rezervace stagingu uvádí nový protokol.
+
 Aktualizováno 15. října 2026 podle výslovného rozhodnutí uživatele: **cílem první verze je úroveň spolehlivosti současného jádra Samandarin-0.16**, nikoli nový transakční filesystem backend. Tento dokument nahrazuje dřívější přísnější návrh. D1–D5 z [hlavního návrhu](directory-sync-plugin-design.md) platí dál, zejména nezávislá obnova před přepisem i mazáním a zachování podporovaných vlastností. Plugin zatím pouze skenuje, porovnává a zobrazuje náhled. Zápisový executor, SMB testy ani změny SDK/hostitele nejsou tímto pokynem povoleny.
 
 ## Referenční úroveň a omezení

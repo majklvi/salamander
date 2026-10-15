@@ -4,6 +4,7 @@
 // Split & Combine plugin. The comparison engine is independent of the SDK.
 #include "precomp.h"
 #include "engine.h"
+#include "copy.h"
 #include "resource.h"
 #include <thread>
 #include <memory>
@@ -52,7 +53,7 @@ void ConfigureDark(HWND dialog)
 }
 struct Preview
 {
-    enum class Intent { None, Apply, Summary };
+    enum class Intent { None, Apply, Summary, Copy };
     HWND window = nullptr;
     std::wstring left, right;
     std::wstring panelLeft, panelRight;
@@ -65,6 +66,10 @@ struct Preview
     std::vector<size_t> visible;
     std::atomic<bool> cancel{false};
     dirsync::Progress progress;
+    dirsync::CopyProgress copyProgress;
+    dirsync::CopyReport copyReport;
+    std::vector<size_t> copyRows;
+    bool copying = false, hasCopyReport = false;
     std::thread worker;
     SIZE initialClient{}, minimumWindow{};
     std::vector<std::pair<HWND, RECT>> controls;
@@ -110,12 +115,19 @@ void Status(Preview& p)
     if (p.running)
     {
         wchar_t text[256]{};
+        if (p.copying) {
+            swprintf_s(text, Text(IDS_COPY_PROGRESS).c_str(), p.copyProgress.item.load()+1,
+                uint64_t(p.copyRows.size()), p.copyProgress.copied.load(), p.copyProgress.verified.load(),
+                p.copyProgress.completed.load());
+            SetDlgItemTextW(p.window,IDC_STATUS,text); return;
+        }
         uint64_t bytes = p.progress.readBytes.load(std::memory_order_relaxed);
         if (p.validating) swprintf_s(text, Text(IDS_VALIDATING).c_str(), p.progress.scanned.load());
         else if (bytes) swprintf_s(text, Text(IDS_READING).c_str(), bytes, p.progress.scanned.load(), p.progress.compared.load());
         else swprintf_s(text, Text(IDS_SCAN).c_str(), p.progress.scanned.load(), p.progress.compared.load());
         SetDlgItemTextW(p.window, IDC_STATUS, text); return;
     }
+    if (p.hasCopyReport) { SetDlgItemTextW(p.window,IDC_STATUS,Text(IDS_COPY_AGAIN).c_str()); return; }
     if (p.result.stale && !p.result.cancelled)
     { SetDlgItemTextW(p.window, IDC_STATUS, Text(IDS_STALE).c_str()); return; }
     if (p.failed || p.result.cancelled)
@@ -152,7 +164,7 @@ void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
                    IDC_EMPTY, IDC_COMPARE, IDC_ACTION, IDC_APPLY, IDC_SUMMARY, IDC_EQUAL,
-                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT})
+                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW})
         EnableWindow(GetDlgItem(p.window, id), !busy);
     EnableWindow(GetDlgItem(p.window, IDC_SELECTED), !busy && !p.options.selection.empty());
     bool locked = Checked(p.window, IDC_SELECTED);
@@ -164,6 +176,7 @@ void InvalidatePlan(Preview& p)
 {
     if (p.running) return;
     p.result = {}; p.visible.clear(); p.failed = false;
+    p.hasCopyReport = false;
     ListView_SetItemCount(GetDlgItem(p.window, IDC_LIST), 0);
     Status(p);
 }
@@ -268,6 +281,57 @@ void Summary(Preview& p)
                uint64_t(p.result.rows.size() - p.visible.size()));
     DarkModeMessageBoxW(p.window, text, Text(IDS_NAME).c_str(), MB_OK | MB_ICONINFORMATION);
 }
+void CopySummary(Preview& p)
+{
+    uint64_t copied=0, failed=0, pending=0; std::wstring details;
+    for (const auto& item:p.copyReport.items) {
+        if (item.status==dirsync::CopyStatus::Copied) ++copied;
+        else if (item.status==dirsync::CopyStatus::NotStarted) ++pending;
+        else {
+            ++failed;
+            if (details.empty()) details=L"\n\n"+item.target+L"\n"+Text(IDS_COPY_ERROR)+Number(item.error)+
+                (item.published ? L"\n"+Text(IDS_COPY_PUBLISHED_ERROR):L"");
+        }
+        if (!item.remainingStage.empty()) details+=L"\n"+Text(IDS_COPY_REMAINDER)+item.remainingStage;
+    }
+    wchar_t text[1024]{};
+    swprintf_s(text,Text(IDS_COPY_RESULT).c_str(),copied,failed,pending,uint64_t(p.copyReport.omitted));
+    std::wstring message=text;
+    if (p.copyReport.stale) message+=L"\n"+Text(IDS_STALE);
+    if (p.copyReport.cancelled) message+=L"\n"+Text(IDS_COPY_STOPPED);
+    message+=details;
+    DarkModeMessageBoxW(p.window,message.c_str(),Text(IDS_NAME).c_str(),MB_OK|MB_ICONINFORMATION);
+}
+void CopyNew(Preview& p)
+{
+    p.copyRows.clear(); uint64_t bytes=0,omitted=0;
+    for (size_t i:p.visible) {
+        const auto& r=p.result.rows[i];
+        if (dirsync::IsNewFileCopy(r)) { p.copyRows.push_back(i); bytes+=(r.action==dirsync::Action::CopyRight?r.left:r.right).size; }
+        else if (r.action!=dirsync::Action::None) ++omitted;
+    }
+    if (p.copyRows.empty()) { Message(p.window,IDS_COPY_EMPTY); return; }
+    wchar_t confirm[1024]{};
+    swprintf_s(confirm,Text(IDS_COPY_CONFIRM).c_str(),uint64_t(p.copyRows.size()),bytes,omitted);
+    if (DarkModeMessageBoxW(p.window,confirm,Text(IDS_NAME).c_str(),MB_OKCANCEL|MB_ICONQUESTION)!=IDOK) return;
+    p.cancel=false; p.failed=false; p.copying=true; p.running=true; p.hasCopyReport=false;
+    p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
+    p.copyProgress.phase=dirsync::CopyPhase::Checking; p.copyReport={};
+    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP)),TRUE);
+    try {
+        // Freeze all visible rows, including omitted actions for an accurate report.
+        const auto rows=p.visible;
+        p.worker=std::thread([&p,rows]() {
+            try { p.copyReport=dirsync::CopyNewFiles(p.result,rows,p.cancel,p.progress,p.copyProgress); }
+            catch (...) { p.failed=true; }
+            PostMessageW(p.window,Done,0,0);
+        });
+        SetTimer(p.window,1,150,nullptr);
+    } catch (...) {
+        p.failed=true; p.running=false; p.copying=false; Busy(p,false); Status(p);
+        SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_COMPARE)),TRUE);
+    }
+}
 INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
 {
     Preview* p = reinterpret_cast<Preview*>(GetWindowLongPtrW(window, DWLP_USER));
@@ -322,7 +386,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 if (id == IDC_LIST) { r.right += dx; r.bottom += dy; }
                 else if (id == IDC_LEFT || id == IDC_RIGHT) r.right += dx;
                 else if (id == IDC_STATUS) { r.top += dy; r.bottom += dy; r.right += dx; }
-                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDCANCEL)
+                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDCANCEL)
                 { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
             }
@@ -332,6 +396,17 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
     case Done:
         p->Join(); p->running = false; KillTimer(window, 1);
         if (p->validating) { p->result = std::move(p->checkedResult); p->validating = false; }
+        if (p->copying) {
+            p->copying=false; p->hasCopyReport=true; p->result.stale=true; p->result.snapshot.reset();
+            // Snapshot paths were decoded on entry; preserve their UTF-8 encoding for SDK notifications.
+            for (const auto& path:{p->left,p->right}) {
+                int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path.c_str(),-1,nullptr,0,nullptr,nullptr);
+                if (n>0) { std::vector<char> encoded(static_cast<size_t>(n));
+                    if (WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,path.c_str(),-1,encoded.data(),n,nullptr,nullptr))
+                        general->PostChangeOnPathNotification(encoded.data(),TRUE); }
+            }
+            if (!p->closing) { if (p->failed) Message(window,IDS_COPY_FAILED); else CopySummary(*p); }
+        }
         if (p->closing) EndDialog(window, 0);
         else
         {
@@ -346,6 +421,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             {
                 if (intent == Preview::Intent::Apply) Apply(*p);
                 else if (intent == Preview::Intent::Summary) Summary(*p);
+                else if (intent == Preview::Intent::Copy) CopyNew(*p);
             }
         }
         return TRUE;
@@ -362,6 +438,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDCANCEL: SendMessageW(window, WM_CLOSE, 0, 0); return TRUE;
         case IDC_APPLY: ValidatePreview(*p, Preview::Intent::Apply); return TRUE;
         case IDC_SUMMARY: ValidatePreview(*p, Preview::Intent::Summary); return TRUE;
+        case IDC_COPY_NEW: ValidatePreview(*p, Preview::Intent::Copy); return TRUE;
         case IDC_EQUAL: case IDC_DIFFERENT: case IDC_SINGLE: case IDC_TORIGHT: case IDC_TOLEFT:
             if (!p->running) Filter(*p); return TRUE;
         case IDC_SELECTED:
@@ -448,7 +525,7 @@ public:
             active = nullptr;
         }
         catch (...) { active = nullptr; Message(parent, IDS_FAILED); }
-        return FALSE; // Read-only preview preserves panel selections.
+        return FALSE; // Preserve panel selections; completed copies refresh via notifications.
     }
     BOOL WINAPI HelpForMenuItem(HWND parent, int) override { Message(parent, IDS_HELP); return TRUE; }
     void WINAPI BuildMenu(HWND, CSalamanderBuildMenuAbstract*) override {}

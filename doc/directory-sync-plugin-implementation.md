@@ -157,6 +157,12 @@ Příklad přímého lokálního sestavení (cestu k MSBuild zvolit podle instal
 
 Pro načtení jsou potřeba `dirsync.spl` a sousední `lang/english.slg`; zkopírovat celou složku pluginu. Installer obsahuje příslušné položky a automatická registrace je ověřena v oddělené testovací distribuci přes `plugins.ver`. Sestavení celého Inno balíčku nebylo provedeno.
 
+## Kopie pouze do nových cílů (15. října 2026)
+
+Na navazující pokyn uživatele přidán privátní `copy.cpp`/`copy.h` adaptér a tlačítko Copy new files: zmrazené viditelné položky, znovu ověřený snapshot, vlastní CREATE_NEW staging, CopyFileExW s progress/Stop, ověření hlavních dat i ADS a cílových práv/mtime/atributů, MoveFileExW bez nahrazení. Existující cíle, přepisy a návrhy mazání se nevykonají. D4 obnova zatím nevznikla; SDK ani hostitel se nemění. Podrobnosti, přesná matice a omezení jsou v [protokolu copy-only etapy](directory-sync-plugin-copy-new.md).
+
+Lokálně: 292 copy assertions Debug/Release x64, regrese enginu 539, lifecycle skenu/porovnání 347 a UI prostředků 975 v obou konfiguracích; Debug plugin Win32/x64/ARM64 a Release x64. Computer Use v soukromé distribuci potvrdilo Cancel bez vytvoření cíle, jednu skutečnou novou kopii s ADS, nezměněný existující soubor a povinné nové Compare. Žádné SMB testy. Nové force-unload/Close během kopie, jiné filesystémy, plný disk a podrobnější chyby po publish zůstávají konkrétní neprovedené případy; neztotožňovat je se starou sondou ani s provedenými regresními testy.
+
 ## Meze a další etapy
 
 ### Izolovaná sonda zápisového protokolu (15. října 2026)
