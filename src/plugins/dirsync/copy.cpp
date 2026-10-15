@@ -207,7 +207,9 @@ void CopyOne(const std::wstring& sourceRoot, const std::wstring& targetRoot, con
         Stop(cancel);
         File staging(Open(stage,GENERIC_READ|FILE_WRITE_ATTRIBUTES)); Need(staging.h!=INVALID_HANDLE_VALUE);
         if (!SameId(owned,Info(staging.h))) throw Failure{ERROR_FILE_INVALID};
-        inherited.Apply(stage);
+        // A normal Modify grant need not include WRITE_DAC. Avoid rewriting an
+        // already correct inherited DACL; restore it only if copying changed it.
+        if (!inherited.Matches(stage)) inherited.Apply(stage);
         FILETIME mtime{DWORD(expected.time),DWORD(expected.time>>32)};
         Need(SetFileTime(staging.h,nullptr,nullptr,&mtime));
         Need(SetFileAttributesW(ApiPath(stage).c_str(),(expected.attributes & selectedAttrs)|FILE_ATTRIBUTE_ARCHIVE));

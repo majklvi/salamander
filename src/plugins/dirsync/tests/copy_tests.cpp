@@ -109,6 +109,27 @@ void Scope() {
     Fixture filter; Put(filter.left+L"\\a","A"); Put(filter.left+L"\\b","B"); auto selected=filter.Run(filter.Scan(),{0});
     Check(selected.items.size()==1 && GetFileAttributesW(ApiPath(filter.right+L"\\b").c_str())==INVALID_FILE_ATTRIBUTES,"only frozen visible rows execute");
 }
+void ModifyOnlyDestination() {
+    Fixture f; Put(f.left+L"\\a","MODIFY"); Put(f.left+L"\\a:note","ADS");
+    // Root remains controllable by the fixture; new files inherit Modify only.
+    // OWNER RIGHTS suppresses the owner's implicit WRITE_DAC grant as well.
+    Acl(f.right,L"D:P(A;;FA;;;WD)(A;OICIIO;0x1301bf;;;WD)(A;OICIIO;0x1301bf;;;S-1-3-4)");
+    bool denied=false;
+    SetCopyHook([&](CopyPhase phase,const std::wstring& stage) {
+        if(phase!=CopyPhase::Copying || !f.progress.copied || denied) return;
+        HANDLE h=CreateFileW(ApiPath(stage).c_str(),WRITE_DAC,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+            nullptr,OPEN_EXISTING,0,nullptr);
+        denied=h==INVALID_HANDLE_VALUE && GetLastError()==ERROR_ACCESS_DENIED;
+        if(h!=INVALID_HANDLE_VALUE) CloseHandle(h);
+    });
+    auto report=f.Run(f.Scan()); SetCopyHook({});
+    Check(denied,"fixture staging has Modify but not WRITE_DAC");
+    Check(report.items.size()==1 && report.items[0].status==CopyStatus::Copied,"Modify-only destination needs no redundant DACL write");
+    Check(Read(f.right+L"\\a")=="MODIFY" && Read(f.right+L"\\a:note")=="ADS","Modify-only main data and ADS verified");
+    Put(f.right+L"\\reference","ACL");
+    Check(Dacl(f.right+L"\\a")==Dacl(f.right+L"\\reference"),"Modify-only target retains inherited permissions");
+    f.NoStaging(f.right);
+}
 void Boundaries() {
     for(int mode=0;mode<9;++mode) {
         Fixture f; Put(f.left+L"\\a",std::string(1024*1024,'A')); Put(f.left+L"\\b","B"); auto r=f.Scan();
@@ -251,6 +272,6 @@ void DiskSpace() {
 }
 }
 int main() {
-    try { Success(); Scope(); Boundaries(); Paths(); AfterPublication(); DiskSpace(); std::cout<<checks<<" copy assertions passed\n"; return 0; }
+    try { Success(); Scope(); ModifyOnlyDestination(); Boundaries(); Paths(); AfterPublication(); DiskSpace(); std::cout<<checks<<" copy assertions passed\n"; return 0; }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }
 }

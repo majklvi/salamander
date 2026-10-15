@@ -1,5 +1,7 @@
 # Kopie do nových cílů: nedostatek místa
 
+Navazující [skutečný NTFS VHD test](directory-sync-plugin-vhd-results.md) již ověřil chybu 112 v GUI i nový pokus a odhalil opravený nadbytečný zápis DACL při právech Modify. Aktuální copy regrese má 766 assertions Debug/Release x64. Níže uvedený chybějící skutečný test a 743 assertions popisují předchozí etapu.
+
 Pro další skutečný běh je připraven [postup izolovaného NTFS VHD a potřebných oprávnění](directory-sync-plugin-vhd-runbook.md). Postup zatím nebyl proveden a nemění níže uvedené výsledky.
 
 15. října 2026. Pouze syntetická místní data. Bez přepisů existujících cílů, mazání uživatelských položek, SMB testů a změn SDK nebo hostitele. Navazuje na [první kopírovací etapu](directory-sync-plugin-copy-new.md) a [ověření uvolnění pluginu](directory-sync-plugin-copy-unload.md).

@@ -1,6 +1,6 @@
 # Skutečný nedostatek místa: postup pro izolovaný NTFS VHD
 
-Připraveno 15. října 2026. **Jde o plán dalšího testu, nikoli záznam provedeného ověření.** Dosavadní [řízené testy chyb 112/39](directory-sync-plugin-copy-space.md) nenahrazují skutečně zaplněný svazek. V této etapě se nic nepřipojuje ani neformátuje; plugin, SDK a hostitel se nemění.
+Připraveno 15. října 2026. Jde o postup přípravy; výsledky následně provedeného běhu jsou v [samostatném záznamu skutečných NTFS VHD testů](directory-sync-plugin-vhd-results.md). [Řízené testy chyb 112/39](directory-sync-plugin-copy-space.md) zůstávají odděleným druhem důkazu. Vytvoření tohoto postupu samo neprovedlo připojení ani formátování a neměnilo plugin, SDK nebo hostitele.
 
 ## Oprávnění a rozdělení práce
 
