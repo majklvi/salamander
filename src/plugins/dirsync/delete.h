@@ -20,8 +20,12 @@ struct DeleteReport {
     bool keepOriginals=true,stale=false,cancelled=false,complete=false;
 };
 bool IsFileDeletion(const Row& row);
-// Only asymmetric right-only regular files. The UI must separately confirm the
-// visible set and the frozen recovery choice. Never removes directories.
+bool IsDeletion(const Row& row);
+// Shared by confirmation and execution. A directory requires all descendants
+// to be visible, eligible deletion proposals; never implicitly selects children.
+std::vector<size_t> DeletionRows(const Result& snapshot,const std::vector<size_t>& visible);
+// Asymmetric right-only files followed by empty directories, deepest first.
+// The UI separately confirms this set and the frozen recovery choice.
 DeleteReport DeleteFiles(Result snapshot,const std::vector<size_t>& visible,bool keepOriginals,
     const std::wstring& recoveryRoot,std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress);
 }

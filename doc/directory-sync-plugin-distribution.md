@@ -146,3 +146,9 @@ Nový nepodepsaný ruční x64 ZIP: `C:\Samandarin\builds\dirsync-distribution\c
 ## 2026-10-16 — GUI ověření formátů panelů
 
 Aktuální nepodepsaný ruční x64 ZIP: `C:\Samandarin\builds\dirsync-distribution\panel-format-gui-20261016\plugin_5.0_dirsync_0.1_x64.zip`, SHA-256 `3a5c157c4e301c5b10d4b7720ef89a920db96cafaeb1d7d2b0b802c5b19778be`. Obsahuje doplněný návod a produkční SPL totožné s GUI ověřeným modulem. Rozbalením ověřeno všech 11 hashů manifestu a inventář 12 souborů včetně obou jazyků. [GUI evidence](directory-sync-plugin-ui.md#2026-10-16--gui-porovnání-show-sizes-a-show-names) dokládá shodu všech tří režimů velikostí a šesti skutečně dostupných režimů názvů s hlavními panely hostitele. Bez chyby vyžadující změnu kódu; nejde o opakovanou čistou instalaci ani změnu systémového locale.
+
+## 2026-10-16 — asymetrické mazání adresářů
+
+Nepodepsaný ruční x64 balíček: `C:\Samandarin\builds\dirsync-distribution\directory-deletion-20261016-r2\plugin_5.0_dirsync_0.1_x64.zip`, SHA-256 `952f52cc61d2af9cfd1a12e9163f74b8315cef2575593d18ebc3b43621dc38c5`. Obsahuje aktuální Release SPL, anglický i český SLG a aktualizovaný návod. Nové rozbalení ověřilo všech 11 hashů manifestu i přesný inventář 12 souborů. Nejde o nové ověření čisté instalace/restartů.
+
+Rozsah a výsledky místních nativních testů jsou v [evidenci mazání adresářů](directory-sync-plugin-directories.md#implementace-a-ověření): 3 729 společných kontrol adaptéru v Release i Debug x64, engine 542, UI EN/CZ 1 974/1 990, lifecycle 2 357. Produkční Release x64 a Debug Win32/x64/ARM64 byly sestaveny s warnings-as-errors. Nový GUI průchod skutečným mazáním adresářů zatím neproběhl. Bez SMB testů a změn SDK.

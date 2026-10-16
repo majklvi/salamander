@@ -362,6 +362,40 @@ std::wstring OutcomeLine(size_t index,const CopyOutcome& c,const wchar_t* comple
         L",\"error\":"+std::to_wstring(c.error)+L",\"published\":"+(c.published?L"true":L"false")+
         L",\"remainingStage\":"+Json(c.remainingStage)+L"}";
 }
+void DirectoryStreams(const std::wstring& path)
+{
+    WIN32_FIND_STREAM_DATA data{};
+    HANDLE find=FindFirstStreamW(ApiPath(path).c_str(),FindStreamInfoStandard,&data,0);
+    if(find==INVALID_HANDLE_VALUE) {
+        DWORD error=GetLastError();
+        if(error==ERROR_HANDLE_EOF) return; // An ordinary NTFS directory has no data stream.
+        throw Failure{error};
+    }
+    FindClose(find);
+    // Directory ADS recovery is not supported. Never discard it, even with
+    // Keep originals OFF; surface the unsupported item before any deletion.
+    throw Failure{ERROR_NOT_SUPPORTED};
+}
+void SaveDirectory(const std::wstring& root,const Entry& expected,RecoveryItem& item,
+                   std::atomic<bool>& cancel,CopyProgress& progress)
+{
+    Stop(cancel); Parents(root,item.original,false,cancel);
+    File original(Open(item.original,FILE_READ_ATTRIBUTES)); Need(original.h!=INVALID_HANDLE_VALUE);
+    if(!Unchanged(expected,Info(original.h))) throw Failure{ERROR_FILE_INVALID};
+    DirectoryStreams(item.original);
+    auto data=item.saved.substr(0,item.saved.size()-expected.path.size()-1);
+    Parents(data,item.saved,true,cancel);
+    Need(CreateDirectoryW(ApiPath(item.saved).c_str(),nullptr));
+    File saved(Open(item.saved,FILE_READ_ATTRIBUTES|FILE_WRITE_ATTRIBUTES)); Need(saved.h!=INVALID_HANDLE_VALUE);
+    FILETIME time{DWORD(expected.time),DWORD(expected.time>>32)};
+    Need(SetFileTime(saved.h,nullptr,nullptr,&time));
+    Need(SetFileAttributesW(ApiPath(item.saved).c_str(),(expected.attributes & selectedAttrs)|FILE_ATTRIBUTE_DIRECTORY));
+    const auto observed=Info(saved.h);
+    if(!observed.directory || observed.time!=expected.time ||
+        (observed.attributes & selectedAttrs)!=(expected.attributes & selectedAttrs)) throw Failure{ERROR_INVALID_DATA};
+    if(!Unchanged(expected,Info(original.h))) throw Failure{ERROR_FILE_INVALID};
+    item.copy.status=CopyStatus::Copied; item.copy.published=true; progress.completed.fetch_add(1);
+}
 }
 #if defined(DIRSYNC_ENGINE_TEST) || defined(DIRSYNC_COPY_TEST_HOOKS)
 void SetRecoveryLogHook(std::function<DWORD(const std::wstring&)> callback) { recoveryLogHook=std::move(callback); }
@@ -376,7 +410,7 @@ static RecoveryReport SaveOriginalsImpl(Result snapshot,const std::vector<size_t
         for (size_t i:visible) {
             if (i>=snapshot.rows.size() || !unique.insert(i).second) continue;
             const auto& row=snapshot.rows[i];
-            if (deletion?IsFileDeletion(row):IsOriginalToSave(row)) {
+            if (deletion?IsDeletion(row):IsOriginalToSave(row)) {
                 RecoveryItem item; item.row=i; item.right=deletion || row.action==Action::CopyRight; report.items.push_back(std::move(item));
             }
             else if (row.action!=Action::None) ++report.omitted;
@@ -411,7 +445,7 @@ static RecoveryReport SaveOriginalsImpl(Result snapshot,const std::vector<size_t
             item.saved=Join(data,row.path); item.copy.row=item.row; item.copy.target=item.saved;
             append(L"{\"event\":\"planned\",\"item\":"+std::to_wstring(n+1)+L",\"side\":"+
                 Json(item.right?L"right":L"left")+L",\"relative\":"+Json(row.path)+L",\"original\":"+Json(item.original)+
-                L",\"saved\":"+Json(item.saved)+L",\"size\":"+std::to_wstring(entry.size)+L",\"mtime\":"+
+                L",\"saved\":"+Json(item.saved)+L",\"kind\":"+Json(entry.directory?L"directory":L"file")+L",\"size\":"+std::to_wstring(entry.size)+L",\"mtime\":"+
                 std::to_wstring(entry.time)+L",\"attributes\":"+std::to_wstring(entry.attributes)+L"}");
         }
         size_t n=0;
@@ -422,7 +456,8 @@ static RecoveryReport SaveOriginalsImpl(Result snapshot,const std::vector<size_t
                 if (!SameId(runId,Info(currentRun.h))) throw Failure{ERROR_FILE_INVALID};
                 Row original; original.path=row.path; original.hasLeft=true; original.left=item.right?row.right:row.left; original.action=Action::CopyRight;
                 auto data=item.saved.substr(0,item.saved.size()-row.path.size()-1);
-                CopyOne(item.right?right:left,data,original,item.copy,cancel,progress);
+                if(original.left.directory) SaveDirectory(item.right?right:left,original.left,item,cancel,progress);
+                else CopyOne(item.right?right:left,data,original,item.copy,cancel,progress);
             } catch (const Failure& failure) {
                 item.copy.error=failure.error; report.error=failure.error;
                 report.cancelled=cancel.load() || failure.error==ERROR_CANCELLED || failure.error==ERROR_OPERATION_ABORTED || failure.error==ERROR_REQUEST_ABORTED;
@@ -450,26 +485,65 @@ bool IsFileDeletion(const Row& row)
     return row.action==Action::DeleteRight && row.state==State::RightOnly && !row.hasLeft && row.hasRight &&
         e.identified && !e.directory && !e.error && !Unsupported(e.attributes) && Relative(row.path);
 }
+bool IsDeletion(const Row& row)
+{
+    const auto& e=row.right;
+    return row.action==Action::DeleteRight && row.state==State::RightOnly && !row.hasLeft && row.hasRight &&
+        e.identified && !e.error && !Unsupported(e.attributes) && Relative(row.path);
+}
+std::vector<size_t> DeletionRows(const Result& snapshot,const std::vector<size_t>& visible)
+{
+    std::set<size_t> selected;
+    if(!SnapshotAsymmetric(snapshot)) return {};
+    for(size_t i:visible) if(i<snapshot.rows.size() && IsDeletion(snapshot.rows[i])) selected.insert(i);
+    auto less=[](const std::wstring& a,const std::wstring& b) {
+        return CompareStringOrdinal(a.c_str(),-1,b.c_str(),-1,TRUE)==CSTR_LESS_THAN;
+    };
+    std::set<std::wstring,decltype(less)> retained(less);
+    for(size_t i=0;i<snapshot.rows.size();++i) if(!selected.count(i)) retained.insert(snapshot.rows[i].path);
+    std::vector<size_t> result;
+    for(size_t i:selected) {
+        const auto& row=snapshot.rows[i]; bool eligible=true;
+        if(row.right.directory) {
+            auto first=retained.lower_bound(row.path+L"\\");
+            eligible=first==retained.end() || !RecoveryWithin(row.path,*first);
+        }
+        if(eligible) result.push_back(i);
+    }
+    std::stable_sort(result.begin(),result.end(),[&](size_t a,size_t b) {
+        const auto& x=snapshot.rows[a]; const auto& y=snapshot.rows[b];
+        if(x.right.directory!=y.right.directory) return !x.right.directory;
+        if(x.right.directory) return std::count(x.path.begin(),x.path.end(),L'\\')>std::count(y.path.begin(),y.path.end(),L'\\');
+        return a<b;
+    });
+    return result;
+}
 DeleteReport DeleteFiles(Result snapshot,const std::vector<size_t>& visible,bool keepOriginals,
     const std::wstring& recoveryRoot,std::atomic<bool>& cancel,Progress& checking,CopyProgress& progress)
 {
     DeleteReport report; report.keepOriginals=keepOriginals; std::wstring left,right; File journal;
     try {
-        std::set<size_t> unique; std::vector<size_t> selected;
+        if(!SnapshotAsymmetric(snapshot)) { report.stale=true; return report; }
+        const auto selected=DeletionRows(snapshot,visible);
+        const std::set<size_t> eligible(selected.begin(),selected.end());
+        std::set<size_t> unique;
         for(size_t i:visible) {
             if(i>=snapshot.rows.size() || !unique.insert(i).second) continue;
             const auto& row=snapshot.rows[i];
-            if(IsFileDeletion(row)) { DeleteOutcome item; item.row=i; report.items.push_back(std::move(item)); selected.push_back(i); }
-            else if(row.action!=Action::None) ++report.omitted;
+            if(!eligible.count(i) && row.action!=Action::None) ++report.omitted;
         }
+        for(size_t i:selected) { DeleteOutcome item; item.row=i; report.items.push_back(std::move(item)); }
         if(report.items.empty()) return report;
         if(!SnapshotAsymmetric(snapshot) || !SnapshotRoots(snapshot,left,right) || !Revalidate(snapshot,cancel,checking)) {
             report.stale=true; report.cancelled=cancel.load(); return report;
         }
         for(auto& item:report.items) {
             const auto& row=snapshot.rows[item.row]; item.target=Join(right,row.path);
-            if(row.right.attributes & FILE_ATTRIBUTE_READONLY) {
-                item.status=DeleteStatus::Failed; item.error=ERROR_ACCESS_DENIED; throw Failure{item.error};
+            try {
+                if(row.right.directory) DirectoryStreams(item.target);
+                if(row.right.attributes & FILE_ATTRIBUTE_READONLY) throw Failure{ERROR_ACCESS_DENIED};
+            } catch(const Failure& failure) {
+                item.status=DeleteStatus::Failed; item.error=failure.error; throw;
             }
         }
         if(keepOriginals) {
@@ -491,7 +565,9 @@ DeleteReport DeleteFiles(Result snapshot,const std::vector<size_t>& visible,bool
         append(L"{\"event\":\"run\",\"schema\":1,\"operation\":\"delete_right\",\"keepOriginals\":true,\"left\":"+
             Json(left)+L",\"right\":"+Json(right)+L",\"recoveryManifest\":"+Json(report.recovery.journal)+L"}");
         for(size_t n=0;n<report.items.size();++n) append(L"{\"event\":\"planned\",\"item\":"+std::to_wstring(n+1)+
-            L",\"target\":"+Json(report.items[n].target)+L",\"saved\":"+Json(keepOriginals?report.recovery.items[n].saved:L"")+L"}");
+            L",\"target\":"+Json(report.items[n].target)+L",\"kind\":"+
+            Json(snapshot.rows[report.items[n].row].right.directory?L"directory":L"file")+
+            L",\"saved\":"+Json(keepOriginals?report.recovery.items[n].saved:L"")+L"}");
         auto resultLine=[&](size_t n) {
             const auto& item=report.items[n];
             const wchar_t* status=item.status==DeleteStatus::Deleted?L"deleted":item.status==DeleteStatus::Cancelled?L"cancelled":
@@ -511,9 +587,17 @@ DeleteReport DeleteFiles(Result snapshot,const std::vector<size_t>& visible,bool
                 catch(const Failure& failure) { if(failure.error!=ERROR_FILE_NOT_FOUND && failure.error!=ERROR_PATH_NOT_FOUND) throw; }
                 Absent(Join(left,row.path)); Parents(right,item.target,false,cancel);
                 File current(Open(item.target,FILE_READ_ATTRIBUTES)); Need(current.h!=INVALID_HANDLE_VALUE);
-                if(!Unchanged(row.right,Info(current.h))) throw Failure{ERROR_FILE_INVALID};
+                const auto observed=Info(current.h);
+                // Removing our children changes a directory's timestamps and
+                // link count. Identity, type and attributes must still match.
+                if(row.right.directory) {
+                    if(!SameId(row.right,observed) || !observed.directory || observed.attributes!=row.right.attributes)
+                        throw Failure{ERROR_FILE_INVALID};
+                    DirectoryStreams(item.target);
+                } else if(!Unchanged(row.right,observed)) throw Failure{ERROR_FILE_INVALID};
                 Stop(cancel); current.Close();
-                Need(DeleteFileW(ApiPath(item.target).c_str()));
+                if(row.right.directory) Need(RemoveDirectoryW(ApiPath(item.target).c_str()));
+                else Need(DeleteFileW(ApiPath(item.target).c_str()));
                 item.removed=true; item.status=DeleteStatus::Deleted; progress.completed.fetch_add(1);
                 Phase(progress,CopyPhase::Deleted,item.target);
             } catch(const Failure& failure) {

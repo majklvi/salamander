@@ -584,8 +584,20 @@ Result Compare(const std::wstring& inputLeft, const std::wstring& inputRight, co
         if (row.state != State::Blocked && (UnderExcluded(a, p.first) || UnderExcluded(b, p.first)))
         { row.state = State::Blocked; row.action = Action::Blocked; row.reason = Reason::Excluded; }
         bool directory = (ea && ea->directory) || (eb && eb->directory);
-        if (directory && row.state != State::Blocked && row.state != State::Conflict &&
-            (!o.emptyDirectories || (ea && !ea->empty) || (eb && !eb->empty))) continue;
+        if (directory && row.state != State::Blocked && row.state != State::Conflict)
+        {
+            bool deletion = o.asymmetric && !ea && eb && o.emptyDirectories && (eb->empty || o.recursive);
+            // A filtered or unreadable descendant cannot authorize removing its
+            // parent. Nonrecursive scans authorize only physically empty dirs.
+            for (const Tree* tree : {&a, &b})
+                for (const auto* protectedPaths : {&tree->excluded, &tree->blocked})
+                {
+                    auto first = protectedPaths->lower_bound(p.first + L"\\");
+                    if (protectedPaths->count(p.first) ||
+                        (first != protectedPaths->end() && Within(*first, p.first))) deletion = false;
+                }
+            if (!deletion && (!o.emptyDirectories || (ea && !ea->empty) || (eb && !eb->empty))) continue;
+        }
         if (!directory && row.state != State::Blocked && ea && eb && o.content &&
             ea->size == eb->size && (o.ignoreDate || row.state == State::Equal))
         {

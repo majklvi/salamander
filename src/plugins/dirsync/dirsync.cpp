@@ -944,8 +944,10 @@ bool Proposal(const Preview& p,size_t index,int command,dirsync::Action& action)
 {
     if(index>=p.result.rows.size()) return false;
     const auto& row=p.result.rows[index];
-    if(row.state==dirsync::State::Blocked || row.state==dirsync::State::Conflict ||
-        (row.hasLeft && row.left.directory) || (row.hasRight && row.right.directory)) return false;
+    if(row.state==dirsync::State::Blocked || row.state==dirsync::State::Conflict) return false;
+    const bool directory=(row.hasLeft && row.left.directory) || (row.hasRight && row.right.directory);
+    if(directory && (!row.hasRight || row.hasLeft || !p.options.asymmetric ||
+        (command!=RestoreProposal && command!=int(dirsync::Action::None) && command!=int(dirsync::Action::DeleteRight)))) return false;
     if(command==RestoreProposal) {
         if(index>=p.defaults.size()) return false;action=p.defaults[index];
     } else if(command==ReverseProposal) {
@@ -1007,11 +1009,11 @@ bool PlanEnabled(const Preview& p,int command)
     if(p.running || !p.result.snapshot || p.result.stale || p.result.cancelled || p.failed) return false;
     if(command==PlanSummary) return true;
     if(command==PlanSave && !settings.keepOriginals) return false;
+    if(command==PlanDelete) return !dirsync::DeletionRows(p.result,p.visible).empty();
     for(size_t index:p.visible) if(index<p.result.rows.size()) {
         const auto& row=p.result.rows[index];
         if(command==PlanCopy && dirsync::IsNewFileCopy(row)) return true;
         if((command==PlanOverwrite || command==PlanSave) && dirsync::IsFileOverwrite(row)) return true;
-        if(command==PlanDelete && dirsync::SnapshotAsymmetric(p.result) && dirsync::IsFileDeletion(row)) return true;
     }
     return false;
 }
@@ -1333,9 +1335,11 @@ void Overwrite(Preview& p)
 void DeleteSummary(Preview& p)
 {
     const auto& report=p.deleteReport;
-    uint64_t deleted=0,failed=0,pending=0,recovered=0; std::wstring details;
+    uint64_t deleted=0,directories=0,failed=0,pending=0,recovered=0; std::wstring details;
     for(const auto& item:report.items) {
-        if(item.status==dirsync::DeleteStatus::Deleted) ++deleted;
+        if(item.status==dirsync::DeleteStatus::Deleted) {
+            if(p.result.rows[item.row].right.directory) ++directories; else ++deleted;
+        }
         else if(item.status==dirsync::DeleteStatus::NotStarted) ++pending;
         else ++failed;
         if(details.empty() && item.error) details=L"\n\n"+item.target+L"\n"+Text(IDS_COPY_ERROR)+Number(item.error);
@@ -1348,7 +1352,8 @@ void DeleteSummary(Preview& p)
             break;
         }
     }
-    InfoRows rows;Field(rows,IDS_UI_DELETED,deleted);Field(rows,IDS_UI_ERRORS,failed);Field(rows,IDS_UI_PENDING,pending);
+    InfoRows rows;Field(rows,IDS_UI_DELETED,deleted);Field(rows,IDS_UI_DELETED_DIRECTORIES,directories);
+    Field(rows,IDS_UI_ERRORS,failed);Field(rows,IDS_UI_PENDING,pending);
     Field(rows,IDS_UI_OMITTED,uint64_t(report.omitted));Field(rows,IDS_UI_RECOVERY,Text(report.keepOriginals?IDS_UI_ON:IDS_UI_OFF));
     auto message=Text(IDS_UI_RESULT_NOTE)+L"\n\n"+Text(report.keepOriginals?IDS_DELETE_ON:IDS_DELETE_OFF);
     if(report.keepOriginals) {
@@ -1363,17 +1368,20 @@ void DeleteSummary(Preview& p)
 }
 void DeleteFiles(Preview& p)
 {
-    p.copyRows.clear(); uint64_t bytes=0,omitted=0;
+    p.copyRows=dirsync::DeletionRows(p.result,p.visible); uint64_t bytes=0,omitted=0,files=0,directories=0;
+    auto eligible=p.copyRows; std::sort(eligible.begin(),eligible.end());
     if(!dirsync::SnapshotAsymmetric(p.result)) { Message(p.window,IDS_DELETE_EMPTY); return; }
     for(size_t i:p.visible) {
         const auto& row=p.result.rows[i];
-        if(dirsync::IsFileDeletion(row)) { p.copyRows.push_back(i); bytes+=row.right.size; }
+        if(std::binary_search(eligible.begin(),eligible.end(),i)) {
+            if(row.right.directory) ++directories; else { ++files; bytes+=row.right.size; }
+        }
         else if(row.action!=dirsync::Action::None) ++omitted;
     }
     if(p.copyRows.empty()) { Message(p.window,IDS_DELETE_EMPTY); return; }
     const bool keep=settings.keepOriginals; const auto root=settings.recoveryRoot;
     if(keep && root.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
-    InfoRows fields;Field(fields,IDS_UI_FILES,uint64_t(p.copyRows.size()));Field(fields,IDS_UI_ORIGINAL_BYTES,bytes);
+    InfoRows fields;Field(fields,IDS_UI_FILES,files);Field(fields,IDS_UI_DIRECTORIES,directories);Field(fields,IDS_UI_ORIGINAL_BYTES,bytes);
     Field(fields,IDS_UI_OMITTED,omitted);Field(fields,IDS_UI_RECOVERY,Text(keep?IDS_UI_ON:IDS_UI_OFF));
     if(keep)Field(fields,IDS_UI_RECOVERY_FOLDER,root);
     auto message=Text(IDS_UI_DELETE_POLICY)+L"\n\n"+Text(keep?IDS_DELETE_ON:IDS_DELETE_OFF);
@@ -1612,7 +1620,14 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_GETINFOTIPW) {
             auto* tip=reinterpret_cast<NMLVGETINFOTIPW*>(l);
             if(tip->iItem>=0 && size_t(tip->iItem)<p->visible.size() && tip->cchTextMax>0) {
-                auto text=Text(IDS_ACTION+int(p->result.rows[p->visible[size_t(tip->iItem)]].action));
+                const auto& row=p->result.rows[p->visible[size_t(tip->iItem)]];
+                auto text=Text(IDS_ACTION+int(row.action));
+                for(const auto side:{std::pair<const dirsync::Entry*,const wchar_t*>{row.hasLeft?&row.left:nullptr,L"L"},
+                                     {row.hasRight?&row.right:nullptr,L"R"}}) if(side.first) {
+                    for(const auto attribute:{std::pair<DWORD,int>{FILE_ATTRIBUTE_HIDDEN,IDS_UI_HIDDEN_ATTRIBUTE},
+                                              {FILE_ATTRIBUTE_SYSTEM,IDS_UI_SYSTEM_ATTRIBUTE}})
+                        if(side.first->attributes & attribute.first) text+=L"\n"+std::wstring(side.second)+L": "+Text(attribute.second);
+                }
                 size_t count=std::min(text.size(),size_t(tip->cchTextMax-1));
                 if(count && count<text.size() && IS_HIGH_SURROGATE(text[count-1])) --count;
                 memcpy(tip->pszText,text.data(),count*sizeof(wchar_t));tip->pszText[count]=0;

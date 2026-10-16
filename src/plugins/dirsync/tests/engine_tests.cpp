@@ -268,11 +268,17 @@ void PostScan()
 {
     auto blocked = [](const Result& r) { return std::all_of(r.rows.begin(),r.rows.end(),[](const Row& row) { return row.action==Action::Blocked; }); };
     auto overwrite = [](const std::wstring& path) {
-        HANDLE h=CreateFileW(ApiPath(path).c_str(),GENERIC_WRITE,0,nullptr,OPEN_EXISTING,0,nullptr);
+        HANDLE h=CreateFileW(ApiPath(path).c_str(),GENERIC_WRITE|FILE_READ_ATTRIBUTES,0,nullptr,OPEN_EXISTING,0,nullptr);
         Check(h!=INVALID_HANDLE_VALUE,"mutate existing fixture"); DWORD n=0;
+        FILE_BASIC_INFO basic{};
+        Check(GetFileInformationByHandleEx(h,FileBasicInfo,&basic,sizeof(basic)),"mutation baseline change time");
         constexpr uint64_t ticks=134000000000000000;
         FILETIME time{DWORD(ticks & 0xffffffff),DWORD(ticks>>32)};
         bool ok=WriteFile(h,"BBBB",4,&n,nullptr) && n==4 && SetFileTime(h,nullptr,nullptr,&time);
+        // The filesystem clock may coalesce very fast writes into one tick.
+        // This fixture explicitly changes ChangeTime while restoring mtime.
+        basic.LastWriteTime.QuadPart=ticks; basic.ChangeTime.QuadPart+=10000000;
+        ok=ok && SetFileInformationByHandle(h,FileBasicInfo,&basic,sizeof(basic));
         CloseHandle(h); Check(ok,"same size and restored mtime fixture mutation");
     };
     {

@@ -8,6 +8,7 @@
 #include <sddl.h>
 #include <winioctl.h>
 #include <iostream>
+#include <algorithm>
 #include <stdexcept>
 using namespace dirsync;
 namespace {
@@ -549,7 +550,9 @@ void DeletionSuccess() {
         const auto acl=Dacl(f.root+L"\\alias"); const auto attrs=GetFileAttributesW(ApiPath(f.root+L"\\alias").c_str());
         Options o; o.asymmetric=true; o.emptyDirectories=true;
         auto plan=Compare(f.left,f.right,o,f.cancel,f.checking);
-        auto report=RemoveFiles(f,plan,keep,keep?recovery:L"invalid unused recovery");
+        std::vector<size_t> files;
+        for(size_t i=0;i<plan.rows.size();++i) if(!plan.rows[i].right.directory) files.push_back(i);
+        auto report=RemoveFiles(f,plan,keep,keep?recovery:L"invalid unused recovery",files);
         Check(report.complete && !report.error && report.items.size()==3,"asymmetric regular-file deletions complete");
         for(const auto& item:report.items) Check(item.status==DeleteStatus::Deleted && item.removed && !Exists(item.target),"only accepted file names deleted");
         Check(Exists(f.right+L"\\empty-dir") && Exists(f.right+L"\\sub") && !Exists(f.right+L"\\new") && Read(f.left+L"\\new")=="NEW" &&
@@ -657,6 +660,112 @@ void DeletionPaths() {
         if(keep) Check(Read(report.recovery.items[0].saved)=="OLD" && Read(report.recovery.items[0].saved+L":漢字")=="ADS","long Unicode deletion recovery succeeds");
     }
 }
+Result DirectoryPlan(Fixture& f,const std::wstring& mask=L"*.*",bool recursive=true) {
+    Options o; o.asymmetric=true; o.emptyDirectories=true; o.recursive=recursive; o.mask=mask;
+    return Compare(f.left,f.right,o,f.cancel,f.checking);
+}
+void DirectoryDeletion() {
+    for(bool keep:{false,true}) {
+        Fixture f; auto recovery=f.root+L"\\recovery-漢字"; f.Dir(recovery);
+        f.Dir(f.left+L"\\common"); f.Dir(f.right+L"\\common");
+        f.Dir(f.right+L"\\empty"); f.Dir(f.right+L"\\tree"); f.Dir(f.right+L"\\tree\\階😀");
+        Put(f.right+L"\\tree\\階😀\\žluťoučký.txt","DATA"); Put(f.right+L"\\tree\\階😀\\žluťoučký.txt:note","ADS");
+        Check(SetFileAttributesW(ApiPath(f.right+L"\\tree").c_str(),FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM),"hidden/system directory");
+        auto plan=DirectoryPlan(f); auto selected=DeletionRows(plan,{0,1,2,3,4});
+        Check(selected.size()==4,"common empty directory excluded from deletion");
+        auto report=RemoveFiles(f,plan,keep,recovery);
+        if(!report.complete) std::cerr<<"directory error="<<report.error<<" backup="<<report.recovery.error<<"\n";
+        Check(report.complete && report.items.size()==4,"directory tree deletion ON/OFF");
+        Check(Exists(f.right+L"\\common") && !Exists(f.right+L"\\empty") && !Exists(f.right+L"\\tree"),"only right-only directories removed");
+        Check(!plan.rows[report.items.front().row].right.directory,"files precede directory removals");
+        size_t previous=SIZE_MAX;
+        for(const auto& item:report.items) if(plan.rows[item.row].right.directory) {
+            size_t depth=std::count(item.target.begin(),item.target.end(),L'\\');
+            Check(depth<=previous,"deepest directories first"); previous=depth;
+        }
+        if(keep) {
+            Check(report.recovery.complete && report.recovery.items.size()==4,"all recovery complete before directory deletion");
+            for(const auto& item:report.recovery.items) {
+                const auto& e=plan.rows[item.row].right;
+                Check(Exists(item.saved) && item.logged && item.copy.status==CopyStatus::Copied,"saved topology includes every empty directory");
+                if(e.directory) {
+                    Check((GetFileAttributesW(ApiPath(item.saved).c_str()) & (FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM))==
+                        (e.attributes & (FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM)),"directory recovery attributes");
+                } else Check(Read(item.saved)=="DATA" && Read(item.saved+L":note")=="ADS","directory tree file recovery main and ADS");
+            }
+            Check(Read(report.journal).find("\"kind\":\"directory\"")!=std::string::npos &&
+                Read(report.recovery.journal).find("\"kind\":\"directory\"")!=std::string::npos,"directory kind in recovery and delete journals");
+        } else Check(report.recovery.items.empty() && report.journal.empty(),"directory deletion OFF creates no recovery");
+    }
+    for(int mode=0;mode<4;++mode) {
+        Fixture f; f.Dir(f.right+L"\\tree"); Put(f.right+L"\\tree\\keep.bin","KEEP");
+        auto plan=DirectoryPlan(f,mode==0?L"*.txt":L"*.*",mode!=3);
+        std::vector<size_t> visible;
+        for(size_t i=0;i<plan.rows.size();++i) {
+            if(mode==1 && !plan.rows[i].right.directory) plan.rows[i].action=Action::None;
+            if(mode!=2 || plan.rows[i].right.directory) visible.push_back(i);
+        }
+        Check(DeletionRows(plan,visible).empty(),"mask, Skip, hidden child and nonrecursive scan protect parent");
+        auto report=DeleteFiles(plan,visible,false,L"",f.cancel,f.checking,f.progress);
+        Check(report.items.empty() && Read(f.right+L"\\tree\\keep.bin")=="KEEP","protected contents never removed");
+    }
+    {
+        Fixture f; f.Dir(f.right+L"\\tree"); Put(f.right+L"\\tree\\keep.bin","KEEP"); Put(f.right+L"\\tree-other.bin","KEEP");
+        auto plan=DirectoryPlan(f,L"*.txt");
+        Check(std::none_of(plan.rows.begin(),plan.rows.end(),[](const Row& row) {return row.path==L"tree" && IsDeletion(row);}),
+            "excluded sibling sorting before descendant does not bypass parent protection");
+    }
+    {
+        Fixture f; auto recovery=f.root+L"\\recovery"; f.Dir(recovery); f.Dir(f.right+L"\\a"); f.Dir(f.right+L"\\z");
+        auto plan=DirectoryPlan(f);
+        SetRecoveryLogHook([](const std::wstring& line) {return line.find(L"\"event\":\"planned\"")!=std::wstring::npos?DWORD(ERROR_WRITE_FAULT):DWORD(0);});
+        auto report=RemoveFiles(f,plan,true,recovery); SetRecoveryLogHook({});
+        Check(!report.complete && Exists(f.right+L"\\a") && Exists(f.right+L"\\z"),"directory recovery journal failure prevents all deletions");
+    }
+    for(bool keep:{false,true}) {
+        Fixture f; auto recovery=f.root+L"\\recovery"; f.Dir(recovery); f.Dir(f.right+L"\\a");
+        Acl(f.right,L"D:P(D;;0x40;;;WD)(A;OICI;FA;;;OW)");
+        Acl(f.right+L"\\a",L"D:P(D;;SD;;;WD)(A;;FA;;;OW)");
+        auto report=RemoveFiles(f,DirectoryPlan(f),keep,recovery);
+        Acl(f.right,L"D:P(A;OICI;FA;;;OW)"); Acl(f.right+L"\\a",L"D:P(A;;FA;;;OW)");
+        Check(!report.complete && report.error==ERROR_ACCESS_DENIED && Exists(f.right+L"\\a"),"ordinary directory DELETE and parent DELETE_CHILD denial");
+    }
+    for(bool keep:{false,true}) for(int mode=0;mode<8;++mode) {
+        Fixture f; auto recovery=f.root+L"\\recovery"; f.Dir(recovery);
+        f.Dir(f.right+L"\\a"); f.Dir(f.right+L"\\z");
+        auto plan=DirectoryPlan(f); bool reached=false;
+        if(mode==6) { Put(f.right+L"\\a:directory-data","KEEP ADS"); plan=DirectoryPlan(f); }
+        if(mode==7) { Check(SetFileAttributesW(ApiPath(f.right+L"\\a").c_str(),FILE_ATTRIBUTE_READONLY),"read-only directory"); plan=DirectoryPlan(f); }
+        SetCopyHook([&](CopyPhase phase,const std::wstring& path) {
+            if(path!=f.right+L"\\a" || reached) return;
+            if((mode==1 && phase==CopyPhase::Deleted) || (mode!=1 && phase==CopyPhase::Deleting)) {
+                reached=true;
+                if(mode<=1) f.cancel=true;
+                if(mode==2) Put(path+L"\\new.txt","NEW");
+                if(mode==3) f.Dir(f.left+L"\\a");
+                if(mode==4) { Check(RemoveDirectoryW(ApiPath(path).c_str()),"replace empty directory before deletion"); f.Junction(path,recovery); }
+                if(mode==5) Put(path+L":late-data","LATE ADS");
+            }
+        });
+        auto report=RemoveFiles(f,plan,keep,recovery); SetCopyHook({});
+        Check(!report.complete && Exists(f.right+L"\\z"),"directory failure or Stop prevents next removal");
+        if(mode<=1) Check(reached && report.cancelled && (report.items[0].removed==(mode==1)),"directory Stop before/after removal");
+        if(mode==2) Check(report.error==ERROR_DIR_NOT_EMPTY && Read(f.right+L"\\a\\new.txt")=="NEW","new content blocks RemoveDirectory");
+        if(mode==3) Check(report.error==ERROR_FILE_EXISTS && Exists(f.right+L"\\a"),"new left counterpart blocks directory deletion");
+        if(mode==4) Check(report.error==ERROR_FILE_INVALID && Exists(recovery),"reparse replacement not followed or removed");
+        if(mode==5 || mode==6) Check((report.error==ERROR_NOT_SUPPORTED || (mode==5 && report.error==ERROR_FILE_INVALID)) && Read(f.right+L"\\a:"+(mode==5?std::wstring(L"late-data"):std::wstring(L"directory-data")))==
+            (mode==5?"LATE ADS":"KEEP ADS"),"directory ADS safely refused ON/OFF");
+        if(mode==7) Check(report.error==ERROR_ACCESS_DENIED && report.recovery.items.empty(),"read-only directory refused without changing attributes");
+    }
+    for(bool keep:{false,true}) {
+        Fixture f; auto recovery=f.root+L"\\recovery-階"; f.Dir(recovery); auto path=f.right;
+        for(int i=0;i<5;++i) { path+=L"\\漢字-"+std::wstring(55,L'階'); f.Dir(path); }
+        Put(path+L"\\😀.txt","LONG");
+        Check(path.size()>260 && WideCharToMultiByte(CP_UTF8,0,path.c_str(),-1,nullptr,0,nullptr,nullptr)>260,"long UTF16 and UTF8 directory fixture");
+        auto report=RemoveFiles(f,DirectoryPlan(f),keep,recovery);
+        Check(report.complete && report.items.size()==6 && !Exists(path),"long Unicode directory removal and recovery ON/OFF");
+    }
+}
 void DiskSpace() {
     using dirsync_test::SpaceFault;
     for(auto fault:{SpaceFault::Reserve,SpaceFault::MainData,SpaceFault::NamedStream,SpaceFault::RetainStage,SpaceFault::Publish}) {
@@ -705,7 +814,7 @@ void DiskSpace() {
 int main() {
     try { Success(); Scope(); ModifyOnlyDestination(); Boundaries(); Paths(); AfterPublication(); DiskSpace();
         RecoverySuccess(); RecoveryFailures(); RecoveryPaths(); OverwriteSuccess(); OverwriteFailures(); OverwritePaths();
-        DeletionSuccess(); DeletionFailures(); DeletionPaths();
+        DeletionSuccess(); DeletionFailures(); DeletionPaths(); DirectoryDeletion();
         std::cout<<checks<<" copy/recovery/overwrite/delete assertions passed\n"; return 0; }
     catch(const std::exception& e) { std::cerr<<"FAILED: "<<e.what()<<"\n"; return 1; }
 }
