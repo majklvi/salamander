@@ -57,6 +57,7 @@ Obnovovací kopie jsou nezávislá data, nikoli hardlinky. Dědí oprávnění o
 ## Známá omezení a stav ověření
 
 - Ověřený provoz je místní NTFS x64 se současným SDK 0.16. SMB není otestované; síťovou spolehlivost tento stav neslibuje. Win32 a ARM64 se sestavují v CI, runtime ověření je x64.
+- Větší NTFS pilot porovnal 5 849 souborových položek a ověřil 111 nových kopií a 51 přepisů s obnovou. Úplné procházení přístupnosti tisíců zobrazených řádků v této Windows/UI Automation relaci vyvolalo výrazné prodlevy; po skrytí shod byl celý datový průchod ovladatelný. Nezávislé běžné ruční ovládání plného seznamu bez tohoto zatížení zůstává k ověření. Podrobnosti a meze závěru jsou v [evidenci pilotu](directory-sync-plugin-pilot.md).
 - Bez mazání složek, samostatné synchronizace prázdných složek, historie, profilů dvojic, automatické smíšené dávky, automatické obnovy nebo úklidu starých záloh. Nabídka Empty folders může zobrazit návrhy složek, které nynější operační příkazy vynechají.
 - Reparse/junction/symlink, EFS a nepodporované cloud/offline položky se blokují. Kořeny se nesmějí překrývat. Unicode a dlouhé cesty jsou podporované v pluginu; průchod takovou cestou v panelech hostitele je samostatná schopnost.
 - První chyba nebo Stop zastaví zbytek. Hotové kopie/přepisy/odstranění se automaticky nevracejí. Vlastní nedokončený staging se uklidí, pokud je to možné; případný zbytek je nutné prohlédnout podle ohlášené cesty. Mohou zůstat vytvořené prázdné rodičovské složky a neúplné protokoly.
