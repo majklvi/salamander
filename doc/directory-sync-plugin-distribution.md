@@ -100,3 +100,9 @@ Aktuální balíček `C:\Samandarin\builds\dirsync-distribution\joined-stop-2026
 Aktuální ZIP: `C:\Samandarin\builds\dirsync-distribution\retained-options-20261016\plugin_5.0_dirsync_0.1_x64.zip`, SHA-256 `0042DAFDB4CD104B2207CB77F07CE4B49AC920FBB11B9C7572E86376E5DDBBB7`. Nahrazuje joined-stop balíček. Obsahuje masku vlevo, šest skenovacích voleb ve dvou řádcích, pravý svislý sloupec Compare/Synchronize/Close, nezávislé kombinovatelné filtry, tlumené Skip řádky a seznam bez vnějších mezer po stranách a nad status barem. Checkboxy se převezmou až dalším Compare; nový návod vysvětluje zachování režimu současného plánu. Potvrzování ztráty výsledků i jeho preference už neexistují.
 
 Po rozbalení ověřeno všech 10 hashů a přesný inventář 11 souborů. Finální balíčkové SPL/SLG byly nasazené do nového soukromého `layout-options-20261016-host`, bez zásahu do instalovaných uživatelských instancí. Hlavní GUI průchod a nativní regresi popisuje poslední záznam v directory-sync-plugin-ui.md. Prošel Release x64 warnings-as-errors, 1 924 resource/font kontrol v každé konfiguraci Debug/Release a 2 356 lifecycle kontrol. Balíček zůstává nepodepsaný místní x64 preview ZIP pro ruční instalaci; tato etapa není novým kompletním čistým instalačním ověřením ani testem přechodu mezi DPI monitory. Bez mazání složek, SMB testů a změn SDK.
+
+## 2026-10-16 — balíček s kompaktní mřížkou checkboxů
+
+Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\checkbox-grid-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
+SHA256: `52d6ce87b4c937fba6118bb70d5843a2fd41242fcd55a3a2f2b29ae8a9d76d8c`.
+Po rozbalení ověřeno všech 10 hashů manifestu a přesný inventář 11 souborů. Změna upravuje pouze geometrii šesti voleb; instalace ani nastavení se nemění. Dřívější instalační ověření platí pro předchozí balíček; tento balíček nebyl nově ručně načten v GUI.

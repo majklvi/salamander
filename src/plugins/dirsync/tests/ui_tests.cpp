@@ -93,7 +93,10 @@ void Test(int dialog)
         Check(control(IDC_MASK).x<control(IDC_RECURSIVE).x && control(IDC_MASK).width<=60,"narrow mask at left of scan options");
         for(DWORD id:{IDC_CONTENT,IDC_IGNORE}) Check(control(id).y==control(IDC_RECURSIVE).y,"first compact scan row");
         for(DWORD id:{IDC_SELECTED,IDC_EMPTY}) Check(control(id).y==control(IDC_ASYMMETRIC).y,"second compact scan row");
-        Check(control(IDC_ASYMMETRIC).y>control(IDC_RECURSIVE).y && control(IDC_ASYMMETRIC).x==control(IDC_RECURSIVE).x,"two compact scan rows");
+        Check(control(IDC_ASYMMETRIC).y==control(IDC_RECURSIVE).y+13,"native compact scan row spacing");
+        Check(control(IDC_ASYMMETRIC).x==control(IDC_RECURSIVE).x &&
+              control(IDC_SELECTED).x==control(IDC_CONTENT).x &&
+              control(IDC_EMPTY).x==control(IDC_IGNORE).x,"aligned scan option columns");
         Check(control(IDC_COMPARE).x==control(IDC_SYNCHRONIZE).x && control(IDCANCEL).x==control(IDC_COMPARE).x &&
             control(IDC_COMPARE).y<control(IDC_SYNCHRONIZE).y && control(IDC_SYNCHRONIZE).y<control(IDCANCEL).y,"Compare, Synchronize and Close stacked on right");
         for(auto pair:{std::pair<DWORD,DWORD>{IDC_COMPARE,IDC_STOP},{IDC_SYNCHRONIZE,IDC_STOP_SYNC}}) {
