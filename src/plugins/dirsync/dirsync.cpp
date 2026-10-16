@@ -34,7 +34,7 @@ HINSTANCE instance = nullptr, language = nullptr;
 CSalamanderGeneralAbstract* general = nullptr;
 CSalamanderGUIAbstract* gui = nullptr;
 constexpr UINT Done = WM_APP + 41;
-constexpr std::array<int,10> ColumnOrder{0,1,2,3,9,4,5,6,7,8};
+constexpr std::array<int,10> ColumnOrder{0,1,2,3,5,4,9,6,7,8};
 HBRUSH backgroundBrush = nullptr;
 bool dark = false;
 using Palette = std::array<COLORREF,7>;
@@ -51,6 +51,7 @@ struct Settings {
     bool actionLabels=false;
     bool relativeSizes=false;
     bool relativeTimes=false;
+    bool sideNames=false;
     std::array<Palette,2> colors{DefaultPalette(false),DefaultPalette(true)};
     std::wstring recoveryRoot;
 } settings;
@@ -70,6 +71,9 @@ void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     enabled=0;
     if(registry->GetValue(key,"RelativeTimesV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
         settings.relativeTimes=enabled!=0;
+    enabled=0;
+    if(registry->GetValue(key,"SideNamesV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
+        settings.sideNames=enabled!=0;
     enabled=0x3ff;
     if(registry->GetValue(key,"VisibleColumnsV1",REG_DWORD,&enabled,sizeof(enabled)))
         settings.visibleColumns=(enabled&0x3ff)|0x209; // Both names and Action are mandatory.
@@ -108,6 +112,8 @@ bool StoreSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     DWORD relativeSize=settings.relativeSizes?1:0,relativeTime=settings.relativeTimes?1:0;
     appearance=(registry->SetValue(key,"RelativeSizesV1",REG_DWORD,&relativeSize,sizeof(relativeSize))!=FALSE) && appearance;
     appearance=(registry->SetValue(key,"RelativeTimesV1",REG_DWORD,&relativeTime,sizeof(relativeTime))!=FALSE) && appearance;
+    DWORD sideNames=settings.sideNames?1:0;
+    appearance=(registry->SetValue(key,"SideNamesV1",REG_DWORD,&sideNames,sizeof(sideNames))!=FALSE) && appearance;
     DWORD columns=(settings.visibleColumns&0x3ff)|0x209,column=DWORD(settings.sortColumn),descending=settings.sortDescending?1:0;
     appearance=(registry->SetValue(key,"VisibleColumnsV1",REG_DWORD,&columns,sizeof(columns))!=FALSE) && appearance;
     appearance=(registry->SetValue(key,"SortColumnV1",REG_DWORD,&column,sizeof(column))!=FALSE) && appearance;
@@ -703,6 +709,7 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             SetDlgItemTextW(window,IDC_COLUMN_FIRST+int(i),Text(IDS_COLUMNS+OptionalColumns[i]).c_str());
             CheckDlgButton(window,IDC_COLUMN_FIRST+int(i),(appearance->draft.visibleColumns&(1u<<OptionalColumns[i]))?BST_CHECKED:BST_UNCHECKED);
         }
+        CheckDlgButton(window,IDC_SIDE_NAMES,appearance->draft.sideNames?BST_CHECKED:BST_UNCHECKED);
         CheckDlgButton(window,IDC_RELATIVE_SIZES,appearance->draft.relativeSizes?BST_CHECKED:BST_UNCHECKED);
         CheckDlgButton(window,IDC_RELATIVE_TIMES,appearance->draft.relativeTimes?BST_CHECKED:BST_UNCHECKED);
         SendDlgItemMessageW(window,IDC_RECOVERY_ROOT,EM_SETLIMITTEXT,32759,0);
@@ -757,6 +764,7 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS);
             settings.recoveryRoot=std::move(appearance->draft.recoveryRoot);
             settings.actionLabels=Checked(window,IDC_ACTION_LABELS);
+            settings.sideNames=Checked(window,IDC_SIDE_NAMES);
             settings.relativeSizes=Checked(window,IDC_RELATIVE_SIZES);
             settings.relativeTimes=Checked(window,IDC_RELATIVE_TIMES);
             settings.colors[appearance->theme]=appearance->draft.colors[appearance->theme];
@@ -947,6 +955,15 @@ void GrowRelativeColumns(Preview& p,bool sizes,bool times)
     }
     if(previous) SelectObject(dc,previous);ReleaseDC(list,dc);
 }
+int ColumnCaptionId(int column,bool sideNames)
+{
+    if(!sideNames) {
+        if(column==0 || column==9) return IDS_COLUMN_NAME;
+        if(column==1 || column==4) return IDS_COLUMN_SIZE;
+        if(column==2 || column==5) return IDS_COLUMN_MODIFIED;
+    }
+    return IDS_COLUMNS+column;
+}
 void ColumnStyle(Preview& p)
 {
     HWND list=GetDlgItem(p.window,IDC_LIST),header=ListView_GetHeader(list);
@@ -954,7 +971,7 @@ void ColumnStyle(Preview& p)
         ListView_SetColumnWidth(list,i,(settings.visibleColumns&(1u<<i))?p.columnWidths[size_t(i)]:0);
         // The host's dark header theme does not consistently render HDF sort
         // arrows. Retain their semantic flags and show a compact text marker.
-        auto caption=(dark && i==settings.sortColumn?std::wstring(settings.sortDescending?L"\u2193 ":L"\u2191 "):L"")+Text(IDS_COLUMNS+i);
+        auto caption=(dark && i==settings.sortColumn?std::wstring(settings.sortDescending?L"\u2193 ":L"\u2191 "):L"")+Text(ColumnCaptionId(i,settings.sideNames));
         HDITEMW title{};title.mask=HDI_TEXT;title.pszText=caption.data();
         SendMessageW(header,HDM_SETITEMW,i,LPARAM(&title));
         HDITEMW item{};item.mask=HDI_FORMAT;
@@ -1724,7 +1741,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         ListView_SetUnicodeFormat(list, TRUE);
         // Column captions and actions always come from the language module.
         for (int i = 0; i < 10; ++i)
-        { std::wstring title = Text(IDS_COLUMNS + i); LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT; c.fmt=(i==1 || i==4)?LVCFMT_RIGHT:LVCFMT_LEFT; c.pszText = &title[0]; c.cx = MulDiv(widths[i], dpi, 96); SendMessageW(list, LVM_INSERTCOLUMNW, i, LPARAM(&c)); }
+        { std::wstring title = Text(ColumnCaptionId(i,settings.sideNames)); LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT; c.fmt=(i==1 || i==4)?LVCFMT_RIGHT:LVCFMT_LEFT; c.pszText = &title[0]; c.cx = MulDiv(widths[i], dpi, 96); SendMessageW(list, LVM_INSERTCOLUMNW, i, LPARAM(&c)); }
         ListView_SetColumnOrderArray(list,int(ColumnOrder.size()),ColumnOrder.data());
         RECT client{}, outer{}; GetClientRect(window, &client); GetWindowRect(window, &outer);
         p->initialClient = {client.right, client.bottom};

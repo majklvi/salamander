@@ -1,5 +1,16 @@
 # Řazení a volitelné sloupce — 0.1.2
 
+## 2026-10-17 — symetrické sloupce a volitelné označení stran (0.1.3)
+
+Pořadí hlavních sedmi sloupců je Název | Velikost | Změněno | Operace | Změněno | Velikost | Název. Stav, Důvod a Chyba zůstávají za nimi. Jde pouze o vizuální pořadí nativního ListView; logické identity sloupců zůstaly zachované, takže uložené řazení a viditelnost odpovídají původním údajům. Výchozí záhlaví neobsahuje označení strany. Checkbox „Uvádět stranu v záhlaví“ / „Show side names in headers“ je v dosud volné buňce dvousloupcového nastavení. Dialog se nezvětšil. Volba je default OFF, uložená jako validovaný DWORD `SideNamesV1`; chybějící nebo neplatná hodnota znamená OFF. Explicitní označení stran zůstává v položkách nastavení viditelnosti a v nabídce sloupců, aby tyto položky byly rozlišitelné.
+
+Ověření: Release x64 s warnings-as-errors; 2 357 lifecycle kontrol včetně nových výchozích/uložených/neplatných hodnot, mapování všech krátkých a úplných záhlaví, skutečného nativního pořadí a sousedství pravého data, velikosti a názvu. Řazení a filtrování nadále pracuje s původními modelovými identitami. Anglické/české resource a layout testy: 2 357 / 2 389 kontrol při 96–240 DPI metrikách; nový checkbox se vejde do původního dialogu.
+
+Computer Use na soukromém Samandarinu 0.16 x64 a místní NTFS sadě `dirsync-relative-20261017`: anglický světlý náhled ukazuje výchozí krátká symetrická záhlaví, metadata a relativní časy na správných stranách. Zapnutí označení stran změní jen záhlaví a zachová všech 5 výsledků. Kliknutí na nově umístěné pravé datum seřadí podle pravého FILETIME; chybějící protějšek je první, nejnovější pravý soubor poslední. Skutečný restart do českého tmavého režimu zachoval zapnuté označení stran i řazení pravého data. Český checkbox byl vyzkoušen myší i mezerníkem a Enterem; návrat ke krátkým záhlavím zachoval všech 5 výsledků a aktivní řazení. Žádná souborová operace v GUI nebyla spuštěna; bez SMB testů a změn SDK.
+
+Následující oddíly jsou historická evidence předchozího uspořádání.
+
+
 ## Doplnění 17. října — oboustranné názvy, Settings a posouvání
 
 Aktuální náhled má deset sloupců. **Název vlevo** a **Název vpravo** opakují stejný koncový název na obou stranách operace. Pravá část začíná názvem před pravou velikostí a časem. Oba názvy i Operace jsou povinné; relativní cesta zůstává v záhlaví skupiny. Zobrazení názvu na obou stranách se používá také u jednostranného výsledku a nepředstírá fyzickou existenci protějšku: jeho velikost a čas zůstávají prázdné, stav a návrh se nemění. Oba názvy mají stejné formátování hostitele a lze podle obou řadit.

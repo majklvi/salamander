@@ -47,3 +47,5 @@ Pošlete hlášení autorovi pluginu; souhrn výsledku lze zkopírovat přes **C
 Při neočekávané změně dat další zápisy zastavte, uchovejte souhrn i obnovovací běh a nejprve zkontrolujte kopie v odděleném adresáři.
 
 Od 0.1.3 lze v Nastavení → Sloupce nezávisle zapnout relativní velikost a relativní čas. Obě volby jsou standardně vypnuté. U rozdílných hodnot dvojic souborů zobrazují rozdíl vůči protější straně; shodné hodnoty a chybějící protějšek ponechávají absolutní údaje. Řazení se nadále řídí skutečnou velikostí a časem. Podrobnosti uvádí README.cs.md.
+
+Tabulka má symetrické pořadí Název | Velikost | Změněno | Operace | Změněno | Velikost | Název. První trojice patří levému adresáři, poslední pravému. Volba Nastavení → Sloupce → Uvádět stranu v záhlaví přidá do popisků vlevo/vpravo; standardně je vypnutá a pamatuje se.

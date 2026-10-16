@@ -93,6 +93,7 @@ BEGIN
     CONTROL "Stav", 524, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 159, 136, 140, 12
     CONTROL "Důvod", 525, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 159, 149, 140, 12
     CONTROL "Chyba", 526, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 159, 162, 140, 12
+    CONTROL "Uvádět stranu v záhlaví", IDC_SIDE_NAMES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 159, 175, 140, 12
     CONTROL "Zobrazovat velikost relativně", IDC_RELATIVE_SIZES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 190, 140, 12
     CONTROL "Zobrazovat čas relativně", IDC_RELATIVE_TIMES, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 159, 190, 140, 12
     LTEXT "Další nastavení", -1, 7, 209, 75, 8

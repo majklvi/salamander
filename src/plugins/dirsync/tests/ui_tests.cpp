@@ -127,6 +127,9 @@ void Test(int dialog)
     }
     if(dialog==IDD_APPEARANCE) {
         auto control=[&](DWORD id)->const Control& {for(const auto& c:controls) if(c.id==id) return c;throw std::runtime_error("missing preference control");};
+        const auto& sideNames=control(IDC_SIDE_NAMES);
+        Check(sideNames.x==159 && sideNames.y==control(IDC_COLUMN_FIRST+3).y && sideNames.width==140 &&
+            (sideNames.style&BS_TYPEMASK)==BS_AUTOCHECKBOX,"side label option fills the unused settings grid cell");
         const auto& relativeSize=control(IDC_RELATIVE_SIZES);
         const auto& relativeTime=control(IDC_RELATIVE_TIMES);
         Check(relativeSize.y==relativeTime.y && relativeSize.x==7 && relativeTime.x==159 &&
@@ -231,6 +234,7 @@ int main()
             const wchar_t* value=nullptr;int n=LoadStringW(GetModuleHandleW(nullptr),id,reinterpret_cast<LPWSTR>(&value),0);
             Check(n>0,"localized relative metadata string present");return std::wstring(value,size_t(n));
         };
+        for(int id:{IDS_COLUMN_NAME,IDS_COLUMN_SIZE,IDS_COLUMN_MODIFIED}) Check(!text(id).empty(),"short column captions localized");
         const auto duration=dirsync::RelativeDuration(937840000000,
             {text(IDS_DURATION_DAY),text(IDS_DURATION_HOUR),text(IDS_DURATION_MINUTE),text(IDS_DURATION_SECOND)},text(IDS_DURATION_SUBSECOND));
         Check(duration==L"1 d 2 h 3 min 4 s","localized duration units");

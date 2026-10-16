@@ -65,6 +65,12 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeDisplayFormatting()
         check(kinds==std::vector<bool>({true,false}));
         check(displayed==L"PARENT\\"+std::wstring(300,L'ž')+L" žluťoučký-漢字-😀.txt");
         check(path==L"Parent\\"+original);
+        for(int column=0;column<10;++column) {
+            check(ColumnCaptionId(column,true)==IDS_COLUMNS+column);
+            check(ColumnCaptionId(column,false)==(column==0 || column==9?IDS_COLUMN_NAME:
+                column==1 || column==4?IDS_COLUMN_SIZE:column==2 || column==5?IDS_COLUMN_MODIFIED:IDS_COLUMNS+column));
+        }
+        check(ColumnOrder==std::array<int,10>{0,1,2,3,5,4,9,6,7,8});
         check(dirsync::MetadataDifference(0,UINT64_MAX)==UINT64_MAX);
         check(dirsync::MetadataDifference(UINT64_MAX,0)==UINT64_MAX);
         check(dirsync::MetadataDifference(42,42)==0);
@@ -202,6 +208,14 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     ok &= list!=nullptr && bar!=nullptr;
     SetWindowSubclass(list,PreviewList,1,0);SetWindowSubclass(ListView_GetHeader(list),PreviewHeader,1,0);
     for(int i=0;i<10;++i) {LVCOLUMNW column{};column.mask=LVCF_WIDTH;column.cx=100;SendMessageW(list,LVM_INSERTCOLUMNW,i,LPARAM(&column));}
+    ok &= ListView_SetColumnOrderArray(list,int(ColumnOrder.size()),ColumnOrder.data())!=FALSE;
+    std::array<int,10> nativeOrder{};
+    ok &= ListView_GetColumnOrderArray(list,int(nativeOrder.size()),nativeOrder.data())!=FALSE && nativeOrder==ColumnOrder;
+    RECT operation{},rightTime{},rightSize{},rightName{};
+    HWND headerWindow=ListView_GetHeader(list);
+    ok &= Header_GetItemRect(headerWindow,3,&operation) && Header_GetItemRect(headerWindow,5,&rightTime) &&
+        Header_GetItemRect(headerWindow,4,&rightSize) && Header_GetItemRect(headerWindow,9,&rightName) &&
+        operation.right==rightTime.left && rightTime.right==rightSize.left && rightSize.right==rightName.left;
     p.result=dirsync::Compare(left,right,p.options,p.cancel,p.progress);auto snapshot=p.result.snapshot;
     dirsync::Row row;row.path=L"skipped-漢字.txt";row.state=dirsync::State::Different;row.action=dirsync::Action::None;
     p.result.rows={row};p.defaults={dirsync::Action::CopyRight};p.visible={0};Filter(p);
@@ -467,6 +481,10 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
         plugin.LoadConfiguration(nullptr,nullptr,&registry);
         check(settings.keepOriginals && settings.recoveryRoot.empty());
         check(!settings.relativeSizes && !settings.relativeTimes);
+        check(!settings.sideNames);
+        settings.sideNames=true;plugin.SaveConfiguration(nullptr,key,&registry);settings={};plugin.LoadConfiguration(nullptr,key,&registry);
+        check(settings.sideNames);
+        registry.values["SideNamesV1"].bytes={2,0,0,0};plugin.LoadConfiguration(nullptr,key,&registry);check(!settings.sideNames);
         settings.relativeSizes=true;plugin.SaveConfiguration(nullptr,key,&registry);settings={};plugin.LoadConfiguration(nullptr,key,&registry);
         check(settings.relativeSizes && !settings.relativeTimes);
         settings.relativeSizes=false;settings.relativeTimes=true;plugin.SaveConfiguration(nullptr,key,&registry);settings={};plugin.LoadConfiguration(nullptr,key,&registry);

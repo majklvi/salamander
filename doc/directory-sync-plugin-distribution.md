@@ -1,5 +1,9 @@
 # Directory Synchronization: balíček a čistá konfigurace 0.16
 
+## 2026-10-17 — aktualizace 0.1.3: symetrické sloupce
+
+Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\symmetric-0.1.3-20261017\plugin_5.0_dirsync_0.1.3_x64.zip`, SHA-256 `d5054971b319bf99ff3dd8f9abc926cb7442de933c04e9997c33ac8e79231bd2`. Nahrazuje níže uvedený první balíček 0.1.3. Verze zůstává **0.1.3**. Záhlaví jsou standardně krátká, hlavní sloupce symetrické; nové zapamatované nastavení umožňuje výslovně označit strany. Aktualizované příručky jsou uvnitř ZIP. Archiv znovu rozbalen a ověřeno všech 12 hashů manifestu. [Ověření](directory-sync-plugin-columns.md) zahrnuje anglický světlý i český tmavý náhled, restart a klávesnici. Bez SMB testů a změn SDK.
+
 ## 2026-10-17 — 0.1.3: volitelné relativní velikosti a časy
 
 Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\relative-0.1.3-20261017\plugin_5.0_dirsync_0.1.3_x64.zip`, SHA-256 `2e4d76b37f6f0bf85f411cbd13e62dde8647bd509bd75dea9197e7cd18a2a10d`. SPL a oba SLG mají verzi **0.1.3**. Přiložené README.cs.md a PILOT.cs.md popisují dvě nezávislé volby relativního zobrazení, standardně vypnuté. ZIP znovu rozbalen a ověřeno všech 12 hashů manifestu. [Rozsah automatického a GUI ověření](directory-sync-plugin-relative.md). Bez SMB testů a změn SDK.
