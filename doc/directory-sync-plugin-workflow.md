@@ -64,3 +64,31 @@ Aktuální rozložení už nemá dolní tlačítka ani Proposal/Apply. Návrhy s
 ## 2026-10-16 — volby příštího porovnání
 
 Aktuální checkboxy Subfolders/By content/Ignore date/Asymmetric/Panel selection/Empty folders nemění ani nemažou zobrazený plán. Použijí se až příštím Compare; do té doby i kontextové a operační příkazy používají snapshot a režim původního porovnání. Stav hlásí čekající volby. Původní potvrzení ztráty výsledků a jeho preference byly odstraněny. Samotná textová změna masky nebo kořenové cesty zůstává přímým zneplatněním. Filtry jsou nezávislé kombinovatelné přepínače, nikoli volba jediné kategorie; GUI i nativní test kombinací potvrdily zachování ostatních stavů. Skip je šedý s tlumeným odstínem State; tabulka sahá až k bokům a status baru.
+
+## 2026-10-16 — aktuální průchod včetně ruční obnovy
+
+Computer Use, soukromý Samandarin 0.16 Release x64, Windows Dark Mode (experimental), produkční plugin z `8acdbd98`. SPL SHA-256 `45F5161B1E14AA55D469403CC968CCCAD909F29FADE831D65E694C1F985C4FDD` odpovídá rozbalenému balíčku `dark-responsive-dpi-20261016`. Nebyly použity testovací hooky ani změny hostitele/SDK. Fixture na místním NTFS: `C:\Samandarin\builds\dirsync-pilot-20261016`, kořeny `left`/`right`, samostatná obnova `recovery-漢字` a kontrolní cíl `restored`.
+
+| Položka | Vstup | Očekávání |
+| --- | --- | --- |
+| equal.txt | obě strany 5 B, shodný čas i data | Equal |
+| new-漢字.txt | pouze vlevo, 8 B + Unicode ADS | nová kopie doprava |
+| overwrite.txt | vlevo 12 B, o minutu novější; vpravo 8 B, obě strany s ADS | přepis doprava, uchovat původní pravý soubor |
+| skip.txt | pouze vlevo, 9 B + ADS | ručně Skip před první kopií |
+| delete.txt | pouze vpravo, 11 B + ADS | samostatně odstranit s obnovou ON |
+| empty-dir | prázdná pravá složka | zachovat |
+
+Provedený postup:
+
+1. Kořeny zadány přímo v pluginu, maska `*.*`, Subfolders, By content, Asymmetric a Empty folders ON. Compare sestavilo šest řádků bez blokování; shoda měla důvod Binary content, přepis Left is newer. Výběr skip.txt a Ctrl+M změnil právě jeden návrh.
+2. Filtr Equal OFF: 5 viditelných / 1 skrytý. Navíc směr doprava OFF: 3 / 3. Opětovné zapnutí směru: 5 / 1, zapnutí Equal: 6 / 0. Ruční Skip zůstal zachovaný. Nejde o přepínače vzájemně výlučné kategorie.
+3. Synchronize → Copy visible new files zařadilo 1 soubor / 8 B, vynechalo 3 jiné návrhy. Výsledek 1 copied and verified, 0 chyb, 0 nezahájených. Zvýrazněný Skip se nekopíroval, nezvýrazněná Unicode kopie ano. Ověřena hlavní data i ADS na disku.
+4. Přes Settings nastavena existující oddělená Unicode obnova, Keep originals ON. Nové Compare správně změnilo novou kopii na Equal a obnovilo výchozí návrh skip.txt na Copy to right. Samostatný přepis zařadil pouze overwrite.txt: 12 B nových / 8 B původních dat, 3 jiné návrhy vynechané. Výsledek 1 replaced and verified, 0 chyb, obnova 1/1. Cílová DACL zachována, originál obsahuje OLD DATA a OLD DATA ADS; manifest i overwrite.jsonl končí complete.
+5. Po dalším Compare samostatné mazání nabídlo pouze delete.txt / 11 B, 2 jiné návrhy vynechalo. Po konkrétním souhlasu uživatele v GUI odstraněn 1 soubor, 0 chyb, obnova 1/1 v novém běhu; složka zůstala. Závěrečné Compare má 5 viditelných řádků, žádné blokování. Tři páry jsou shodné, skip.txt a prázdná složka zůstávají zamýšlenými odlišnostmi.
+6. Z manifestů přes `item`/`planned`/`result: saved` určeny originály obou běhů; prováděcí protokoly potvrzují replaced/deleted a complete. Plugin zavřen přes Close. V panelu hostitele přes Shift+F7 otevřena složka `saved`, zaměřen soubor a přes F5 zkopírován do nového cíle `restored\overwrite.txt`, obdobně `restored\delete.txt`. Obě kopie proběhly bez přepisování existujících dat. Obnova na původní jména v synchronizovaném stromu nebyla součástí testu.
+
+**31 nezávislých následných kontrol prošlo, 0 selhání.** Kontroly zahrnují původní zdroje a shodný cíl, SHA-256 hlavních dat, ADS a mtime nových výsledků, cílovou DACL, nepřítomnost Skip/odstraněného jména, zachování složky a přesný inventář pravého stromu; dále původní hashe uchovaných i ručně obnovených souborů, jejich ADS a mtime a dokončení všech čtyř JSONL protokolů ve dvou bězích. Navíc přímo ověřeny očekávané texty obnovených ADS: OLD DATA ADS a DELETE DATA ADS. Kontrolní kopie obsahují jen hlavní proud a odpovídající Unicode ADS.
+
+Soukromý hostitel běžně ukončen, konfigurace obnovena byte-for-byte; tři uživatelské instance zůstaly spuštěné. Evidence mimo Git: `before.json`, `overwrite-evidence.json`, `results.json`, konfigurace před testem a malé testovací soubory v uvedené fixture. Průchod neodhalil chybu produkčního pluginu; upravuje se pouze návod a tato evidence, nové sestavení není potřeba.
+
+Jde o malý syntetický úspěšný průchod s obnovou ON, nikoli o uživatelský pilot na reprezentativních datech či zátěžový test. Praktická obnova běžným F5 je nyní ověřená i v GUI hostitele. Zůstává vhodné vyzkoušet kopii skutečné pracovní sady a aktuální ZIP na dalším počítači; skutečné jiné systémové DPI a přechod monitorů zůstávají samostatně neověřené. OFF, přerušení a chyby místa dokládají předchozí testy. Bez mazání složek, SMB testů a změn SDK.
