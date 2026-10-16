@@ -24,11 +24,11 @@ BEGIN
     CONTROL "By c&ontent", IDC_CONTENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 95, 67, 75, 12
     CONTROL "&Ignore date", IDC_IGNORE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 178, 67, 80, 12
     CONTROL "&Asymmetric", IDC_ASYMMETRIC, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 266, 67, 80, 12
-    CONTROL "Only &selected", IDC_SELECTED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 354, 67, 90, 12
+    CONTROL "Scan panel &selection", IDC_SELECTED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 354, 67, 90, 12
     CONTROL "&Empty folders", IDC_EMPTY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 452, 67, 100, 12
     DEFPUSHBUTTON "&Compare", IDC_COMPARE, 8, 86, 70, 16
     PUSHBUTTON "S&top", IDC_STOP, 86, 86, 60, 16
-    LTEXT "Review proposals, then confirm each operation separately.", -1, 157, 89, 440, 12
+    LTEXT "Operations use all visible eligible proposals, regardless of highlighted rows.", -1, 157, 89, 440, 12
     CONTROL "E&qual", IDC_EQUAL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 112, 60, 12
     CONTROL "&Different", IDC_DIFFERENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 72, 112, 68, 12
     CONTROL "Si&ngle-sided", IDC_SINGLE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 148, 112, 85, 12
@@ -37,16 +37,16 @@ BEGIN
     CONTROL "", IDC_LIST, "SysListView32", LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 8, 132, 594, 165
     LTEXT "&Proposal:", IDC_PROPOSAL_LABEL, 8, 308, 39, 10
     COMBOBOX IDC_ACTION, 50, 305, 105, 90, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
-    PUSHBUTTON "Apply to selected ro&ws", IDC_APPLY, 162, 305, 110, 16
+    PUSHBUTTON "Apply to highlighted ro&ws", IDC_APPLY, 162, 305, 110, 16
     PUSHBUTTON "Plan summar&y", IDC_SUMMARY, 280, 305, 90, 16
-    PUSHBUTTON "Copy new files...", IDC_COPY_NEW, 378, 305, 115, 16
-    PUSHBUTTON "Overwrite files...", IDC_OVERWRITE, 501, 305, 101, 16
+    PUSHBUTTON "Copy visible new files...", IDC_COPY_NEW, 378, 305, 115, 16
+    PUSHBUTTON "Overwrite visible files...", IDC_OVERWRITE, 501, 305, 101, 16
     CONTROL "&Keep originals (before overwrites/deletions)", IDC_KEEP_ORIGINALS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 330, 240, 12
     LTEXT "Recovery copies use additional disk space.", IDC_RECOVERY_SPACE, 260, 331, 342, 10
     LTEXT "Recovery folder:", IDC_RECOVERY_LABEL, 8, 354, 74, 10
     EDITTEXT IDC_RECOVERY_ROOT, 86, 351, 389, 14, ES_AUTOHSCROLL
-    PUSHBUTTON "Sa&ve originals...", IDC_SAVE_ORIGINALS, 483, 351, 119, 16
-    PUSHBUTTON "Delete files...", IDC_DELETE_FILES, 8, 375, 115, 16
+    PUSHBUTTON "Sa&ve visible originals...", IDC_SAVE_ORIGINALS, 483, 351, 119, 16
+    PUSHBUTTON "Delete visible files...", IDC_DELETE_FILES, 8, 375, 115, 16
     LTEXT "Visible right-only files in asymmetric mode. Folders are kept.", IDC_DELETE_SCOPE, 131, 378, 471, 10
     PUSHBUTTON "Close", IDCANCEL, 532, 404, 70, 16
     CONTROL "", IDC_STATUS, "msctls_statusbar32", SBARS_SIZEGRIP | SBARS_TOOLTIPS, 0, 430, 610, 16
@@ -75,7 +75,7 @@ BEGIN
     IDS_UI_OVERWRITE_RESULT "Overwrite result"
     IDS_UI_DELETE_CONFIRM "Confirm file deletion"
     IDS_UI_DELETE_RESULT "File deletion result"
-    IDS_UI_FILES "Files"
+    IDS_UI_FILES "Eligible visible files"
     IDS_UI_BYTES "New main data (bytes)"
     IDS_UI_ORIGINAL_BYTES "Original main data (bytes)"
     IDS_UI_OMITTED "Other visible proposals omitted"
@@ -95,12 +95,15 @@ BEGIN
     IDS_UI_SAVE_POLICY "Creates independent, verified copies and a manifest in an existing recovery folder outside both trees. Originals remain unchanged; no proposal is executed. Recovery copies inherit the recovery folder permissions. Stop preserves completed copies."
     IDS_UI_OVERWRITE_POLICY "New targets and deletions are omitted. Replaces existing file names after staging and verification, preserving original target permissions. Read-only targets are refused without attribute changes. Stop preserves completed replacements; there is no automatic rollback."
     IDS_UI_DELETE_POLICY "Only visible Delete on right proposals for right-only files in asymmetric mode are eligible. Folders are never removed, even when empty. The Recycle Bin is not used. Read-only files are refused without attribute changes. Stop preserves completed deletions; there is no automatic rollback."
-    IDS_UI_RESULT_NOTE "Inspect the result, then Compare again before another operation. Ctrl+C copies a selected value; Ctrl+Shift+C copies the full summary."
+    IDS_UI_RESULT_NOTE "Inspect the result, then Compare again before another operation. Compare rebuilds proposals; reapply manual Skip if needed. Ctrl+C copies a selected value; Ctrl+Shift+C copies the full summary."
     IDS_UI_COPY_VALUE "Copy &value\tCtrl+C"
     IDS_UI_COPY_ALL "Copy &all\tCtrl+Shift+C"
     IDS_UI_CLIPBOARD_ERROR "Could not copy the text to the clipboard."
     IDS_UI_ADS_NOTE "Byte counts exclude alternate data streams (ADS)."
-    IDS_UI_PLAN_NOTE "Proposals only. Copy new files, Overwrite files and Delete files each require a separate confirmation. Only right-only files can be deleted in asymmetric mode; folders are kept. Copy counts and bytes include both new and existing targets."
+    IDS_UI_SCOPE_LABEL "Scope"
+    IDS_UI_SCOPE_VALUE "All visible eligible proposals"
+    IDS_UI_SCOPE_NOTE "Highlighted rows do not limit these commands. Hidden and Skip rows are excluded. Run each kind of operation separately."
+    IDS_UI_PLAN_NOTE "Proposals only, for all visible rows regardless of highlighting. Run copies, overwrites and deletions separately; each requires confirmation. Copy counts and bytes include both new and existing targets. Only right-only files can be deleted in asymmetric mode; folders are kept. Compare rebuilds proposals; reapply manual Skip if needed."
     IDS_UI_TO_RIGHT "Copies to right (count / main bytes)"
     IDS_UI_TO_LEFT "Copies to left (count / main bytes)"
     IDS_UI_DELETE_RIGHT "Proposed deletions on right (includes folders)"
@@ -189,7 +192,7 @@ BEGIN
     IDS_COPY_STOPPED "Stopped. Completed new files remain in place."
     IDS_COPY_FAILED "The copy worker failed. Completed files may remain. Compare again and inspect the destination before retrying."
     IDS_SELECT_ROW "Select one or more rows first. Blocked and conflicting rows cannot receive actions."
-    IDS_HELP "Choose the two Windows folders and Compare. Only selected uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nChange actions on selected rows and review Plan summary. Only visible actions enter that summary; blocked/conflicting rows always stay visible. Copy new files executes only visible file copies with missing targets after a separate confirmation. Existing targets, deletions and empty-folder actions are omitted.\n\nKeep originals is enabled by default and can be switched off. This setting and the recovery folder are remembered for this plugin. Disabling it creates no recovery copies and leaves existing backups in place. Delete files separately confirms visible Delete on right proposals from asymmetric comparison. Only supported files absent on the left are eligible. Folders are never deleted. The confirmation states recovery ON/OFF; when ON all originals must first be saved and verified. When OFF deleted data and ADS have no recovery copy. The Recycle Bin is not used. Read-only files are refused.\n\nOverwrite files separately confirms replacement of visible existing-file targets. The confirmation states whether recovery is ON or OFF. When ON, all original targets must first be saved and verified outside both trees. When OFF, overwritten data and old ADS have no recovery copy from this run. Replacements keep original target permissions. Read-only targets are refused. Stop leaves completed replacements in place.\n\nSave originals separately saves original target files for visible copy proposals with an existing file on both sides. Enter an existing recovery folder outside both compared trees. This creates independent verified copies and a manifest; originals remain unchanged and no proposal is executed. Permissions inherit from the recovery folder.\n\nData and metadata are verified; Stop preserves completed files. Compare again after either run."
+    IDS_HELP "Choose the two Windows folders and Compare. Scan panel selection uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nHighlight rows and use Apply to highlighted rows to change their proposals, then review Plan summary. Highlighting does not restrict Copy, Overwrite, Delete or Save originals: each command uses all visible eligible proposals. Hidden and Skip rows are excluded. Run each kind of operation separately. Only visible actions enter that summary; blocked/conflicting rows always stay visible. Copy new files executes only visible file copies with missing targets after a separate confirmation. Existing targets, deletions and empty-folder actions are omitted.\n\nKeep originals is enabled by default and can be switched off. This setting and the recovery folder are remembered for this plugin. Disabling it creates no recovery copies and leaves existing backups in place. Delete files separately confirms visible Delete on right proposals from asymmetric comparison. Only supported files absent on the left are eligible. Folders are never deleted. The confirmation states recovery ON/OFF; when ON all originals must first be saved and verified. When OFF deleted data and ADS have no recovery copy. The Recycle Bin is not used. Read-only files are refused.\n\nOverwrite files separately confirms replacement of visible existing-file targets. The confirmation states whether recovery is ON or OFF. When ON, all original targets must first be saved and verified outside both trees. When OFF, overwritten data and old ADS have no recovery copy from this run. Replacements keep original target permissions. Read-only targets are refused. Stop leaves completed replacements in place.\n\nSave originals separately saves original target files for visible copy proposals with an existing file on both sides. Enter an existing recovery folder outside both compared trees. This creates independent verified copies and a manifest; originals remain unchanged and no proposal is executed. Permissions inherit from the recovery folder.\n\nData and metadata are verified; Stop preserves completed files. Compare again after a run. Compare rebuilds proposals; reapply manual Skip if needed."
     220 "Relative path"
     221 "Left size"
     222 "Left modified"

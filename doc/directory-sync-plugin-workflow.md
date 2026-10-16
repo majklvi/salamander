@@ -35,3 +35,22 @@ V obnově jsou přesně dva originální soubory z oddělených běhů, s původ
 Průchod neodhalil chybu produkčního kódu; mění se pouze dokumentace. Praktické pravidlo: **Compare sestavuje nový plán a ruční Skip se do něj nepřenáší.** Před každou další operací je třeba nový náhled zkontrolovat a potřebné ruční volby znovu použít. V tomto průchodu další samostatné příkazy přepisu/mazání nekopírovaly skip.txt ani po obnovení jeho návrhu Copy to right. Trvalé vyloučení lze vyjádřit maskou; tuto variantu tento průchod netestoval.
 
 Jde o jeden běžný úspěšný pracovní postup s obnovou ON, nikoli novou chybovou/souběhovou kampaň. OFF a přerušení dokládají dřívější samostatná ověření. Závěrečné GUI porovnání Binary content se týká hlavních dat; ADS byly navíc ověřeny nezávisle na disku. Neověřuje se SMB, mazání složek, instalátor ani jiné architektury za běhu. Samostatné příkazy a ruční obnova zůstávají rozsahem první verze.
+
+## Rozsah operačních tlačítek — 16. října 2026
+
+Aktuální rozhraní rozlišuje tři věci: `Scan panel selection` omezuje vstupy skenu podle původního označení v panelech, `Apply to highlighted rows` mění návrhy pouze zvýrazněných řádků náhledu a operační tlačítka používají **všechny viditelné způsobilé návrhy bez ohledu na zvýraznění**. Názvy Copy/Overwrite/Save/Delete obsahují „visible“; stálá instrukce nad náhledem, první řádek Scope v každém potvrzení a úvod poznámek uvádějí tentýž rozsah. Kopie, přepisy a mazání se spouštějí samostatně. Skryté řádky a Skip se neprovádějí. Počítadlo Other visible proposals omitted znamená jiné viditelné nenulové návrhy, nikoli skryté řádky či Skip. Plan summary zahrnuje viditelné návrhy; součty kopií zahrnují nové i existující cíle. Compare návrhy sestavuje znovu, proto je třeba případný ruční Skip zopakovat; nově to připomíná souhrn, výsledek i nápověda.
+
+Computer Use ověření proběhlo v soukromém Release x64 Samandarinu 0.16 v experimentálním Windows Dark Mode, s produkčním SPL i neupraveným produkčním SLG. Fixture `C:\Samandarin\builds\dirsync-ui\scope-20261016` obsahovala dvě nové kopie doprava (5 + 5 B, jedna s Unicode jménem), jeden budoucí přepis (9 B proti 3 B), další levostranný soubor 4 B a pravostranný soubor 6 B pro kopii doleva; oddělená obnova `recovery-漢字` byla prázdná.
+
+| Ověření | Výsledek |
+| --- | --- |
+| Apply při zvýraznění pouze skip.txt | Jen tento návrh přešel na Skip; ostatní zůstaly původní. |
+| Vypnutí Right to left | Návrh kopie doleva zmizel, stav 5 řádků / 4 viditelné / 1 skrytý / 0 blokovaných. |
+| Plan summary | 3 kopie doprava / 19 B včetně přepisu; 0 doleva, 1 skrytý. |
+| Potvrzení přepisu a uložení originálů, obě zrušena | Každé zařadilo 1 existující cíl, 3 B originálu, vynechalo 2 jiné viditelné návrhy. Scope a upozornění na zvýraznění/Skip/skryté řádky čitelné. Žádný přepis ani záloha neprovedeny. |
+| Zvýrazněno pouze a-visible-漢字.txt, spuštěno Copy visible new files | Potvrzení 2 soubory / 10 B, 1 jiný návrh vynechán; výsledek 2 ověřené kopie, 0 chyb, 0 nezahájených, 1 vynechaný. Nezvýrazněný b-visible.txt se správně také zkopíroval. |
+| Nové Compare | Obě nové kopie Equal; skip.txt opět Copy to right, původní cíl přepisu dál odlišný a jeden návrh skrytý. |
+
+**12 nezávislých kontrol disku prošlo:** všech šest původních souborů má původní SHA-256, obě nové kopie odpovídají zdrojům, skrytý ani Skip cíl nevznikl, obnova zůstala prázdná a přesný počet osmi souborů v obou stromech vylučuje další výstupy. Soukromý hostitel běžně ukončen, jeho konfigurace obnovena byte-for-byte, tři původní uživatelské instance zachovány. Evidence mimo Git: before.json, results.json a config-before.reg ve fixture.
+
+Debug i Release x64 produkční build s warnings-as-errors prošel; v obou konfiguracích prošlo **1 670** stávajících kontrol kompilovaných resources a rozložení při 96/120/144/192/240 DPI. Nové texty se vejdou do stávajícího kompaktního rozložení. Nemění se výběr operací ani adaptéry. Jde o ověření rozsahu přes novou kopii a zrušená potvrzení; neprohlašuje nový běh přepisu/mazání, runtime přechody DPI, instalaci, SMB ani jiné architektury za běhu. Mazání složek a změny SDK/hostitele nejsou součástí.

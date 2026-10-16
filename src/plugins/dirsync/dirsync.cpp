@@ -296,7 +296,8 @@ INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
 }
 bool InformationBox(HWND parent,int title,InfoRows rows,const std::wstring& notes,bool confirm=false)
 {
-    Information info{title,std::move(rows),confirm?Text(IDS_UI_ADS_NOTE)+L"\n\n"+notes:notes,confirm,{}, {}, {}};
+    if(confirm) rows.insert(rows.begin(),{Text(IDS_UI_SCOPE_LABEL),Text(IDS_UI_SCOPE_VALUE)});
+    Information info{title,std::move(rows),confirm?Text(IDS_UI_SCOPE_NOTE)+L"\n\n"+Text(IDS_UI_ADS_NOTE)+L"\n\n"+notes:notes,confirm,{}, {}, {}};
     INT_PTR result=DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_INFORMATION),parent,InformationDialog,LPARAM(&info));
     if(result==-1) Message(parent,IDS_FAILED);
     return result==IDOK;
