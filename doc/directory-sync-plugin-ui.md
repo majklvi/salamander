@@ -21,9 +21,36 @@ Potvrzení zápisových operací jsou záměrnou součástí release, nikoli dia
 - Stávající lifecycle sada po překladu aktuálního probe: **2 343 kontrol** v Debug i Release x64. Adaptér a SDK se nemění.
 - Computer Use, Release hostitel 0.16, Windows Dark Mode (experimental), izolovaná NTFS sada `C:\Samandarin\builds\dirsync-ui\compact-20261016`: souhrn šesti řádků 452 × 285 px, potvrzení nové kopie se třemi řádky 452 × 260 px, výsledek se čtyřmi řádky 452 × 238 px. Bez pole Selected value a bez prázdných řádků navíc. Kontextové menu má dvě položky a odpovídá vzhledu hostitele. Maximalizace i návrat do kompaktní velikosti zachovaly tabulku, poznámky a OK.
 - Výslovně potvrzená kopie nového `new-漢字.txt`: Copied and verified 1, errors 0, not started 0, omitted 1. Šest následných kontrol disku/konfigurace prošlo: nová data, nezměněný původní cíl i zdroj, prázdná obnova, přesně obnovená soukromá konfigurace, tři uživatelské instance ponechané v běhu. V tomto běhu neproběhl přepis ani odstranění.
-- **Schránka/klávesnice v modalním souhrnu: GUI ověření není průkazné.** Computer Use nevystavuje vnořené informační okno jako samostatný cíl; při aktivaci jeho zakázaného rodiče klávesa nedorazí do tabulky a otevřené menu se před volbou zavře. Pokus o vložení neprokázal nový obsah schránky. Nejde o úspěšný test Ctrl+C/Ctrl+Shift+C ani menu příkazů. Implementace používá existující `CopyTextToClipboardW`; úplné hodnoty se berou z modelu, nikoli ze zkrácených buněk. Běžné ruční ověření těchto zkratek a dlouhé Unicode hodnoty zůstává otevřené.
+- Původní pokus o GUI ověření schránky byl neprůkazný kvůli cílení zakázaného rodiče v Computer Use. Následující ověření toto omezení obešlo testovacím resource modulem a dokončilo kontrolu všech čtyř způsobů kopírování. Produkční kód kopírování nevyžadoval opravu.
 
 Evidence mimo Git: `results.json`, `config-before.reg` v aktuální fixture. SPL SHA-256 `AE85E5D6A48C079DC19BB8587CA8A58A57311F776A8CB5DA84BC71A7FE3B7C29`, SLG `F9FCB15A1C2CF963FB1558351BC95E27BBA12B0A16EA387448C31CE499FE7DDD`.
+
+## Dokončené ověření schránky (16. října 2026)
+
+Computer Use, skutečný Release plugin v hostiteli Samandarin 0.16 x64, Windows Dark Mode (experimental). SPL zůstal **beze změny**. V dočasné kopii anglického SLG byl pouze u `IDD_INFORMATION` přidán extended style `WS_EX_APPWINDOW`; modalita, rodič, dialogová procedura, tabulka, resources textů i skutečné SDK clipboard/menu služby zůstaly stejné. Příznak umožnil vybrat potvrzovací dialog z `list_windows()` místo aktivace jeho zakázaného rodiče. Testovací SLG se nedistribuuje; po testu byl obnoven původní modul a konfigurace, ověřeno SHA-256.
+
+Cesta zadaná do Recovery folder měla **346 jednotek UTF-16 / 896 bajtů UTF-8**: ASCII prefix, `obnova-漢字`, tři samostatné komponenty po 90 znacích `階`, konec `žluťoučký-😀`. Žádná komponenta nepřekračuje běžný limit jména. Cesta sloužila jen jako text; neověřuje se zde její otevření ani zápis. Potvrzení přepisu zobrazilo šest polí, ve kterých tato cesta byla zkrácená na šířku buňky.
+
+| Ovládání | Výsledek vložení do nového dokumentu Poznámkového bloku |
+| --- | --- |
+| Ctrl+C na řádku Recovery folder | Přesná shoda celé cesty, včetně posledního emoji; žádné zkrácení podle buňky nebo accessibility textu. |
+| Ctrl+Shift+C | Přesná shoda názvu dialogu, všech šesti názvů/hodnot, tabulátorů a úplných poznámek včetně prázdných řádků. |
+| Pravé tlačítko → Copy value | Přesná shoda celé dlouhé cesty. |
+| Shift+F10 → Copy all | Menu ukotvené k vybranému řádku; přesná shoda se souhrnem z Ctrl+Shift+C. |
+
+Shoda se kontrolovala s očekávaným textem přes `document_text` po skutečném Ctrl+V, nikoli přímým čtením schránky nebo pouhou kontrolou návratové hodnoty SDK. Souhrn má 928 jednotek UTF-16 při normalizaci CRLF na LF. Poslední vložení bylo uloženo jako `pasted-summary.txt`: **940 jednotek UTF-16, 1 490 bajtů UTF-8, šest tabulátorů, 12 CRLF**, SHA-256 `C9FE579FD558B4923C712B6467F2D13815A41A6B2D4593B5594D766A62089F95`. Uložená testovací záložka byla zavřena, původní dokumenty editoru ponechány.
+
+Escape zavřelo potvrzení bez provedení přepisu. Původní zdroj `NEW` i cíl `OLD` zůstaly stejné, neproběhlo mazání ani vytvoření obnovy. Tři původní instance Salamanderu zůstaly spuštěné. Evidence mimo Git: `C:\Samandarin\builds\dirsync-ui\clipboard-20261016\results.json`, `pasted-summary.txt`, `shipping.slg`, `probe.slg`, `config-before.reg`. Produkční SPL/SLG mají stejné hashe jako v předchozím odstavci; testovací SLG má hash `935199E17827B4131D8645E1435502C52A15257D5DA00E693DCBBF50D6163A31`.
+
+### Opakování s Computer Use
+
+1. Zavřít pouze soukromý testovací hostitel. Zálohovat jeho konfiguraci i původní `english.slg`.
+2. Spustit [prepare-clipboard-probe.ps1](../src/plugins/dirsync/tests/prepare-clipboard-probe.ps1) s `-SourceLanguage <původní english.slg> -ProbeLanguage <nová cesta mimo instalaci>`. Skript odmítá přepis zdroje i existujícího výstupu; ověřuje extended dialog a přesnou očekávanou změnu resource. Neupravuje SPL, repozitářové resources ani SDK.
+3. Pouze v kopii hostitele nahradit SLG vytvořeným probe, spustit hostitel a přes GUI zadat izolované kořeny a dlouhou testovací hodnotu. Porovnat, otevřít potvrzení, vybrat jeho **vlastní** vrácené okno. Neprovést žádnou zápisovou operaci.
+4. V tabulce vybrat hodnotu. Každou zkratku a menu ověřit skutečným vložením do nového dokumentu; porovnat plné řetězce. Pro celý souhrn kontrolovat také tabulátory a odstavce.
+5. Zrušit potvrzení, zavřít testovací hostitel a obnovit původní SLG i konfiguraci. Ověřit shodu hashů a nezměněné cíle.
+
+Jde o ověření skutečných clipboard/menu handlerů s jedním testovacím příznakem dostupnosti okna. Netvrdí se, že Computer Use umí přímo cílit dialog s nezměněným produkčním extended style. Žádná změna SDK/hostitele ani nový test souborových operací není potřeba.
 
 ## Předchozí ověření původního širšího presenteru
 
