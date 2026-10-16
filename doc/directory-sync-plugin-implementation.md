@@ -3,6 +3,8 @@
 > **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
 
 
+**Distribuce (16. října 2026):** [ZIP balíček, čistá konfigurace a dva restarty](directory-sync-plugin-distribution.md) ověřily registraci i zapamatování ON/OFF a Unicode cesty. Zkrácen registrační popis pro pevný limit současného hostitele; SDK a hostitel se nemění. Nová regrese: 1 684 resource/layout kontrol Debug/Release x64.
+
 **Rozsah operací (16. října 2026):** názvy tlačítek, stálá instrukce a potvrzení nyní výslovně rozlišují zvýraznění od všech viditelných způsobilých návrhů. [GUI ověření zvýrazněných, skrytých a Skip řádků](directory-sync-plugin-workflow.md#rozsah-operačních-tlačítek--16-října-2026) prošlo: dvě nové kopie při jediném zvýrazněném řádku, 12 kontrol disku, 1 670 layout kontrol Debug/Release x64. Bez změny operační logiky, SDK či hostitele.
 
 **Rozhraní (16. října 2026):** [nativní status bar a strukturované potvrzovací/výsledkové dialogy](directory-sync-plugin-ui.md). Stav a počítadla mají vlastní části; souhrny kompaktní zvětšitelnou tabulku údaj/hodnota a oddělené poznámky. Samostatné pole Selected value bylo odstraněno. Dokončeno GUI ověření Ctrl+C, Ctrl+Shift+C i obou položek kontextového menu, včetně cesty o 346 jednotkách UTF-16 / 896 bajtech UTF-8 a přesné shody celého souhrnu. Testovací SLG přidal pouze příznak dostupnosti okna pro Computer Use; produkční SPL, resources a SDK zůstaly stejné. Bez změny zápisových operací.

@@ -131,6 +131,17 @@ void Test(int dialog)
 }
 int main()
 {
-    try { Test(IDD_PREVIEW); Test(IDD_INFORMATION); std::cout << checks << " resource/layout checks passed\n"; return 0; }
+    try {
+        // The 0.16 host reloads registered metadata into 260-byte buffers.
+        // A longer description installs successfully but drops the plugin on restart.
+        for(int id:{IDS_NAME,IDS_DESCRIPTION,IDS_MENU}) {
+            const wchar_t* text=nullptr;
+            int n=LoadStringW(GetModuleHandleW(nullptr),id,reinterpret_cast<LPWSTR>(&text),0);
+            Check(n>0,"registration metadata present");
+            int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text,n,nullptr,0,nullptr,nullptr);
+            Check(bytes>0 && bytes<260,"registration metadata fits existing host UTF-8 limit including terminator");
+        }
+        Test(IDD_PREVIEW); Test(IDD_INFORMATION); std::cout << checks << " resource/layout checks passed\n"; return 0;
+    }
     catch (const std::exception& e) { std::cerr << "FAILED: " << e.what() << "\n"; return 1; }
 }

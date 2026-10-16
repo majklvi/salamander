@@ -13,7 +13,7 @@ plugins/dirsync/lang/english.slg
 
 Zavřete instance používající starou verzi pluginu, zkopírujte celou složku `dirsync` do `plugins` vedle programu a ponechte uvedenou strukturu. V Samandarinu otevřete **Plugins → Plugins Manager → Add…**, vyberte `dirsync.spl` a ověřte položku Directory Synchronization. Pokud ji distribuce už zaregistrovala, znovu ji nepřidávejte. Plugin spusťte z nabídky **Plugins → Directory Synchronization → Directory synchronization…**. Obě porovnávané složky musí být fyzické Windows cesty; archivy a virtuální pluginové systémy nejsou vstupem.
 
-Při sestavení ze zdrojů použijte projekt `src/plugins/dirsync/vcxproj/dirsync.vcxproj`; jazykový modul je jeho závislost. Podrobný build postup je v [implementačním záznamu](directory-sync-plugin-implementation.md#sestavení-a-testy). Čistá instalace balíčku a zachování nastavení v čisté konfiguraci jsou stále samostatným distribučním ověřením; tento návod je nenahrazuje.
+Při sestavení ze zdrojů použijte projekt `src/plugins/dirsync/vcxproj/dirsync.vcxproj`; jazykový modul je jeho závislost. Podrobný build postup je v [implementačním záznamu](directory-sync-plugin-implementation.md#sestavení-a-testy). [Distribuční ověření](directory-sync-plugin-distribution.md) dokončilo rozbalení ZIP do čisté konfigurace 0.16 x64, automatickou registraci a dva skutečné restarty s ON/OFF a Unicode cestou obnovy. Jde o ruční portable instalaci pluginu, nikoli sestavení celého Inno instalátoru.
 
 ## Běžný postup
 
@@ -48,7 +48,7 @@ Obnovovací kopie jsou nezávislá data, nikoli hardlinky. Dědí oprávnění o
 - Reparse/junction/symlink, EFS a nepodporované cloud/offline položky se blokují. Kořeny se nesmějí překrývat. Unicode a dlouhé cesty jsou podporované v pluginu; průchod takovou cestou v panelech hostitele je samostatná schopnost.
 - První chyba nebo Stop zastaví zbytek. Hotové kopie/přepisy/odstranění se automaticky nevracejí. Vlastní nedokončený staging se uklidí, pokud je to možné; případný zbytek je nutné prohlédnout podle ohlášené cesty. Mohou zůstat vytvořené prázdné rodičovské složky a neúplné protokoly.
 - Při OFF není v této verzi trvalý prováděcí protokol. Chyba zápisu protokolu při ON zastaví další operace, ale již provedenou změnu nevrátí. Nejde o transakční zálohování ani záruku při pádu napájení či libovolných souběžných změnách.
-- Čistý distribuční balíček/instalace a nová konfigurace zbývají k ověření. V jedné starší testovací RegFile konfiguraci se po restartu nenačetla uložená registrace; příčina je otevřená, viz [GUI evidence](directory-sync-plugin-ui.md). Kontroly rozložení při více DPI nenahrazují runtime přechod mezi monitory. Podrobná evidence rozlišuje skutečné GUI testy od řízených chybových testů.
+- ZIP a čistá konfigurace jsou ověřené pro x64; podepsaná katalogová distribuce a celý Inno instalátor nejsou součástí tohoto ověření. Předchozí mizení registrace opravuje kratší registrační popis: hostitel 0.16 přijímá nejvýše 259 bajtů textu. Pokud starý preview plugin již zmizel z nabídky, po aktualizaci souborů jej znovu přidejte přes Plugins Manager; starší obnovy nemažte. Kontroly rozložení při více DPI nenahrazují runtime přechod mezi monitory. Podrobná evidence rozlišuje skutečné GUI testy od řízených chybových testů.
 
 ## Mapa dokumentace
 
@@ -62,4 +62,4 @@ Obnovovací kopie jsou nezávislá data, nikoli hardlinky. Dědí oprávnění o
 | Technický formát a ověření zápisů | [Nové kopie](directory-sync-plugin-copy-new.md), [obnova](directory-sync-plugin-recovery.md), [přepisy](directory-sync-plugin-overwrite.md), [mazání souborů](directory-sync-plugin-delete.md) |
 | Přerušení a nedostatek místa | [Stop/Close](directory-sync-plugin-copy-cancellation.md), [uvolnění](directory-sync-plugin-copy-unload.md), [chyby místa](directory-sync-plugin-copy-space.md), [skutečný VHD test](directory-sync-plugin-vhd-results.md) |
 
-Starší protokolové a souběhové experimenty jsou výzkumná evidence, nikoli požadavek první verze. Rozhodnutí držet úroveň běžných operací jádra má přednost před jejich původními doporučeními. Další krok je distribuční ověření balíčku a čisté konfigurace; mazání složek, SMB testy a změny SDK zůstávají mimo tento rozsah.
+Starší protokolové a souběhové experimenty jsou výzkumná evidence, nikoli požadavek první verze. Rozhodnutí držet úroveň běžných operací jádra má přednost před jejich původními doporučeními. Použitelný rozsah první preview verze uzavírá [distribuční ověření](directory-sync-plugin-distribution.md). Mazání složek, SMB testy a změny SDK zůstávají mimo tento rozsah.
