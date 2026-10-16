@@ -191,7 +191,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     HWND bar=CreateWindowExW(0,STATUSCLASSNAMEW,L"",WS_CHILD,0,440,610,30,window,HMENU(INT_PTR(IDC_STATUS)),instance,nullptr);
     ok &= list!=nullptr && bar!=nullptr;
     SetWindowSubclass(list,PreviewList,1,0);SetWindowSubclass(ListView_GetHeader(list),PreviewHeader,1,0);
-    for(int i=0;i<9;++i) {LVCOLUMNW column{};column.mask=LVCF_WIDTH;column.cx=100;SendMessageW(list,LVM_INSERTCOLUMNW,i,LPARAM(&column));}
+    for(int i=0;i<10;++i) {LVCOLUMNW column{};column.mask=LVCF_WIDTH;column.cx=100;SendMessageW(list,LVM_INSERTCOLUMNW,i,LPARAM(&column));}
     p.result=dirsync::Compare(left,right,p.options,p.cancel,p.progress);auto snapshot=p.result.snapshot;
     dirsync::Row row;row.path=L"skipped-漢字.txt";row.state=dirsync::State::Different;row.action=dirsync::Action::None;
     p.result.rows={row};p.defaults={dirsync::Action::CopyRight};p.visible={0};Filter(p);
@@ -268,7 +268,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     Filter(p);
     ok &= p.visible.size()==5 && ListView_GetItemCount(list)==5 && ListView_GetGroupCount(list)==4;
     ok &= p.groups==std::vector<std::wstring>{L"",L"alpha",L"alpha\\nested",L"beta-漢字"};
-    ok &= Cell(p.result.rows[1],0,p)==L"same.txt" && Cell(p.result.rows[4],0,p)==L"delete-dir\\";
+    ok &= Cell(p.result.rows[1],0,p)==L"same.txt" && Cell(p.result.rows[1],9,p)==L"same.txt" && Cell(p.result.rows[4],0,p)==L"delete-dir\\";
     for(size_t i=0;i<p.visible.size();++i) {
         LVITEMW item{};item.mask=LVIF_GROUPID;item.iItem=int(i);
         ok &= SendMessageW(list,LVM_GETITEMW,0,LPARAM(&item))!=FALSE;
@@ -304,7 +304,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
         entry.left.size=i%3==0?2:i%3==1?1000:10;entry.left.time=i%3==0?300:i%3==1?100:200;
         p.result.rows.push_back(entry);
     }
-    Filter(p);for(int i=0;i<9;++i) p.columnWidths[size_t(i)]=100;
+    Filter(p);for(int i=0;i<10;++i) p.columnWidths[size_t(i)]=100;
     ListView_SetItemState(list,-1,0,LVIS_SELECTED|LVIS_FOCUSED);
     auto picked=std::find(p.visible.begin(),p.visible.end(),size_t(2))-p.visible.begin();
     ListView_SetItemState(list,int(picked),LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
@@ -312,7 +312,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     SortPreview(p,1);ok &= p.visible==std::vector<size_t>({1,2,0,4,5,3}) && SelectedRows(p)==std::vector<size_t>{2};
     SortPreview(p,2);ok &= p.visible==std::vector<size_t>({1,2,0,4,5,3});
     SortPreview(p,2);ok &= p.visible==std::vector<size_t>({0,2,1,3,5,4});
-    for(int column=0;column<9;++column) for(bool descending:{false,true}) {
+    for(int column=0;column<10;++column) for(bool descending:{false,true}) {
         settings.sortColumn=column;settings.sortDescending=descending;Filter(p);ColumnStyle(p);
         for(size_t i=1;i<p.visible.size();++i) if(RowDirectory(p.result.rows[p.visible[i-1]])==RowDirectory(p.result.rows[p.visible[i]])) {
             int comparison=CompareRows(p.result.rows[p.visible[i-1]],p.result.rows[p.visible[i]],p,column);
@@ -321,17 +321,18 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
         HDITEMW arrow{};arrow.mask=HDI_FORMAT;SendMessageW(ListView_GetHeader(list),HDM_GETITEMW,column,LPARAM(&arrow));
         ok &= (arrow.fmt&(HDF_SORTUP|HDF_SORTDOWN))==(descending?HDF_SORTDOWN:HDF_SORTUP);
     }
+    SortPreview(p,8);
     const auto beforeHide=p.visible;const auto beforeSelection=SelectedRows(p);
     for(int column:{1,2,4,5,6,7,8}) {ToggleColumn(p,column);ok &= ListView_GetColumnWidth(list,column)==0;}
-    ok &= settings.visibleColumns==0x9 && settings.sortColumn==0 && !settings.sortDescending;
+    ok &= settings.visibleColumns==0x209 && settings.sortColumn==0 && !settings.sortDescending;
     ListView_SetColumnWidth(list,0,0);ListView_SetColumnWidth(list,3,0);ListView_SetColumnWidth(list,6,100);
     ok &= ListView_GetColumnWidth(list,0)>=24 && ListView_GetColumnWidth(list,3)>=24 && ListView_GetColumnWidth(list,6)==0;
     ok &= p.visible.size()==beforeHide.size() && SelectedRows(p)==beforeSelection;
-    ToggleColumn(p,0);ToggleColumn(p,3);ok &= settings.visibleColumns==0x9;
+    ToggleColumn(p,0);ToggleColumn(p,3);ToggleColumn(p,9);ok &= settings.visibleColumns==0x209;
     for(int column:{1,2,4,5,6,7,8}) {ToggleColumn(p,column);ok &= ListView_GetColumnWidth(list,column)>0;}
-    ok &= settings.visibleColumns==0x1ff;
+    ok &= settings.visibleColumns==0x3ff;
     p.running=true;SortPreview(p,4);ToggleColumn(p,4);p.running=false;
-    ok &= settings.sortColumn==0 && settings.visibleColumns==0x1ff;
+    ok &= settings.sortColumn==0 && settings.visibleColumns==0x3ff;
     auto x=p.result.rows[0],y=x;x.left.size=2;y.left.size=1000000000000ULL;
     ok &= CompareRows(x,y,p,1)<0 && CompareRows(y,x,p,1)>0;
     x.left.time=UINT64_MAX;y.left.time=1;ok &= CompareRows(x,y,p,2)>0;
@@ -350,6 +351,31 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     const auto started=GetTickCount64();Filter(p);
     ok &= p.visible.size()==6000 && ListView_GetItemCount(list)==6000 && ListView_GetGroupCount(list)==60;
     fprintf(stdout,"Grouped list: 6000 items / 60 groups rebuilt in %llu ms\n",GetTickCount64()-started);
+    // Group post-paint must never touch the column-header band when a partially
+    // scrolled group overlaps it. Paint into a sentinel bitmap to detect damage.
+    RECT headerBand{};GetWindowRect(ListView_GetHeader(list),&headerBand);
+    MapWindowPoints(nullptr,list,reinterpret_cast<POINT*>(&headerBand),2);
+    HDC memory=CreateCompatibleDC(nullptr);BITMAPINFO bitmapInfo{};
+    bitmapInfo.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bitmapInfo.bmiHeader.biWidth=600;
+    bitmapInfo.bmiHeader.biHeight=-600;bitmapInfo.bmiHeader.biPlanes=1;bitmapInfo.bmiHeader.biBitCount=32;
+    void* pixels=nullptr;HBITMAP bitmap=CreateDIBSection(memory,&bitmapInfo,DIB_RGB_COLORS,&pixels,nullptr,0);
+    ok &= memory && bitmap && pixels;
+    if(memory && bitmap && pixels) {
+        auto oldBitmap=SelectObject(memory,bitmap);bool overlap=false;
+        for(int step=0;step<10 && !overlap;++step) {
+            ListView_Scroll(list,0,5);RECT group{};ListView_GetGroupRect(list,0,LVGGR_HEADER,&group);
+            overlap=group.top<headerBand.bottom && group.bottom>headerBand.top;
+            if(!overlap) continue;
+            HBRUSH sentinel=CreateSolidBrush(RGB(171,37,193));RECT all{0,0,600,600};FillRect(memory,&all,sentinel);DeleteObject(sentinel);
+            NMLVCUSTOMDRAW draw{};draw.nmcd.hdr={list,IDC_LIST,NM_CUSTOMDRAW};draw.nmcd.dwDrawStage=CDDS_POSTPAINT;draw.nmcd.hdc=memory;
+            DialogBody(window,WM_NOTIFY,IDC_LIST,LPARAM(&draw));
+            for(int y=std::max(0L,headerBand.top);y<headerBand.bottom;++y)
+                ok &= GetPixel(memory,10,y)==RGB(171,37,193);
+        }
+        fprintf(stdout,"Scrolled group overlaps header band: %d; preview checks: %d\n",int(overlap),int(ok));
+        ok &= overlap;SelectObject(memory,oldBitmap);
+    }
+    if(bitmap) DeleteObject(bitmap);if(memory) DeleteDC(memory);
     DestroyWindow(window);p.window=nullptr;return ok;
 } catch(const std::exception& error) {fprintf(stderr,"Preview controls: %s\n",error.what());return FALSE;}
 // Exercise the real SDK configuration callbacks without touching user registry data.
@@ -425,10 +451,10 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
         check(settings.actionLabels && settings.colors[0][2]==RGB(12,34,56) && settings.colors[1][6]==RGB(98,76,54));
         settings.visibleColumns=0x39;settings.sortColumn=5;settings.sortDescending=true;
         plugin.SaveConfiguration(nullptr,key,&registry);settings={};plugin.LoadConfiguration(nullptr,key,&registry);
-        check(settings.visibleColumns==0x39 && settings.sortColumn==5 && settings.sortDescending);
+        check(settings.visibleColumns==0x239 && settings.sortColumn==5 && settings.sortDescending);
         registry.values["VisibleColumnsV1"].bytes={0,0,0,0};
         plugin.LoadConfiguration(nullptr,key,&registry);
-        check(settings.visibleColumns==0x9 && settings.sortColumn==0 && !settings.sortDescending);
+        check(settings.visibleColumns==0x209 && settings.sortColumn==0 && !settings.sortDescending);
         registry.values["SortColumnV1"].bytes={99,0,0,0};
         registry.values["SortDescendingV1"].bytes={2,0,0,0};
         plugin.LoadConfiguration(nullptr,key,&registry);check(settings.sortColumn==0 && !settings.sortDescending);

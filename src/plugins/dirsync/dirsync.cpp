@@ -34,6 +34,7 @@ HINSTANCE instance = nullptr, language = nullptr;
 CSalamanderGeneralAbstract* general = nullptr;
 CSalamanderGUIAbstract* gui = nullptr;
 constexpr UINT Done = WM_APP + 41;
+constexpr std::array<int,10> ColumnOrder{0,1,2,3,9,4,5,6,7,8};
 HBRUSH backgroundBrush = nullptr;
 bool dark = false;
 using Palette = std::array<COLORREF,7>;
@@ -43,7 +44,7 @@ Palette DefaultPalette(bool night)
         Palette{RGB(0,112,52),RGB(139,91,0),RGB(0,112,52),RGB(0,92,175),RGB(96,96,96),RGB(178,42,28),RGB(178,42,28)};
 }
 struct Settings {
-    DWORD visibleColumns=0x1ff;
+    DWORD visibleColumns=0x3ff;
     int sortColumn=0;
     bool sortDescending=false;
     bool keepOriginals=true;
@@ -61,11 +62,11 @@ void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     enabled=0;
     if(registry->GetValue(key,"ActionLabels",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
         settings.actionLabels=enabled!=0;
-    enabled=0x1ff;
+    enabled=0x3ff;
     if(registry->GetValue(key,"VisibleColumnsV1",REG_DWORD,&enabled,sizeof(enabled)))
-        settings.visibleColumns=(enabled&0x1ff)|0x9; // Name and Action are mandatory.
+        settings.visibleColumns=(enabled&0x3ff)|0x209; // Both names and Action are mandatory.
     enabled=0;
-    if(registry->GetValue(key,"SortColumnV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<9)
+    if(registry->GetValue(key,"SortColumnV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<10)
         settings.sortColumn=int(enabled);
     enabled=0;
     if(registry->GetValue(key,"SortDescendingV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
@@ -96,7 +97,7 @@ bool StoreSettings(HKEY key,CSalamanderRegistryAbstract* registry)
         DWORD((settings.recoveryRoot.size()+1)*sizeof(wchar_t)))!=FALSE;
     DWORD labels=settings.actionLabels?1:0;
     bool appearance=registry->SetValue(key,"ActionLabels",REG_DWORD,&labels,sizeof(labels))!=FALSE;
-    DWORD columns=(settings.visibleColumns&0x1ff)|0x9,column=DWORD(settings.sortColumn),descending=settings.sortDescending?1:0;
+    DWORD columns=(settings.visibleColumns&0x3ff)|0x209,column=DWORD(settings.sortColumn),descending=settings.sortDescending?1:0;
     appearance=(registry->SetValue(key,"VisibleColumnsV1",REG_DWORD,&columns,sizeof(columns))!=FALSE) && appearance;
     appearance=(registry->SetValue(key,"SortColumnV1",REG_DWORD,&column,sizeof(column))!=FALSE) && appearance;
     appearance=(registry->SetValue(key,"SortDescendingV1",REG_DWORD,&descending,sizeof(descending))!=FALSE) && appearance;
@@ -411,7 +412,7 @@ struct Preview
     int requestedAction = 0;
     std::vector<size_t> visible;
     std::vector<std::wstring> groups;
-    std::array<int,9> columnWidths{};
+    std::array<int,10> columnWidths{};
     std::vector<dirsync::Action> defaults;
     std::array<HICON,7> buttonIcons{};
     std::array<bool,5> filterChecks{};
@@ -508,7 +509,7 @@ std::wstring Cell(const dirsync::Row& row, int column,const Preview& p)
 {
     switch (column)
     {
-    case 0: {
+    case 0: case 9: {
         const auto separator=row.path.find_last_of(L'\\');
         const bool directory=(row.hasLeft && row.left.directory) || (row.hasRight && row.right.directory);
         return PanelName(row.path.substr(separator==std::wstring::npos?0:separator+1),p.nameFormat,directory)+(directory?L"\\":L"");
@@ -648,6 +649,7 @@ struct Appearance {
     int theme=0;
     std::array<CGUIColorArrowButtonAbstract*,7> buttons{};
 };
+constexpr std::array<int,7> OptionalColumns{1,2,4,5,6,7,8};
 void Tooltips(HWND window);
 void RecoveryControls(HWND window)
 {
@@ -671,6 +673,10 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
         ConfigureDark(window);appearance->theme=dark?1:0;
         CheckDlgButton(window,IDC_ACTION_LABELS,appearance->draft.actionLabels?BST_CHECKED:BST_UNCHECKED);
         CheckDlgButton(window,IDC_KEEP_ORIGINALS,appearance->draft.keepOriginals?BST_CHECKED:BST_UNCHECKED);
+        for(size_t i=0;i<OptionalColumns.size();++i) {
+            SetDlgItemTextW(window,IDC_COLUMN_FIRST+int(i),Text(IDS_COLUMNS+OptionalColumns[i]).c_str());
+            CheckDlgButton(window,IDC_COLUMN_FIRST+int(i),(appearance->draft.visibleColumns&(1u<<OptionalColumns[i]))?BST_CHECKED:BST_UNCHECKED);
+        }
         SendDlgItemMessageW(window,IDC_RECOVERY_ROOT,EM_SETLIMITTEXT,32759,0);
         SetDlgItemTextW(window,IDC_RECOVERY_ROOT,appearance->draft.recoveryRoot.c_str());
         RecoveryControls(window);Tooltips(window);
@@ -713,6 +719,12 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             appearance->draft.colors[appearance->theme]=DefaultPalette(appearance->theme!=0);
             AppearanceSample(window,*appearance);return TRUE;
         case IDOK:
+            for(size_t i=0;i<OptionalColumns.size();++i) {
+                DWORD bit=1u<<OptionalColumns[i];
+                if(Checked(window,IDC_COLUMN_FIRST+int(i))) settings.visibleColumns|=bit;
+                else settings.visibleColumns&=~bit;
+            }
+            if(!(settings.visibleColumns&(1u<<settings.sortColumn))) {settings.sortColumn=0;settings.sortDescending=false;}
             appearance->draft.recoveryRoot=ControlText(window,IDC_RECOVERY_ROOT);
             settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS);
             settings.recoveryRoot=std::move(appearance->draft.recoveryRoot);
@@ -886,7 +898,7 @@ bool PreviewLess(const Preview& p,size_t a,size_t b)
 void ColumnStyle(Preview& p)
 {
     HWND list=GetDlgItem(p.window,IDC_LIST),header=ListView_GetHeader(list);
-    for(int i=0;i<9;++i) {
+    for(int i=0;i<10;++i) {
         ListView_SetColumnWidth(list,i,(settings.visibleColumns&(1u<<i))?p.columnWidths[size_t(i)]:0);
         // The host's dark header theme does not consistently render HDF sort
         // arrows. Retain their semantic flags and show a compact text marker.
@@ -933,7 +945,7 @@ void RebuildGroups(Preview& p)
         LVITEMW item{};item.mask=LVIF_TEXT|LVIF_GROUPID;item.iItem=int(i);
         item.pszText=LPSTR_TEXTCALLBACKW;item.iGroupId=directories.at(RowDirectory(p.result.rows[p.visible[i]]));
         if(SendMessageW(list,LVM_INSERTITEMW,0,LPARAM(&item))==-1) throw std::runtime_error("Directory item insertion failed");
-        for(int column=1;column<9;++column) {
+        for(int column=1;column<10;++column) {
             item.mask=LVIF_TEXT;item.iSubItem=column;
             if(!SendMessageW(list,LVM_SETITEMW,0,LPARAM(&item))) throw std::runtime_error("Directory item text failed");
         }
@@ -1216,19 +1228,19 @@ int PreviewHit(HWND list,POINT point)
 void RememberColumns(Preview& p)
 {
     HWND list=GetDlgItem(p.window,IDC_LIST);
-    for(int i=0;i<9;++i) if(settings.visibleColumns&(1u<<i))
+    for(int i=0;i<10;++i) if(settings.visibleColumns&(1u<<i))
         p.columnWidths[size_t(i)]=std::max(24,ListView_GetColumnWidth(list,i));
 }
 void SortPreview(Preview& p,int column)
 {
-    if(p.running || column<0 || column>=9 || !(settings.visibleColumns&(1u<<column))) return;
+    if(p.running || column<0 || column>=10 || !(settings.visibleColumns&(1u<<column))) return;
     RememberColumns(p);
     settings.sortDescending=column==settings.sortColumn?!settings.sortDescending:false;
     settings.sortColumn=column;Filter(p);ColumnStyle(p);
 }
 void ToggleColumn(Preview& p,int column)
 {
-    if(p.running || column<0 || column>=9 || column==0 || column==3) return;
+    if(p.running || column<0 || column>=10 || column==0 || column==3 || column==9) return;
     RememberColumns(p);settings.visibleColumns^=1u<<column;
     if(!(settings.visibleColumns&(1u<<settings.sortColumn))) {
         settings.sortColumn=0;settings.sortDescending=false;Filter(p);
@@ -1238,13 +1250,13 @@ void ToggleColumn(Preview& p,int column)
 void ColumnsMenu(Preview& p,POINT point)
 {
     if(!gui || p.running) return;
-    MENU_TEMPLATE_ITEM items[11]{};
+    MENU_TEMPLATE_ITEM items[12]{};
     items[0]={MNTT_PB,0,0,0,-1,0,nullptr};
-    for(int i=0;i<9;++i) items[i+1]={MNTT_IT,IDS_COLUMNS+i,MNTS_B|MNTS_I|MNTS_A,DWORD(i+1),-1,0,nullptr};
-    items[10]={MNTT_PE,0,0,0,-1,0,nullptr};
+    for(size_t i=0;i<ColumnOrder.size();++i) {int column=ColumnOrder[i];items[i+1]={MNTT_IT,IDS_COLUMNS+column,MNTS_B|MNTS_I|MNTS_A,DWORD(column+1),-1,0,nullptr};}
+    items[11]={MNTT_PE,0,0,0,-1,0,nullptr};
     auto* menu=gui->CreateMenuPopup();if(!menu) return;DWORD command=0;
     if(menu->LoadFromTemplate(language,items,nullptr,nullptr,nullptr)) {
-        for(int i=0;i<9;++i) {menu->CheckItem(i+1,FALSE,(settings.visibleColumns&(1u<<i))!=0);menu->EnableItem(i+1,FALSE,i!=0 && i!=3);}
+        for(int i=0;i<10;++i) {menu->CheckItem(i+1,FALSE,(settings.visibleColumns&(1u<<i))!=0);menu->EnableItem(i+1,FALSE,i!=0 && i!=3 && i!=9);}
         command=menu->Track(MENU_TRACK_RETURNCMD|MENU_TRACK_RIGHTBUTTON|MENU_TRACK_NONOTIFY,point.x,point.y,p.window,nullptr);
     }
     gui->DestroyMenuPopup(menu);if(command) ToggleColumn(p,int(command)-1);
@@ -1289,8 +1301,6 @@ void PreviewMenu(Preview& p,LPARAM position)
         {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
         {MNTT_IT,IDS_MENU_SAVE,MNTS_B|MNTS_I|MNTS_A,PlanSave+1,-1,0,nullptr},
         {MNTT_PE,0,0,0,-1,0,nullptr},
-        {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
-        {MNTT_IT,IDS_MENU_COLUMNS,MNTS_B|MNTS_I|MNTS_A,1001,-1,0,nullptr},
         {MNTT_PE,0,0,0,-1,0,nullptr}};
     auto* menu=gui->CreateMenuPopup();if(!menu) return;DWORD command=0;
     if(menu->LoadFromTemplate(language,items,nullptr,nullptr,nullptr)) {
@@ -1308,8 +1318,7 @@ void PreviewMenu(Preview& p,LPARAM position)
         command=menu->Track(MENU_TRACK_RETURNCMD|MENU_TRACK_RIGHTBUTTON|MENU_TRACK_NONOTIFY,point.x,point.y,p.window,nullptr);
     }
     gui->DestroyMenuPopup(menu);
-    if(command==1001) ColumnsMenu(p,point);
-    else if(command) PreviewCommand(p,rows,int(command)-1);
+    if(command) PreviewCommand(p,rows,int(command)-1);
 }
 LRESULT CALLBACK PreviewHeader(HWND header,UINT message,WPARAM w,LPARAM l,UINT_PTR id,DWORD_PTR data)
 {
@@ -1336,9 +1345,9 @@ LRESULT CALLBACK PreviewList(HWND list,UINT message,WPARAM w,LPARAM l,UINT_PTR i
         if(p && notification->hwndFrom==ListView_GetHeader(list)) {
             if(notification->code==HDN_ITEMCHANGINGW || notification->code==HDN_ITEMCHANGINGA) {
                 auto* header=reinterpret_cast<NMHEADERW*>(l);
-                if(header->iItem>=0 && header->iItem<9 && header->pitem && (header->pitem->mask&HDI_WIDTH)) {
+                if(header->iItem>=0 && header->iItem<10 && header->pitem && (header->pitem->mask&HDI_WIDTH)) {
                     const bool visible=(settings.visibleColumns&(1u<<header->iItem))!=0;
-                    if((!visible && header->pitem->cxy!=0) || (visible && (header->iItem==0 || header->iItem==3) && header->pitem->cxy<24)) return TRUE;
+                    if((!visible && header->pitem->cxy!=0) || (visible && (header->iItem==0 || header->iItem==3 || header->iItem==9) && header->pitem->cxy<24)) return TRUE;
                 }
             }
         }
@@ -1656,14 +1665,15 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         // to the plugin, preserving the shared theming of all other controls.
         SetPropW(list,L"Salamander.DarkModeLib.CustomListView",HANDLE(1));
         ListView_SetExtendedListViewStyle(list, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP | LVS_EX_INFOTIP);
-        int widths[] = {200, 60, 120, 145, 60, 120, 120, 250, 60};
+        int widths[] = {200, 60, 120, 145, 60, 120, 120, 250, 60, 200};
         HDC dc = GetDC(window);
         UINT dpi = GetDeviceCaps(dc, LOGPIXELSX);
         ReleaseDC(window, dc);
         ListView_SetUnicodeFormat(list, TRUE);
         // Column captions and actions always come from the language module.
-        for (int i = 0; i < 9; ++i)
+        for (int i = 0; i < 10; ++i)
         { std::wstring title = Text(IDS_COLUMNS + i); LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT; c.fmt=(i==1 || i==4)?LVCFMT_RIGHT:LVCFMT_LEFT; c.pszText = &title[0]; c.cx = MulDiv(widths[i], dpi, 96); SendMessageW(list, LVM_INSERTCOLUMNW, i, LPARAM(&c)); }
+        ListView_SetColumnOrderArray(list,int(ColumnOrder.size()),ColumnOrder.data());
         RECT client{}, outer{}; GetClientRect(window, &client); GetWindowRect(window, &outer);
         p->initialClient = {client.right, client.bottom};
         p->minimumWindow = {outer.right - outer.left, outer.bottom - outer.top};
@@ -1675,7 +1685,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         }
         LayoutFilters(*p,0);
         ConfigureDark(window);ButtonIcons(*p); Tooltips(window);ActionColumn(window);
-        for(int i=0;i<9;++i) p->columnWidths[size_t(i)]=ListView_GetColumnWidth(list,i);
+        for(int i=0;i<10;++i) p->columnWidths[size_t(i)]=ListView_GetColumnWidth(list,i);
         ColumnStyle(*p);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
@@ -1799,7 +1809,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_SYNCHRONIZE: SynchronizeMenu(*p);return TRUE;
         case IDC_SETTINGS:
             if(!p->running) {
+                RememberColumns(*p);
+                const int previousSort=settings.sortColumn;const bool previousDescending=settings.sortDescending;
                 ConfigureAppearance(window);ConfigureDark(window);ButtonIcons(*p);ActionColumn(window);
+                p->columnWidths[3]=ListView_GetColumnWidth(GetDlgItem(window,IDC_LIST),3);
+                ColumnStyle(*p);
+                if(previousSort!=settings.sortColumn || previousDescending!=settings.sortDescending) Filter(*p);
                 InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,TRUE);Status(*p);
             }
             return TRUE;
@@ -1873,6 +1888,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 // Group-specific notifications are not delivered by every common-
                 // controls theme. Paint the native header rectangles after the list.
                 HWND list=draw->nmcd.hdr.hwndFrom;RECT client{};GetClientRect(list,&client);
+                // A scrolled group header can overlap the column-header child.
+                // Keep all group drawing below it, including partially visible groups.
+                RECT columns{};HWND headerWindow=ListView_GetHeader(list);GetWindowRect(headerWindow,&columns);
+                MapWindowPoints(nullptr,list,reinterpret_cast<POINT*>(&columns),2);
+                int saved=SaveDC(draw->nmcd.hdc);
+                IntersectClipRect(draw->nmcd.hdc,client.left,columns.bottom,client.right,client.bottom);
                 HBRUSH brush=backgroundBrush?backgroundBrush:GetSysColorBrush(COLOR_BTNFACE);
                 HFONT font=reinterpret_cast<HFONT>(SendMessageW(list,WM_GETFONT,0,0));
                 HGDIOBJ old=font?SelectObject(draw->nmcd.hdc,font):nullptr;
@@ -1887,6 +1908,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                     DrawTextW(draw->nmcd.hdc,text.c_str(),int(text.size()),&header,DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX|DT_END_ELLIPSIS);
                 }
                 if(old) SelectObject(draw->nmcd.hdc,old);
+                if(saved) RestoreDC(draw->nmcd.hdc,saved);
                 SetWindowLongPtrW(window,DWLP_MSGRESULT,CDRF_DODEFAULT);return TRUE;
             }
             if(draw->nmcd.dwDrawStage!=CDDS_PREPAINT && draw->dwItemType==LVCDI_GROUP) {

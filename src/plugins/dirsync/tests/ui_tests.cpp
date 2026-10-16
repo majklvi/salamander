@@ -126,6 +126,11 @@ void Test(int dialog)
     }
     if(dialog==IDD_APPEARANCE) {
         auto control=[&](DWORD id)->const Control& {for(const auto& c:controls) if(c.id==id) return c;throw std::runtime_error("missing preference control");};
+        for(int i=0;i<7;++i) {
+            const auto& column=control(IDC_COLUMN_FIRST+i);
+            Check(column.y>control(IDC_COLOR_RESET).y && column.y+column.height<control(IDC_KEEP_ORIGINALS).y &&
+                column.width==140 && (column.style&BS_AUTOCHECKBOX)==BS_AUTOCHECKBOX,"compact optional columns between appearance and recovery settings");
+        }
         Check(control(IDC_COLOR_BUTTON_FIRST).y==control(IDC_COLOR_BUTTON_FIRST+4).y &&
             control(IDC_COLOR_BUTTON_FIRST+4).x>control(IDC_COLOR_BUTTON_FIRST).x,"two columns of color choices");
         Check(control(IDC_KEEP_ORIGINALS).y>control(IDC_COLOR_BUTTON_FIRST+3).y,"recovery settings below colors");

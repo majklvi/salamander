@@ -1,5 +1,17 @@
 # Řazení a volitelné sloupce — 0.1.2
 
+## Doplnění 17. října — oboustranné názvy, Settings a posouvání
+
+Aktuální náhled má deset sloupců. **Název vlevo** a **Název vpravo** opakují stejný koncový název na obou stranách operace. Pravá část začíná názvem před pravou velikostí a časem. Oba názvy i Operace jsou povinné; relativní cesta zůstává v záhlaví skupiny. Zobrazení názvu na obou stranách se používá také u jednostranného výsledku a nepředstírá fyzickou existenci protějšku: jeho velikost a čas zůstávají prázdné, stav a návrh se nemění. Oba názvy mají stejné formátování hostitele a lze podle obou řadit.
+
+**Columns… bylo odstraněno z kontextového menu souborových řádků.** Sedm volitelných sloupců se nastavuje v kompaktní samostatné sekci Settings / Nastavení, mezi vzhledem a obnovou. OK použije a uloží změny, Cancel je zahodí. Přímé standardní zaškrtávací menu na pravý klik záhlaví sloupců zůstává. Dosavadní maska konfigurace je zachována a nový pravý název je při načtení vždy viditelný. Nastavení nemění řádky, návrhy ani rozsah operací. Bez změny řazení není potřeba obnovovat obsah seznamu, takže nastavení nemá posouvat dosavadní pohled k začátku.
+
+Mizení záhlaví způsobovalo vlastní kreslení adresářových předělů v CDDS_POSTPAINT: obdélník částečně odsunuté skupiny zasahuje do oblasti záhlaví sloupců. Kreslení se nyní ořezává výhradně na klientskou část pod spodní hranou nativního záhlaví; SaveDC/RestoreDC zachová původní kreslicí stav. Nativní regresní test vytvoří skutečný ListView s 6 000 řádky, posune jej do prokazatelného překryvu, vykreslí post-paint do bitmapy s kontrolní barvou a ověří, že všechny pixely kontrolního pásu záhlaví zůstaly beze změny.
+
+Lifecycle sada: **2 357 kontrol**, včetně obou názvů, řazení deseti sloupců, migrace masky a ochrany pravého názvu. Poslední naplnění 6 000 položek trvalo 2 250 ms. Resource/layout: **2 208 anglických / 2 232 českých kontrol**, včetně skutečných popisků nové sekce při 96–240 DPI. Release x64 a Debug Win32/x64/ARM64 s warnings-as-errors; ARM64 pouze sestavení.
+
+GUI používá izolovanou sadu `C:\Samandarin\builds\dirsync-scroll-20261017`: 240 dvojic souborů v 20 Unicode adresářích a vlastní hostitel Samandarin 0.16 x64 z předchozí etapy. V českém tmavém náhledu oba názvy odpovídají, po menším i velkém posunu dolů a návratu nahoru zůstávají všechna záhlaví viditelná bez přejíždění myší. V Settings bylo ověřeno zahození rozepsané změny i potvrzené skrytí levé velikosti s uchováním 240 výsledků a zvýraznění. Menu řádků neobsahuje Columns. Po skutečném restartu s finálními moduly v anglickém světlém hostiteli zůstala levá velikost skrytá; po novém Compare a velkém posunu jsou hlavičky čitelné a oba názvy zachované. Otevření Settings a Cancel zachovaly posunutý pohled v oblasti adresářů 09/10. Lokální textová evidence je `gui-evidence.json` pod kořenem sady. Žádná souborová operace nebyla spuštěna, bez SMB testů a změn SDK. Následující části zachycují původní první průchod 0.1.2 před tímto doplněním.
+
 17. října 2026. Navazuje na [seskupení náhledu](directory-sync-plugin-grouping.md) a [aktuální návod](directory-sync-plugin.md). Bez SMB testů a změn SDK nebo zápisových adaptérů.
 
 ## Průzkum a rozhodnutí

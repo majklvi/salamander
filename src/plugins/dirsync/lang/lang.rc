@@ -52,7 +52,7 @@ BEGIN
     PUSHBUTTON "OK", IDOK, 137, 167, 76, 14
     DEFPUSHBUTTON "Cancel", IDCANCEL, 219, 167, 74, 14
 END
-IDD_APPEARANCE DIALOGEX 0, 0, 306, 201
+IDD_APPEARANCE DIALOGEX 0, 0, 306, 273
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "Preferences"
@@ -83,14 +83,23 @@ BEGIN
     PUSHBUTTON "...", 456, 251, 78, 26, 16
     CONTROL "", 466, "Static", SS_OWNERDRAW, 281, 78, 18, 16
     PUSHBUTTON "Restore defa&ult colors", IDC_COLOR_RESET, 179, 102, 120, 16
-    LTEXT "Other settings", -1, 7, 123, 75, 8
-    CONTROL "", -1, "Static", SS_ETCHEDHORZ, 88, 127, 211, 1
-    CONTROL "&Keep originals", IDC_KEEP_ORIGINALS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 139, 140, 12
-    LTEXT "Rec&overy folder:", IDC_RECOVERY_LABEL, 7, 160, 76, 10
-    EDITTEXT IDC_RECOVERY_ROOT, 86, 157, 195, 14, ES_AUTOHSCROLL
-    PUSHBUTTON "...", IDC_BROWSE_RECOVERY, 285, 157, 14, 14
-    DEFPUSHBUTTON "OK", IDOK, 169, 181, 62, 14
-    PUSHBUTTON "Cancel", IDCANCEL, 237, 181, 62, 14
+    LTEXT "Columns", -1, 7, 123, 60, 8
+    CONTROL "", -1, "Static", SS_ETCHEDHORZ, 73, 127, 226, 1
+    CONTROL "Left size", 520, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 136, 140, 12
+    CONTROL "Left modified", 521, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 149, 140, 12
+    CONTROL "Right size", 522, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 162, 140, 12
+    CONTROL "Right modified", 523, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 175, 140, 12
+    CONTROL "State", 524, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 159, 136, 140, 12
+    CONTROL "Reason", 525, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 159, 149, 140, 12
+    CONTROL "Error", 526, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 159, 162, 140, 12
+    LTEXT "Other settings", -1, 7, 195, 75, 8
+    CONTROL "", -1, "Static", SS_ETCHEDHORZ, 88, 199, 211, 1
+    CONTROL "&Keep originals", IDC_KEEP_ORIGINALS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 211, 140, 12
+    LTEXT "Rec&overy folder:", IDC_RECOVERY_LABEL, 7, 232, 76, 10
+    EDITTEXT IDC_RECOVERY_ROOT, 86, 229, 195, 14, ES_AUTOHSCROLL
+    PUSHBUTTON "...", IDC_BROWSE_RECOVERY, 285, 229, 14, 14
+    DEFPUSHBUTTON "OK", IDOK, 169, 253, 62, 14
+    PUSHBUTTON "Cancel", IDCANCEL, 237, 253, 62, 14
 END
 STRINGTABLE
 BEGIN
@@ -267,7 +276,7 @@ BEGIN
     IDS_COPY_FAILED "The copy worker failed. Completed files may remain. Compare again and inspect the destination before retrying."
     IDS_SELECT_ROW "Select one or more rows first. Blocked and conflicting rows cannot receive actions."
     IDS_HELP "Results are grouped by relative folder, with the root shown as \\. Headers are separators, not proposals; file rows show names and copied paths remain complete.\n\nChoose the two Windows folders and Compare. Scan checkboxes apply on the next Compare; toggling them preserves the current results and proposals. Scan panel selection uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nHighlight rows and use the right-click / Shift+F10 menu to change proposals, then review Visible plan > Plan summary. Ctrl+D restores the default proposal, Ctrl+M skips, Ctrl+L/R sets the copy direction, Ctrl+W reverses it. Copy paths and Ctrl+C copy displayed Unicode paths; missing sides are omitted. These commands never execute file operations. Icon filters show equal, different, single-sided and directional results; tooltips explain them. Synchronize opens separate Copy, Overwrite and Delete commands. Visible plan in the context menu also offers Plan summary and Save originals. Highlighting does not restrict these plan commands: each command uses all visible eligible proposals. Filtered out and Skip rows are excluded. Run each kind of operation separately. Only visible actions enter that summary; blocked/conflicting rows always stay visible. Copy new files executes only visible file copies with missing targets after a separate confirmation. Existing targets, deletions and empty-folder actions are omitted.\n\nKeep originals is enabled by default and can be switched off. This setting and the recovery folder are remembered for this plugin. Disabling it creates no recovery copies and leaves existing backups in place. Delete items separately confirms visible Delete on right proposals from asymmetric comparison. Supported files and directories absent on the left are eligible. Directories are removed only when empty after planned child deletions. The confirmation states recovery ON/OFF; when ON all originals must first be saved and verified. When OFF deleted data and ADS have no recovery copy. The Recycle Bin is not used. Read-only files are refused.\n\nOverwrite files separately confirms replacement of visible existing-file targets. The confirmation states whether recovery is ON or OFF. When ON, all original targets must first be saved and verified outside both trees. When OFF, overwritten data and old ADS have no recovery copy from this run. Replacements keep original target permissions. Read-only targets are refused. Stop leaves completed replacements in place.\n\nSave originals separately saves original target files for visible copy proposals with an existing file on both sides. Set an existing recovery folder outside both compared trees in the plugin preferences. This creates independent verified copies and a manifest; originals remain unchanged and no proposal is executed. Permissions inherit from the recovery folder.\n\nStop beside Compare cancels scanning, comparison and read-only validation; Stop beside Synchronize cancels the chosen file operation including its validation. Only the appropriate Stop is enabled. Data and metadata are verified; Stop preserves completed files. Compare again after a run. Compare rebuilds proposals; reapply manual Skip if needed."
-    220 "Name"
+    220 "Left name"
     221 "Left size"
     222 "Left modified"
     223 "Action"
@@ -276,6 +285,7 @@ BEGIN
     226 "State"
     227 "Reason"
     228 "Error"
+    229 "Right name"
     240 "Equal"
     241 "Only left"
     242 "Only right"
@@ -303,5 +313,4 @@ BEGIN
     292 "Invalid masks (regex and saved searches are not supported)"
     293 "Counterpart excluded by masks; protected"
     294 "Both paths refer to the same file"
-    517 "&Columns..."
 END

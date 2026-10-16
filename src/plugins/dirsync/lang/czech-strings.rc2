@@ -175,7 +175,7 @@ BEGIN
     IDS_COPY_FAILED "Vlákno kopírování selhalo. Dokončené soubory mohou zůstat na místě. Před opakováním znovu porovnejte a zkontrolujte cíl."
     IDS_SELECT_ROW "Nejprve vyberte jeden nebo více řádků. Blokovaným a konfliktním řádkům nelze přiřadit operace."
     IDS_HELP "Výsledky jsou seskupené podle relativního adresáře, kořen označuje \\. Záhlaví jsou předěly, nikoli návrhy; řádky zobrazují názvy a kopírované cesty zůstávají úplné.\n\nVyberte dva adresáře Windows a stiskněte Porovnat. Volby skenování se použijí při dalším porovnání; jejich změna zachová aktuální výsledky i návrhy. Výběr panelů používá sjednocení původního výběru obou panelů a zamkne původní kořeny. Podadresáře přidají další úrovně; vybrané adresáře zahrnují přímé potomky.\n\nMasky oddělujte mezerami nebo středníky; názvy s mezerami uzavřete do uvozovek. Před vyloučené masky vložte |, počáteční zpětné lomítko ukotví masku ke kořeni a ** označuje libovolnou hloubku. Příklady: *.txt | selB\\ nebo selA\\**\\*.txt. Regulární výrazy a uložená hledání nejsou podporována.\n\nZvýrazněte řádky a pravým tlačítkem nebo Shift+F10 otevřete nabídku pro změnu návrhů. Poté zkontrolujte Viditelný plán > Souhrn plánu. Ctrl+D obnoví výchozí návrh, Ctrl+M přeskočí, Ctrl+L/R nastaví směr kopírování, Ctrl+W jej obrátí. Kopírování cest a Ctrl+C kopírují zobrazené cesty Unicode; chybějící strany se vynechají. Tyto příkazy nikdy neprovádějí souborové operace. Ikonové filtry zobrazují shody, rozdíly, jednostranné a směrové výsledky; vysvětlují je tooltipy. Synchronizovat otevře samostatné příkazy kopírování, přepisu a mazání. Viditelný plán v kontextové nabídce nabízí také souhrn a uchování originálů. Zvýraznění tyto příkazy neomezuje: každý používá všechny viditelné způsobilé návrhy. Řádky skryté filtrem a přeskočené řádky jsou vynechány. Každý druh operace spusťte samostatně. Blokované a konfliktní řádky zůstávají vždy viditelné. Kopírování nových souborů po samostatném potvrzení provede pouze viditelné kopie souborů s chybějícím cílem. Existující cíle, mazání a operace s prázdnými adresáři vynechá.\n\nUchování originálů je ve výchozím stavu zapnuté a lze je vypnout. Tato volba a adresář obnovy se pamatují. Při vypnutí nové kopie pro obnovu nevznikají a existující zálohy zůstanou zachovány. Mazání samostatně potvrzuje viditelné návrhy Smazat vpravo z asymetrického porovnání. Způsobilé jsou podporované soubory a adresáře chybějící vlevo. Adresáře se odstraňují až po zařazených potomcích, pouze když jsou prázdné. Potvrzení uvádí, zda je uchování zapnuté; pak musí být nejprve všechny originály uchovány a ověřeny. Při vypnutí nemají smazaná data a ADS kopii pro obnovu. Koš se nepoužívá. Soubory jen pro čtení jsou odmítnuty.\n\nPřepis samostatně potvrzuje nahrazení viditelných existujících cílových souborů. Potvrzení uvádí zapnutí či vypnutí uchování originálů. Při zapnutí musí být všechny původní cíle nejprve uchovány a ověřeny mimo oba stromy. Při vypnutí nemají přepsaná data a původní ADS z tohoto běhu kopii pro obnovu. Nahrazení zachová původní cílová oprávnění. Cíle jen pro čtení jsou odmítnuty. Zastavení zachová dokončená nahrazení.\n\nUchování originálů samostatně uloží původní cílové soubory pro viditelné návrhy kopírování s existujícím souborem na obou stranách. V nastavení pluginu zvolte existující adresář obnovy mimo oba porovnávané stromy. Vytvoří nezávislé ověřené kopie a manifest; originály zůstanou beze změny a žádný návrh se neprovede. Kopie zdědí oprávnění adresáře obnovy.\n\nKřížek vedle Porovnat zastaví skenování, porovnávání a kontrolu plánu bez zápisů; křížek vedle Synchronizovat zastaví vybranou souborovou operaci včetně její kontroly. Aktivní je pouze příslušné tlačítko zastavení. Data a metadata jsou ověřována; zastavení zachová dokončené soubory. Po běhu znovu porovnejte. Porovnání vytvoří nové návrhy; případné ruční přeskočení nastavte znovu."
-    220 "Název"
+    220 "Název vlevo"
     221 "Velikost vlevo"
     222 "Změněno vlevo"
     223 "Operace"
@@ -184,6 +184,7 @@ BEGIN
     226 "Stav"
     227 "Důvod"
     228 "Chyba"
+    229 "Název vpravo"
     240 "Shoda"
     241 "Pouze vlevo"
     242 "Pouze vpravo"
@@ -211,5 +212,4 @@ BEGIN
     292 "Neplatné masky (regulární výrazy a uložená hledání nejsou podporována)"
     293 "Protějšek vyloučen maskami; chráněno"
     294 "Obě cesty odkazují na stejný soubor"
-    517 "Sloup&ce..."
 END
