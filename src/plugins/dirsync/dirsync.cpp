@@ -9,6 +9,7 @@
 #include "overwrite.h"
 #include "delete.h"
 #include "resource.h"
+#include "previewlayout.h"
 #include "spl_gui.h"
 #include "../../third_party/darkmodelib/include/Darkmodelib.h"
 #include <thread>
@@ -504,22 +505,6 @@ void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color,bool centered=false)
     RestoreDC(dc,saved);
     SelectObject(dc,old);DeleteObject(pen);
 }
-std::array<RECT,5> FilterBounds(RECT anchor,RECT compare,RECT synchronize,int gap,int dx)
-{
-    // Use the actual pixel height: equal DU widths/heights need not be square
-    // after the dialog font has been mapped at the current DPI.
-    const int side=compare.bottom-compare.top;
-    const int left=anchor.left+dx/2;
-    const bool single=left+5*side+4*gap<=compare.left+dx-gap;
-    std::array<RECT,5> bounds{};
-    for(size_t i=0;i<bounds.size();++i) {
-        int column=int(single?i:i%3);
-        int top=single || i<3?compare.top:synchronize.top;
-        int x=left+column*(side+gap);
-        bounds[i]={x,top,x+side,top+side};
-    }
-    return bounds;
-}
 void LayoutFilters(Preview& p,int dx)
 {
     auto original=[&](int id) {
@@ -527,7 +512,7 @@ void LayoutFilters(Preview& p,int dx)
         return RECT{};
     };
     RECT gap{0,0,4,0};MapDialogRect(p.window,&gap);
-    const auto bounds=FilterBounds(original(IDC_EQUAL),original(IDC_COMPARE),original(IDC_SYNCHRONIZE),gap.right,dx);
+    const auto bounds=dirsync::FilterBounds(original(IDC_EQUAL),original(IDC_COMPARE),original(IDC_SYNCHRONIZE),gap.right,dx);
     const int ids[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
     for(size_t i=0;i<bounds.size();++i) {
         const auto& r=bounds[i];

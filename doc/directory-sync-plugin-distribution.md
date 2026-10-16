@@ -122,3 +122,8 @@ Balíček obsahuje aktuální návod, Settings/Close zarovnané s Compare/Synchr
 Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\responsive-filters-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
 SHA256: `bd2cc01451054879ce7e4fee2fcb4e0e915e563271ba17fe5999013c1bf8cad7`.
 Rozbalením ověřeno všech 10 manifestových hashů a přesný inventář 11 souborů. Produkční SPL/SLG stejného sestavení byly ověřeny přes Computer Use ve světlém 0.16 x64 hostiteli: menší čtvercové filtry, dva řádky při 917 px, jeden při 1223 px, návrat tahem a zachovaný stav/výsledky. Návod popisuje automatické přeuspořádání. Nová čistá instalace se neopakovala.
+## 2026-10-16 — evidence tmavého přeuspořádání a DPI metrik
+
+Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\dark-responsive-dpi-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
+SHA256: `a8e25e52b1e55a4ff9fc55f25adf55aa7b2f1171307e94ff94eb712350f56bdd`.
+Rozbalením ověřeno všech 10 hashů manifestu a přesný inventář 11 souborů. Produkční SPL/SLG stejného sestavení byly použity v soukromém tmavém 0.16 x64 hostiteli pro drag přechod dvou řad filtrů do jedné a zpět, zachování a změny filtrů přes myš/klávesnici a obnovu původních výsledků. Návod výslovně odděluje testy fontových DPI metrik od dosud neprovedeného běhu na dalších systémových DPI a přechodu mezi monitory. Nová čistá instalace se neopakovala.

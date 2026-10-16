@@ -12,6 +12,7 @@
 #include <cwctype>
 #include <cstring>
 #include "../resource.h"
+#include "../previewlayout.h"
 namespace
 {
 int checks = 0;
@@ -161,6 +162,35 @@ void Test(int dialog)
             int padding = c.type == 0x80 ? MulDiv((c.style & 0xf) == BS_AUTOCHECKBOX ? 20 : 12, dpi, 96) : 0;
             if (size.cx + padding > MulDiv(c.width, baseX, 4) || size.cy > MulDiv(h, baseY, 8))
             { std::wcerr << L"DPI " << dpi << L": clipped caption " << c.text << L"\n"; fits = false; }
+        }
+        if(dialog==IDD_PREVIEW) {
+            auto box=[&](DWORD id) {
+                for(size_t i=0;i<controls.size();++i) if(controls[i].id==id) return bounds[i];
+                throw std::runtime_error("missing responsive layout control");
+            };
+            const RECT anchor=box(IDC_EQUAL),compare=box(IDC_COMPARE),sync=box(IDC_SYNCHRONIZE);
+            const int gap=MulDiv(4,baseX,4),side=compare.bottom-compare.top;
+            const int extra=MulDiv(300,dpi,96);
+            bool layoutOK=true;int transitions=0;bool previous=false;
+            for(int dx=0;dx<=extra;++dx) {
+                const auto items=dirsync::FilterBounds(anchor,compare,sync,gap,dx);
+                const bool single=items[4].top==compare.top;
+                if(single!=previous) ++transitions;
+                previous=single;
+                for(size_t i=0;i<items.size();++i) {
+                    const auto& filterBox=items[i];
+                    layoutOK &= filterBox.right-filterBox.left==side && filterBox.bottom-filterBox.top==side &&
+                        filterBox.top==(single || i<3?compare.top:sync.top) && filterBox.left>=anchor.left &&
+                        filterBox.right+gap<=compare.left+dx;
+                    for(size_t j=0;j<i;++j) {RECT intersection{};layoutOK &= !IntersectRect(&intersection,&filterBox,&items[j]);}
+                }
+                const auto restored=dirsync::FilterBounds(anchor,compare,sync,gap,0);
+                layoutOK &= restored[4].top==sync.top;
+            }
+            Check(layoutOK,"responsive filters remain square, aligned and nonoverlapping at every pixel width");
+            Check(transitions==1 && previous,"exactly one two-row to one-row transition at requested font DPI");
+            Check(side>=MulDiv(16,dpi,96)+MulDiv(2,dpi,96),"scaled filter icon fits inside square button");
+            std::cout<<dpi<<" DPI: responsive filter boundary and return passed\n";
         }
         SelectObject(dc, old); DeleteObject(font); DeleteDC(dc);
         Check(fits, "dialog bounds and captions fit at requested font DPI");
