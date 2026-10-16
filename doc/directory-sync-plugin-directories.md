@@ -66,4 +66,34 @@ H/S se nadále zahrnují do skenu. Tooltip řádku uvádí Hidden/System (česky
 - **542 kontrol engine**, **1 974 anglických a 1 990 českých kontrol resource/layout**, **2 357 lifecycle kontrol** stávajících cest. Layout kontroly používají metriky 96/120/144/192/240 DPI; nejsou novým průchodem skutečným GUI při těchto DPI. Starší test stejné velikosti a obnoveného mtime jednou selhal při velmi rychlém zápisu; fixture nyní explicitně nastaví odlišný ChangeTime, aby výsledek nezávisel na rozlišení hodin souborového systému.
 - Produkční Release x64 a Debug Win32/x64/ARM64 plugin včetně obou SLG sestaveny s warnings-as-errors. Bez změn sdíleného SDK/hostitele.
 
-Nové mazání adresářů bylo ověřené nativními testy skutečného adaptéru; nový Computer Use průchod potvrzeným mazáním v GUI zatím neproběhl. Průzkum předlohy výše zůstává pouze porovnáním a čtením souhrnů. Ruční obnova adresářů je popsaná v aktuálním návodu; testy ověřují její uložené podklady, nikoli nový ruční GUI průchod.
+V této implementační etapě proběhly nativní testy skutečného adaptéru. Následující oddíl doplňuje pozdější Computer Use průchod potvrzeným mazáním a ruční obnovou v GUI.
+
+## 2026-10-16 — GUI mazání a ruční obnova
+
+Computer Use v izolovaném anglickém/light Samandarinu 0.16 x64, hostitel `C:\Samandarin\builds\dirsync-directory-gui-20261016\host`, místní NTFS. Testovaný původní SPL z balíčku etapy mazání adresářů má SHA-256 `03ff894872240e355a5a6e9d57f8058d32ae44316378186dea8faeace7aa051d`. Uživatelské instalované instance nebyly měněné. Nastavení testovacího hostitele je v samostatném souboru config.reg.
+
+Dvě nezávislé sady `on/left,right` a `off/left,right`: společné `common-empty` a `keep.txt`, pravostranné `empty-right`, `tree-漢字/nested/empty-leaf` a `tree-漢字/nested/žluťoučký.txt` (11 B + `:note`, 8 B), dále kontrolní `protected/keep.bin` a `skipped/keep.txt`. Maska `*.txt`, Subfolders + Asymmetric + Empty folders. Soubor skipped/keep.txt byl v GUI přes Ctrl+M nastaven na Skip; jeho rodič zůstal samostatným návrhem, který příkaz vynechal kvůli ponechanému potomku. Jediné zvýraznění tohoto Skip souboru neomezilo operační příkaz: potvrzení vycházelo ze všech viditelných způsobilých návrhů.
+
+### ON a ruční obnova — dokončeno
+
+Po samostatném souhlasu uživatele potvrzeno skutečné mazání. Souhrn: **1 soubor, 4 adresáře, 0 chyb, 0 nezahájených, 1 jiný návrh vynechaný; 5/5 originálů uchováno**. Obnova vznikla mimo oba stromy v `recovery-漢字/pair-ec7c35863ac57666/run-{BCECF64F-4DAB-4BAF-9796-C4C3CB5EAAF5}`. Oba JSONL protokoly končí complete; manifest má jednu file a čtyři directory položky. Kontrola disku potvrdila odstranění jen potvrzené sady a zachování všech kontrolních souborů, společného prázdného adresáře i předků chráněného obsahu. Nové Compare ukázalo 4 řádky / 0 blokovaných; ruční Skip se podle návrhu novým Compare obnovil na výchozí návrh.
+
+Ruční obnova do nového kontrolního adresáře `restore` přes běžné GUI hostitele:
+
+1. Shift+F7 otevřelo restore. F7 vytvořilo `tree-漢字\nested\empty-leaf` včetně předků a druhé F7 `empty-right`, podle relativních adresářových záznamů manifestu.
+2. Shift+F7 v druhém panelu otevřelo rodiče souborové cesty saved; výběr souboru a F5 jej zkopíroval do `restore\tree-漢字\nested\žluťoučký.txt`.
+3. Nezávislá kontrola potvrdila přesný SHA-256 `c33f1cc7e7e6cf37c8a90b49f79a8528144003c42e56d8523cf28744ac818e48`, obsah `:note` = `ADS DATA`, původní souborový mtime a všechny čtyři adresáře včetně obou prázdných listů. Originální záloha zůstala zachovaná.
+
+**Meze této obnovy:** obnovena struktura, souborová data, ADS a souborový mtime. Adresáře vytvořené F7 mají nové časy; jejich původní časy/atributy se v tomto průchodu ručně nenastavovaly. Není tvrzena přesná obnova adresářových metadat ani ACL/owner/SACL. Nevkládal se celý pomocný strom obnovovacího běhu do původního pravého kořene.
+
+Lokální důkazy mimo Git: baseline.json, gui-evidence.json a on-result.json pod kořenem sady. Baseline obsahuje kontrolní hashe a souborové časy; žádný automatický obnovovací příkaz pluginu nebyl použit.
+
+### OFF — dokončeno
+
+V Preferences vypnuto Keep originals, existující cesta obnovy zůstala uložená a její pole bylo zakázané. Druhá nezávislá sada má stejných 9 řádků a stejnou ochranu maskou/Skip. Otevřené potvrzení správně uvádí **1 soubor, 4 adresáře, 11 hlavních bajtů, 1 vynechaný návrh, OFF — no recovery copy from this run**. Po samostatném souhlasu uživatele skutečně provedeno: **1 soubor, 4 adresáře, 0 chyb, 0 nezahájených, 1 vynechaný návrh**. Nezávislá kontrola NTFS potvrdila nepřítomnost pouze schválené sady, stejné hashe a časy kontrolních souborů i přítomnost common-empty, protected a skipped. Existuje stále jediný původní běh ON; jeho uložený soubor má původní hash i ADS. Nový běh obnovy ani protokol OFF nevznikl. Důkaz off-result.json je vedle baseline.
+
+### Drobné opravy GUI
+
+Anglický titulek potvrzení nyní říká Confirm deletion místo Confirm file deletion, protože běh může obsahovat i adresáře. Při změně návrhu pod ukazatelem mohl owner-data seznam ponechat v cache původní tooltip Delete on right i po přepnutí na Skip; aktualizace modelu nyní přepíše také nativní infotip položky pod ukazatelem. Executor ani SDK se nemění.
+
+Release x64 a Debug Win32/x64/ARM64 se po těchto úpravách sestavily s warnings-as-errors. Anglické/české resource-layout kontroly prošly 1 974/1 990, dosavadní lifecycle sada 2 357. Po řádném ukončení soukromého hostitele načten nový SPL SHA-256 `6e288f5e0cd0ef8b7a5bf354d0594c321f3e3732bd569445175105b32a6f4d9a`. V GUI ověřeno původní Delete on right → Ctrl+M pod nehybným ukazatelem → tooltip Skip i správná ikona. Otevření potvrzení ověřilo nový titulek Confirm deletion; tento dodatečný kontrolní dialog byl zrušen přes Escape bez mazání. Testovací hostitel byl řádně zavřen. ON/OFF datové průchody používají původní modul uvedený výše; následná revize mění pouze GUI. Bez SMB testů a změn SDK.

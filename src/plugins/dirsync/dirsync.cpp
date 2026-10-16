@@ -499,6 +499,17 @@ std::wstring Cell(const dirsync::Row& row, int column,const Preview& p)
     }
     return L"";
 }
+std::wstring RowInfoTip(const dirsync::Row& row)
+{
+    auto text=Text(IDS_ACTION+int(row.action));
+    for(const auto side:{std::pair<const dirsync::Entry*,const wchar_t*>{row.hasLeft?&row.left:nullptr,L"L"},
+                         {row.hasRight?&row.right:nullptr,L"R"}}) if(side.first) {
+        for(const auto attribute:{std::pair<DWORD,int>{FILE_ATTRIBUTE_HIDDEN,IDS_UI_HIDDEN_ATTRIBUTE},
+                                  {FILE_ATTRIBUTE_SYSTEM,IDS_UI_SYSTEM_ATTRIBUTE}})
+            if(side.first->attributes & attribute.first) text+=L"\n"+std::wstring(side.second)+L": "+Text(attribute.second);
+    }
+    return text;
+}
 // Draw simple geometric marks so their shape does not depend on font coverage.
 // Text remains available to accessibility clients, and selection keeps native colors.
 enum class Mark { Equal, Different, Right, Left, Skip, Delete, Warning, Single };
@@ -829,6 +840,18 @@ void Filter(Preview& p)
         if(state) ListView_SetItemState(list,int(i),state,LVIS_SELECTED|LVIS_FOCUSED);
     }
     InvalidateRect(GetDlgItem(p.window, IDC_LIST), nullptr, TRUE);
+    // An owner-data list caches the infotip for the item under the pointer.
+    // Repainting after Skip/filtering alone can keep the old operation text.
+    POINT cursor{};
+    if(GetCursorPos(&cursor) && ScreenToClient(list,&cursor)) {
+        LVHITTESTINFO hit{};hit.pt=cursor;
+        int item=ListView_HitTest(list,&hit);
+        if(item>=0 && size_t(item)<p.visible.size()) {
+            auto text=RowInfoTip(p.result.rows[p.visible[size_t(item)]]);
+            LVSETINFOTIP tip{sizeof(tip),0,text.data(),item,0};
+            SendMessageW(list,LVM_SETINFOTIP,0,LPARAM(&tip));
+        }
+    }
     Status(p);
 }
 int StopControl(const Preview& p)
@@ -1620,14 +1643,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_GETINFOTIPW) {
             auto* tip=reinterpret_cast<NMLVGETINFOTIPW*>(l);
             if(tip->iItem>=0 && size_t(tip->iItem)<p->visible.size() && tip->cchTextMax>0) {
-                const auto& row=p->result.rows[p->visible[size_t(tip->iItem)]];
-                auto text=Text(IDS_ACTION+int(row.action));
-                for(const auto side:{std::pair<const dirsync::Entry*,const wchar_t*>{row.hasLeft?&row.left:nullptr,L"L"},
-                                     {row.hasRight?&row.right:nullptr,L"R"}}) if(side.first) {
-                    for(const auto attribute:{std::pair<DWORD,int>{FILE_ATTRIBUTE_HIDDEN,IDS_UI_HIDDEN_ATTRIBUTE},
-                                              {FILE_ATTRIBUTE_SYSTEM,IDS_UI_SYSTEM_ATTRIBUTE}})
-                        if(side.first->attributes & attribute.first) text+=L"\n"+std::wstring(side.second)+L": "+Text(attribute.second);
-                }
+                auto text=RowInfoTip(p->result.rows[p->visible[size_t(tip->iItem)]]);
                 size_t count=std::min(text.size(),size_t(tip->cchTextMax-1));
                 if(count && count<text.size() && IS_HIGH_SURROGATE(text[count-1])) --count;
                 memcpy(tip->pszText,text.data(),count*sizeof(wchar_t));tip->pszText[count]=0;

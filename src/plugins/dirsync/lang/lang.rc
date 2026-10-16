@@ -147,7 +147,7 @@ BEGIN
     IDS_UI_SAVE_RESULT "Recovery result"
     IDS_UI_OVERWRITE_CONFIRM "Confirm file overwrites"
     IDS_UI_OVERWRITE_RESULT "Overwrite result"
-    IDS_UI_DELETE_CONFIRM "Confirm file deletion"
+    IDS_UI_DELETE_CONFIRM "Confirm deletion"
     IDS_UI_DELETE_RESULT "Deletion result"
     IDS_UI_HIDDEN_ATTRIBUTE "Hidden"
     IDS_UI_SYSTEM_ATTRIBUTE "System"
