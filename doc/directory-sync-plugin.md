@@ -73,6 +73,8 @@ Pravé kliknutí na zvýrazněný řádek zachová celý výběr; kliknutí na j
 Výchozí návrh se pamatuje pouze pro aktuální porovnání; nový Compare zahodí ruční změny. Samotné souborové operace spouštějí oddělené příkazy nabídky Synchronize… / Visible plan pro všechny viditelné způsobilé návrhy, vždy po vlastním potvrzení. Prohlížení, porovnání obsahu, editace, přejmenování, tisk, kopírování vlastností a shellové menu nejsou součástí této nabídky. [Průzkum a implementační evidence](directory-sync-plugin-context-menu.md) rozlišují referenční chování a hotový rozsah pluginu.
 ## Mapa dokumentace
 
+Do vzdálenějšího plánu patří [integrace s přenosovým oknem a frontou jádra](directory-sync-plugin-design.md#dlouhodobý-plán--společné-přenosové-prostředky-hostitele), včetně pozadí a rychlostního limitu. Bude se řešit až po zpřístupnění potřebného API hostitele; současná verze nad SDK 0.16 ponechává vlastní přenosový adaptér.
+
 | Potřeba | Dokument |
 | --- | --- |
 | Aktuální instalace, ovládání, obnova a omezení | Tento návod |

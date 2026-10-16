@@ -1708,7 +1708,25 @@ public:
     { StoreSettings(key,registry); }
     void WINAPI Configuration(HWND parent) override { ConfigureDark(nullptr);ConfigureAppearance(parent); }
     void WINAPI Connect(HWND, CSalamanderConnectAbstract* connect) override
-    { connect->AddMenuItem(-1, general->LoadStr(language, IDS_MENU), 0, 1, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL); }
+    {
+        int iconIndex = -1;
+        CGUIIconListAbstract* icons = gui->CreateIconList();
+        if (icons) {
+            HICON icon = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(IDI_DIRSYNC),
+                                                     IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR));
+            if (icon && icons->Create(16, 16, 1) && icons->ReplaceIcon(0, icon)) {
+                connect->SetIconListForGUI(icons); // The host takes ownership.
+                connect->SetPluginIcon(0);
+                connect->SetPluginMenuAndToolbarIcon(0);
+                icons = nullptr;
+                iconIndex = 0;
+            }
+            if (icon) DestroyIcon(icon);
+            if (icons) gui->DestroyIconList(icons);
+        }
+        connect->AddMenuItem(iconIndex, general->LoadStr(language, IDS_MENU), 0, 1, FALSE,
+                             MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL);
+    }
     void WINAPI ReleasePluginDataInterface(CPluginDataInterfaceAbstract*) override {}
     CPluginInterfaceForArchiverAbstract* WINAPI GetInterfaceForArchiver() override { return nullptr; }
     CPluginInterfaceForViewerAbstract* WINAPI GetInterfaceForViewer() override { return nullptr; }

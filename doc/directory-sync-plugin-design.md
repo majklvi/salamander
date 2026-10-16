@@ -279,6 +279,16 @@ Třetí sada dokončila požadované místní scénáře přerušení přenosu a
 5. Po ověření obnovy také pro odstraněné položky doplnit asymetrické mazání a prázdné složky, poté profily a dokončit ergonomii.
 6. Provést akceptační scénáře a CI, připravit distribuci pluginu. Teprve potom řešit upstream PR a další režimy.
 
+## Dlouhodobý plán — společné přenosové prostředky hostitele
+
+**Odloženo na vzdálenější budoucnost, schváleno uživatelem 16. října 2026.** Až upravené API Salamandera zpřístupní potřebné služby pluginům, integrovat synchronizační plugin se společnými přenosovými prostředky jádra: nativním kopírovacím/přesouvacím oknem, přenosem na pozadí, nastavitelným rychlostním limitem a společnou frontou čekajících přenosů. Tyto funkce přednostně využít z hostitele namísto jejich samostatného duplikování v pluginu.
+
+Současné SDK 0.16 poskytuje jednodušší progress dialog, nikoli obecnou službu pro předání synchronizačního seznamu do plného přenosového okna a fronty jádra. Panelové příkazy F5/F6 ani SDK `MoveFiles` tento kontrakt nenahrazují; poslední přesouvá obsah celé složky a je v jádře výslovně vyřazené z běžné fronty Copy/Move. Zdrojové opory: `CSalamanderForOperationsAbstract` v [spl_com.h](../src/plugins/shared/spl_com.h), `PostSalamanderCommand` v [spl_gen.h](../src/plugins/shared/spl_gen.h), `CFilesWindow::MoveFiles` v [fileswn6.cpp](../src/fileswn6.cpp), `StartProgressDialog` v [dialogs.h](../src/dialogs.h) a `COperationsQueue` v [worker.h](../src/worker.h).
+
+Budoucí API musí umožnit propojit společný přenos a jeho výsledky s potvrzeným plánem pluginu, uchováním originálů podle zapamatované volby, stagingem, Verify a pravidly D4/D5. Při čekání ve frontě je nutné znovu ověřit platnost plánu před skutečným provedením. Konkrétní rozhraní a rozsah integrace se navrhnou až podle dostupného API. Zmínka o přesouvacím okně zde nezavádí nový synchronizační režim přesunu souborů.
+
+**Není to podmínka první verze ani aktuální implementační úkol.** Do té doby zůstává vlastní přenosový adaptér pluginu a kompatibilita se současným Samandarinem 0.16. Toto rozhodnutí nepovoluje nynější změny SDK/hostitele ani implementaci vlastní kopie fronty, rychlostního limitu či přenosového okna.
+
 ## Zdrojová základna a její meze
 
 Primární referencí je oficiální návod TC a konkrétní odpovědi jeho autora. Komunitní wiki a diskuse dokládají popis funkcí a potřeby jednotlivých uživatelů. FreeFileSync a WinSCP slouží jako zdroje návrhových postupů; jejich chování se nepřipisuje Total Commanderu. Dokumentace Microsoftu vymezuje vlastnosti Windows API.

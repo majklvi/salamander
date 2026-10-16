@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 #define IDD_PREVIEW 100
+#define IDI_DIRSYNC 103
 #define IDD_APPEARANCE 102
 #define IDC_BROWSE_LEFT 472
 #define IDC_BROWSE_RIGHT 473
