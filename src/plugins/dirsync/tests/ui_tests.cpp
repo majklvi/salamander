@@ -71,12 +71,10 @@ void Test(int dialog)
         }
         if (c.id == IDC_LIST || c.id == IDC_COMPARE || c.id == IDC_STOP || c.id == IDC_STOP_SYNC || c.id == IDC_SYNCHRONIZE ||
             c.id == IDC_RECOVERY_ROOT || c.id == IDC_SAVE_ORIGINALS || c.id == IDC_KEEP_ORIGINALS || c.id == IDC_OVERWRITE || c.id == IDC_DELETE_FILES || c.id == IDCANCEL ||
-            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_NOTES || c.id == IDC_CONFIRM_DISCARD || c.id == IDC_DONT_ASK ||
+            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_NOTES ||
             c.id == IDC_BROWSE_LEFT || c.id == IDC_BROWSE_RIGHT || c.id == IDC_BROWSE_RECOVERY || c.id == IDOK)
             Check((c.style & WS_TABSTOP) != 0, "primary controls reachable by Tab");
-        if(dialog==IDD_DISCARD_RESULTS && c.id==IDCANCEL)
-            Check((c.style&BS_TYPEMASK)==BS_DEFPUSHBUTTON,"discard warning defaults to Cancel");
-        if((dialog==IDD_DISCARD_RESULTS || dialog==IDD_INFORMATION) && c.id==IDOK)
+        if(dialog==IDD_INFORMATION && c.id==IDOK)
             Check(c.text==L"OK","standard confirmation caption");
         if(c.id==IDC_STATUS) Check(c.className==L"msctls_statusbar32", "real native status bar");
         if(c.id==IDC_INFO_NOTES)
@@ -92,23 +90,25 @@ void Test(int dialog)
             const auto& edit=control(pair.first);const auto& browse=control(pair.second);
             Check(browse.y==edit.y && browse.x==edit.x+edit.width+4 && browse.width==14,"native adjacent folder browse button");
         }
-        for(DWORD id:{IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_SELECTED,IDC_EMPTY})
-            Check(control(id).y==control(IDC_RECURSIVE).y,"scan choices in one row");
-        Check(control(IDC_MASK).y+2==control(IDC_RECURSIVE).y && control(IDC_MASK).width<=60,"compact mask shares scan row");
-        Check(control(IDC_COMPARE).y+control(IDC_COMPARE).height<control(IDC_MASK).y,"scan choices immediately below Compare");
+        Check(control(IDC_MASK).x<control(IDC_RECURSIVE).x && control(IDC_MASK).width<=60,"narrow mask at left of scan options");
+        for(DWORD id:{IDC_CONTENT,IDC_IGNORE}) Check(control(id).y==control(IDC_RECURSIVE).y,"first compact scan row");
+        for(DWORD id:{IDC_SELECTED,IDC_EMPTY}) Check(control(id).y==control(IDC_ASYMMETRIC).y,"second compact scan row");
+        Check(control(IDC_ASYMMETRIC).y>control(IDC_RECURSIVE).y && control(IDC_ASYMMETRIC).x==control(IDC_RECURSIVE).x,"two compact scan rows");
+        Check(control(IDC_COMPARE).x==control(IDC_SYNCHRONIZE).x && control(IDCANCEL).x==control(IDC_COMPARE).x &&
+            control(IDC_COMPARE).y<control(IDC_SYNCHRONIZE).y && control(IDC_SYNCHRONIZE).y<control(IDCANCEL).y,"Compare, Synchronize and Close stacked on right");
         for(auto pair:{std::pair<DWORD,DWORD>{IDC_COMPARE,IDC_STOP},{IDC_SYNCHRONIZE,IDC_STOP_SYNC}}) {
             const auto& start=control(pair.first);const auto& stop=control(pair.second);
             Check(stop.y==start.y && stop.x==start.x+start.width && stop.height==start.height,"joined native start/Stop parts without a gap");
             Check(stop.width==14 && stop.width<start.width/2 && (stop.style&BS_ICON)!=0 && !stop.text.empty(),"small icon-only Stop part retains accessible name");
         }
-        Check(control(IDCANCEL).y==control(IDC_SYNCHRONIZE).y && control(IDCANCEL).x+control(IDCANCEL).width==width-8,"Close in top-right operation group");
+        Check(control(IDCANCEL).x+control(IDCANCEL).width==width-8,"Close in top-right operation group");
         for(DWORD id:{IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT}) {
             const auto& filter=control(id);
             Check((filter.style&BS_ICON)!=0 && (filter.style&WS_TABSTOP)!=0 && filter.width<=20 && !filter.text.empty(),
                 "compact native icon toggle retains accessible name");
         }
         Check(control(IDC_EQUAL).x>width/3 && control(IDC_TOLEFT).x<control(IDC_SYNCHRONIZE).x,"filters between center and operation group");
-        Check(control(IDC_LIST).height>height*3/4 && control(IDC_LIST).y+control(IDC_LIST).height==control(IDC_STATUS).y-6,"file list extends down to status margin");
+        Check(control(IDC_LIST).height>height*3/4 && control(IDC_LIST).y+control(IDC_LIST).height==control(IDC_STATUS).y && control(IDC_LIST).x==0 && control(IDC_LIST).width==width,"file list touches side edges and status bar");
         for(const auto& c:controls) Check(c.id!=IDC_ACTION && c.id!=IDC_APPLY && c.id!=IDC_SUMMARY && c.id!=IDC_COPY_NEW && c.id!=IDC_OVERWRITE && c.id!=IDC_SAVE_ORIGINALS && c.id!=IDC_DELETE_FILES && c.text!=L"Show:","secondary commands live in menus, no filter label");
         for(const auto& c:controls) Check(c.id!=IDC_KEEP_ORIGINALS && c.id!=IDC_RECOVERY_ROOT,"recovery settings only in preferences");
     }
@@ -171,11 +171,11 @@ int main()
         }
         for(int id:{IDS_MENU_PLAN,IDS_MENU_SUMMARY,IDS_MENU_SAVE,IDS_MENU_COPY_NEW,IDS_MENU_OVERWRITE,
             IDS_MENU_DELETE_FILES,IDS_TIP_STOP_COMPARE,IDS_TIP_STOP_SYNC,IDS_FILTER_EQUAL,IDS_FILTER_DIFFERENT,
-            IDS_FILTER_SINGLE,IDS_FILTER_RIGHT,IDS_FILTER_LEFT}) {
+            IDS_FILTER_SINGLE,IDS_FILTER_RIGHT,IDS_FILTER_LEFT,IDS_OPTIONS_PENDING,IDS_TIP_SCAN_OPTIONS}) {
             const wchar_t* text=nullptr;
             Check(LoadStringW(GetModuleHandleW(nullptr),id,reinterpret_cast<LPWSTR>(&text),0)>0,"menu captions and filter/Stop tooltips shipped in language resource");
         }
-        Test(IDD_PREVIEW); Test(IDD_INFORMATION);Test(IDD_APPEARANCE);Test(IDD_DISCARD_RESULTS); std::cout << checks << " resource/layout checks passed\n"; return 0;
+        Test(IDD_PREVIEW); Test(IDD_INFORMATION);Test(IDD_APPEARANCE); std::cout << checks << " resource/layout checks passed\n"; return 0;
     }
     catch (const std::exception& e) { std::cerr << "FAILED: " << e.what() << "\n"; return 1; }
 }

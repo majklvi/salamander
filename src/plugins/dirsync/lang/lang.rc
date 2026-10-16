@@ -19,25 +19,25 @@ BEGIN
     LTEXT "&Right folder:", IDC_RIGHT_LABEL, 312, 9, 52, 10
     EDITTEXT IDC_RIGHT, 366, 6, 218, 14, ES_AUTOHSCROLL
     PUSHBUTTON "...", IDC_BROWSE_RIGHT, 588, 6, 14, 14
-    DEFPUSHBUTTON "&Compare", IDC_COMPARE, 8, 26, 62, 14, WS_GROUP
-    CONTROL "S&top comparison", IDC_STOP, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 70, 26, 14, 14
-    PUSHBUTTON "S&ynchronize...", IDC_SYNCHRONIZE, 454, 26, 80, 14, WS_GROUP
-    CONTROL "Sto&p synchronization", IDC_STOP_SYNC, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 534, 26, 14, 14
-    PUSHBUTTON "Close", IDCANCEL, 552, 26, 50, 14
-    LTEXT "&Masks:", -1, 78, 51, 28, 10
-    EDITTEXT IDC_MASK, 108, 48, 45, 14, ES_AUTOHSCROLL
-    CONTROL "Sub&folders", IDC_RECURSIVE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 161, 50, 61, 12
-    CONTROL "By c&ontent", IDC_CONTENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 226, 50, 64, 12
-    CONTROL "&Ignore date", IDC_IGNORE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 294, 50, 65, 12
-    CONTROL "&Asymmetric", IDC_ASYMMETRIC, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 363, 50, 69, 12
-    CONTROL "Panel &selection", IDC_SELECTED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 436, 50, 80, 12
-    CONTROL "&Empty folders", IDC_EMPTY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 520, 50, 82, 12
-    CONTROL "E&qual", IDC_EQUAL, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 274, 24, 20, 18
-    CONTROL "&Different", IDC_DIFFERENT, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 298, 24, 20, 18
-    CONTROL "Si&ngle-sided", IDC_SINGLE, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 322, 24, 20, 18
-    CONTROL "Left to ri&ght", IDC_TORIGHT, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 346, 24, 20, 18
-    CONTROL "Rig&ht to left", IDC_TOLEFT, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 370, 24, 20, 18
-    CONTROL "", IDC_LIST, "SysListView32", LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 8, 70, 594, 378
+    LTEXT "&Masks:", -1, 8, 29, 28, 10
+    EDITTEXT IDC_MASK, 38, 26, 45, 14, ES_AUTOHSCROLL
+    CONTROL "Sub&folders", IDC_RECURSIVE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 91, 28, 61, 12
+    CONTROL "By c&ontent", IDC_CONTENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 160, 28, 64, 12
+    CONTROL "&Ignore date", IDC_IGNORE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 246, 28, 65, 12
+    CONTROL "&Asymmetric", IDC_ASYMMETRIC, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 91, 46, 69, 12
+    CONTROL "Panel &selection", IDC_SELECTED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 164, 46, 80, 12
+    CONTROL "&Empty folders", IDC_EMPTY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 248, 46, 82, 12
+    CONTROL "E&qual", IDC_EQUAL, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 360, 40, 20, 18
+    CONTROL "&Different", IDC_DIFFERENT, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 384, 40, 20, 18
+    CONTROL "Si&ngle-sided", IDC_SINGLE, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 408, 40, 20, 18
+    CONTROL "Left to ri&ght", IDC_TORIGHT, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 432, 40, 20, 18
+    CONTROL "Rig&ht to left", IDC_TOLEFT, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 456, 40, 20, 18
+    DEFPUSHBUTTON "&Compare", IDC_COMPARE, 508, 26, 80, 14, WS_GROUP
+    CONTROL "S&top comparison", IDC_STOP, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 588, 26, 14, 14
+    PUSHBUTTON "S&ynchronize...", IDC_SYNCHRONIZE, 508, 44, 80, 14, WS_GROUP
+    CONTROL "Sto&p synchronization", IDC_STOP_SYNC, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 588, 44, 14, 14
+    PUSHBUTTON "Close", IDCANCEL, 508, 62, 94, 14
+    CONTROL "", IDC_LIST, "SysListView32", LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 0, 82, 610, 372
     CONTROL "", IDC_STATUS, "msctls_statusbar32", SBARS_SIZEGRIP | SBARS_TOOLTIPS, 0, 454, 610, 16
 END
 IDD_INFORMATION DIALOGEX 0, 0, 300, 188
@@ -51,7 +51,7 @@ BEGIN
     PUSHBUTTON "OK", IDOK, 137, 167, 76, 14
     DEFPUSHBUTTON "Cancel", IDCANCEL, 219, 167, 74, 14
 END
-IDD_APPEARANCE DIALOGEX 0, 0, 306, 219
+IDD_APPEARANCE DIALOGEX 0, 0, 306, 201
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "Preferences"
@@ -88,21 +88,8 @@ BEGIN
     LTEXT "Rec&overy folder:", IDC_RECOVERY_LABEL, 7, 160, 76, 10
     EDITTEXT IDC_RECOVERY_ROOT, 86, 157, 195, 14, ES_AUTOHSCROLL
     PUSHBUTTON "...", IDC_BROWSE_RECOVERY, 285, 157, 14, 14
-    CONTROL "&Warn before discarding comparison results", IDC_CONFIRM_DISCARD, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 177, 292, 12
-    DEFPUSHBUTTON "OK", IDOK, 169, 199, 62, 14
-    PUSHBUTTON "Cancel", IDCANCEL, 237, 199, 62, 14
-END
-IDD_DISCARD_RESULTS DIALOGEX 0, 0, 220, 70
-STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-EXSTYLE WS_EX_APPWINDOW
-CAPTION "Discard comparison results?"
-FONT 8, "MS Shell Dlg"
-BEGIN
-    LTEXT "Changing this option will discard the current", -1, 7, 7, 206, 10
-    LTEXT "results and manual proposals.", -1, 7, 18, 206, 10
-    CONTROL "&Do not ask again", IDC_DONT_ASK, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 32, 206, 12
-    PUSHBUTTON "OK", IDOK, 107, 49, 50, 14
-    DEFPUSHBUTTON "Cancel", IDCANCEL, 163, 49, 50, 14
+    DEFPUSHBUTTON "OK", IDOK, 169, 181, 62, 14
+    PUSHBUTTON "Cancel", IDCANCEL, 237, 181, 62, 14
 END
 STRINGTABLE
 BEGIN
@@ -112,6 +99,8 @@ BEGIN
     IDS_MENU_COPY_NEW "&Copy visible new files..."
     IDS_MENU_OVERWRITE "&Overwrite visible files..."
     IDS_MENU_DELETE_FILES "&Delete visible files..."
+    IDS_OPTIONS_PENDING "Options changed. Compare to apply; results use previous options."
+    IDS_TIP_SCAN_OPTIONS "Used on the next Compare. Current results and manual proposals remain unchanged."
     IDS_TIP_STOP_COMPARE "Stop scanning, content comparison or read-only validation (Alt+T)."
     IDS_TIP_STOP_SYNC "Stop the current file operation, including its validation (Alt+P). Completed changes remain in place."
     IDS_FILTER_EQUAL "Show equal files (Alt+Q)"
@@ -139,8 +128,8 @@ BEGIN
     IDS_TIP_KEEP "Save verified originals before overwrites and deletions. Uses additional disk space. When off, no new recovery copies are created; existing backups are kept."
     IDS_TIP_DELETE "All visible eligible right-only files in asymmetric mode. Highlighting does not limit the operation. Hidden and Skip rows are excluded. Folders are kept."
     IDS_TIP_SCOPE "All visible eligible proposals, regardless of highlighted rows. Hidden and Skip rows are excluded. Each operation requires confirmation."
-    IDS_TIP_SELECTION "Scan the selection originally captured from the file panels, not highlighted preview rows."
-    IDS_TIP_EMPTY "Include empty folders in the preview. Folder deletion is not supported."
+    IDS_TIP_SELECTION "On the next Compare, scan the selection originally captured from the file panels, not highlighted preview rows. Current results remain unchanged."
+    IDS_TIP_EMPTY "Include empty folders on the next Compare. Current results remain unchanged. Folder deletion is not supported."
     IDS_COLOR_FIRST "Equal"
     441 "Different"
     442 "Copy to right"
@@ -272,7 +261,7 @@ BEGIN
     IDS_COPY_STOPPED "Stopped. Completed new files remain in place."
     IDS_COPY_FAILED "The copy worker failed. Completed files may remain. Compare again and inspect the destination before retrying."
     IDS_SELECT_ROW "Select one or more rows first. Blocked and conflicting rows cannot receive actions."
-    IDS_HELP "Choose the two Windows folders and Compare. Scan panel selection uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nHighlight rows and use the right-click / Shift+F10 menu to change proposals, then review Visible plan > Plan summary. Ctrl+D restores the default proposal, Ctrl+M skips, Ctrl+L/R sets the copy direction, Ctrl+W reverses it. Copy paths and Ctrl+C copy displayed Unicode paths; missing sides are omitted. These commands never execute file operations. Icon filters show equal, different, single-sided and directional results; tooltips explain them. Synchronize opens separate Copy, Overwrite and Delete commands. Visible plan in the context menu also offers Plan summary and Save originals. Highlighting does not restrict these plan commands: each command uses all visible eligible proposals. Hidden and Skip rows are excluded. Run each kind of operation separately. Only visible actions enter that summary; blocked/conflicting rows always stay visible. Copy new files executes only visible file copies with missing targets after a separate confirmation. Existing targets, deletions and empty-folder actions are omitted.\n\nKeep originals is enabled by default and can be switched off. This setting and the recovery folder are remembered for this plugin. Disabling it creates no recovery copies and leaves existing backups in place. Delete files separately confirms visible Delete on right proposals from asymmetric comparison. Only supported files absent on the left are eligible. Folders are never deleted. The confirmation states recovery ON/OFF; when ON all originals must first be saved and verified. When OFF deleted data and ADS have no recovery copy. The Recycle Bin is not used. Read-only files are refused.\n\nOverwrite files separately confirms replacement of visible existing-file targets. The confirmation states whether recovery is ON or OFF. When ON, all original targets must first be saved and verified outside both trees. When OFF, overwritten data and old ADS have no recovery copy from this run. Replacements keep original target permissions. Read-only targets are refused. Stop leaves completed replacements in place.\n\nSave originals separately saves original target files for visible copy proposals with an existing file on both sides. Set an existing recovery folder outside both compared trees in the plugin preferences. This creates independent verified copies and a manifest; originals remain unchanged and no proposal is executed. Permissions inherit from the recovery folder.\n\nStop beside Compare cancels scanning, comparison and read-only validation; Stop beside Synchronize cancels the chosen file operation including its validation. Only the appropriate Stop is enabled. Data and metadata are verified; Stop preserves completed files. Compare again after a run. Compare rebuilds proposals; reapply manual Skip if needed."
+    IDS_HELP "Choose the two Windows folders and Compare. Scan checkboxes apply on the next Compare; toggling them preserves the current results and proposals. Scan panel selection uses the union of the original panel selections and locks the original roots. Subfolders adds deeper levels; selected folders include direct children.\n\nMasks are separated by spaces or semicolons; quote names containing spaces. Use | before exclusions, a leading backslash to anchor to the root, and ** for any depth. Examples: *.txt | selB\\ or selA\\**\\*.txt. Regex and saved searches are not supported.\n\nHighlight rows and use the right-click / Shift+F10 menu to change proposals, then review Visible plan > Plan summary. Ctrl+D restores the default proposal, Ctrl+M skips, Ctrl+L/R sets the copy direction, Ctrl+W reverses it. Copy paths and Ctrl+C copy displayed Unicode paths; missing sides are omitted. These commands never execute file operations. Icon filters show equal, different, single-sided and directional results; tooltips explain them. Synchronize opens separate Copy, Overwrite and Delete commands. Visible plan in the context menu also offers Plan summary and Save originals. Highlighting does not restrict these plan commands: each command uses all visible eligible proposals. Hidden and Skip rows are excluded. Run each kind of operation separately. Only visible actions enter that summary; blocked/conflicting rows always stay visible. Copy new files executes only visible file copies with missing targets after a separate confirmation. Existing targets, deletions and empty-folder actions are omitted.\n\nKeep originals is enabled by default and can be switched off. This setting and the recovery folder are remembered for this plugin. Disabling it creates no recovery copies and leaves existing backups in place. Delete files separately confirms visible Delete on right proposals from asymmetric comparison. Only supported files absent on the left are eligible. Folders are never deleted. The confirmation states recovery ON/OFF; when ON all originals must first be saved and verified. When OFF deleted data and ADS have no recovery copy. The Recycle Bin is not used. Read-only files are refused.\n\nOverwrite files separately confirms replacement of visible existing-file targets. The confirmation states whether recovery is ON or OFF. When ON, all original targets must first be saved and verified outside both trees. When OFF, overwritten data and old ADS have no recovery copy from this run. Replacements keep original target permissions. Read-only targets are refused. Stop leaves completed replacements in place.\n\nSave originals separately saves original target files for visible copy proposals with an existing file on both sides. Set an existing recovery folder outside both compared trees in the plugin preferences. This creates independent verified copies and a manifest; originals remain unchanged and no proposal is executed. Permissions inherit from the recovery folder.\n\nStop beside Compare cancels scanning, comparison and read-only validation; Stop beside Synchronize cancels the chosen file operation including its validation. Only the appropriate Stop is enabled. Data and metadata are verified; Stop preserves completed files. Compare again after a run. Compare rebuilds proposals; reapply manual Skip if needed."
     220 "Relative path"
     221 "Left size"
     222 "Left modified"

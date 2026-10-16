@@ -40,7 +40,6 @@ Palette DefaultPalette(bool night)
 struct Settings {
     bool keepOriginals=true;
     bool actionLabels=false;
-    bool confirmDiscardResults=true;
     std::array<Palette,2> colors{DefaultPalette(false),DefaultPalette(true)};
     std::wstring recoveryRoot;
 } settings;
@@ -54,9 +53,6 @@ void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     enabled=0;
     if(registry->GetValue(key,"ActionLabels",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
         settings.actionLabels=enabled!=0;
-    enabled=1;
-    if(registry->GetValue(key,"ConfirmDiscardResults",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
-        settings.confirmDiscardResults=enabled!=0;
     for(int theme=0;theme<2;++theme) {
         Palette palette{};DWORD size=0;const char* name=theme?"DarkColorsV1":"LightColorsV1";
         if(registry->GetSize(key,name,REG_BINARY,size) && size==sizeof(palette) &&
@@ -84,9 +80,7 @@ bool StoreSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     bool appearance=registry->SetValue(key,"ActionLabels",REG_DWORD,&labels,sizeof(labels))!=FALSE;
     for(int theme=0;theme<2;++theme)
         appearance=(registry->SetValue(key,theme?"DarkColorsV1":"LightColorsV1",REG_BINARY,settings.colors[theme].data(),sizeof(Palette))!=FALSE) && appearance;
-    DWORD confirm=settings.confirmDiscardResults?1:0;
-    bool warning=registry->SetValue(key,"ConfirmDiscardResults",REG_DWORD,&confirm,sizeof(confirm))!=FALSE;
-    return mode && path && appearance && warning;
+    return mode && path && appearance;
 }
 void WINAPI SettingsCallback(BOOL load,HKEY key,CSalamanderRegistryAbstract* registry,void* param)
 {
@@ -472,6 +466,16 @@ COLORREF MarkColor(Mark mark)
 {
     return settings.colors[dark?1:0][size_t(mark)];
 }
+COLORREF PreviewColor(const dirsync::Row& row,int column,COLORREF background,COLORREF normal)
+{
+    const bool skip=row.action==dirsync::Action::None;
+    if(column!=3 && column!=6) return skip?MarkColor(Mark::Skip):normal;
+    Mark mark=RowMark(row,column==3);COLORREF color=MarkColor(mark);
+    if(!skip || mark==Mark::Skip) return color;
+    // Preserve the semantic hue while fading skipped rows toward the list background.
+    return RGB((GetRValue(color)+GetRValue(background))/2,
+        (GetGValue(color)+GetGValue(background))/2,(GetBValue(color)+GetBValue(background))/2);
+}
 void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color,bool centered=false)
 {
     int dpi=GetDeviceCaps(dc,LOGPIXELSX);
@@ -508,6 +512,10 @@ LRESULT CALLBACK FilterButton(HWND window,UINT message,WPARAM w,LPARAM l,UINT_PT
         InvalidateRect(window,nullptr,TRUE);return 0;
     }
     if(message==BM_SETSTATE && *checked) w=TRUE;
+    // Dialog default-button/focus handling can reset the native pressed bit
+    // directly, without BM_SETSTATE. Keep each toggle's independent model state.
+    if(message==WM_PAINT && *checked && !(DefSubclassProc(window,BM_GETSTATE,0,0)&BST_PUSHED))
+        DefSubclassProc(window,BM_SETSTATE,TRUE,0);
     if(message==WM_NCDESTROY) RemoveWindowSubclass(window,FilterButton,id);
     return DefSubclassProc(window,message,w,l);
 }
@@ -571,7 +579,6 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
         ConfigureDark(window);appearance->theme=dark?1:0;
         CheckDlgButton(window,IDC_ACTION_LABELS,appearance->draft.actionLabels?BST_CHECKED:BST_UNCHECKED);
         CheckDlgButton(window,IDC_KEEP_ORIGINALS,appearance->draft.keepOriginals?BST_CHECKED:BST_UNCHECKED);
-        CheckDlgButton(window,IDC_CONFIRM_DISCARD,appearance->draft.confirmDiscardResults?BST_CHECKED:BST_UNCHECKED);
         SendDlgItemMessageW(window,IDC_RECOVERY_ROOT,EM_SETLIMITTEXT,32759,0);
         SetDlgItemTextW(window,IDC_RECOVERY_ROOT,appearance->draft.recoveryRoot.c_str());
         RecoveryControls(window);Tooltips(window);
@@ -618,7 +625,6 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS);
             settings.recoveryRoot=std::move(appearance->draft.recoveryRoot);
             settings.actionLabels=Checked(window,IDC_ACTION_LABELS);
-            settings.confirmDiscardResults=Checked(window,IDC_CONFIRM_DISCARD);
             settings.colors[appearance->theme]=appearance->draft.colors[appearance->theme];
             PersistSettings(window);EndDialog(window,IDOK);return TRUE;
         case IDCANCEL: EndDialog(window,IDCANCEL);return TRUE;
@@ -650,7 +656,7 @@ void Tooltips(HWND window)
     HWND tip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
         CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,window,nullptr,instance,nullptr);
     if(!tip) return;
-    auto texts=std::make_unique<std::vector<std::wstring>>();texts->reserve(20);
+    auto texts=std::make_unique<std::vector<std::wstring>>();texts->reserve(24);
     if(!SetWindowSubclass(tip,TooltipLifetime,1,reinterpret_cast<DWORD_PTR>(texts.get()))) {DestroyWindow(tip);return;}
     auto* storage=texts.release();
     HDC dc=GetDC(window);int dpi=GetDeviceCaps(dc,LOGPIXELSX);ReleaseDC(window,dc);
@@ -658,6 +664,8 @@ void Tooltips(HWND window)
     for(auto entry:{std::pair<int,int>{IDC_MASK,IDS_TIP_MASK},{IDC_KEEP_ORIGINALS,IDS_TIP_KEEP},{IDC_RECOVERY_ROOT,IDS_SAVE_ROOT},
         {IDC_SYNCHRONIZE,IDS_TIP_SCOPE},{IDC_STOP,IDS_TIP_STOP_COMPARE},{IDC_STOP_SYNC,IDS_TIP_STOP_SYNC},
         {IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},
+        {IDC_RECURSIVE,IDS_TIP_SCAN_OPTIONS},{IDC_CONTENT,IDS_TIP_SCAN_OPTIONS},
+        {IDC_IGNORE,IDS_TIP_SCAN_OPTIONS},{IDC_ASYMMETRIC,IDS_TIP_SCAN_OPTIONS},
         {IDC_BROWSE_LEFT,IDS_BROWSE_LEFT},{IDC_BROWSE_RIGHT,IDS_BROWSE_RIGHT},{IDC_BROWSE_RECOVERY,IDS_BROWSE_RECOVERY},
         {IDC_EQUAL,IDS_FILTER_EQUAL},{IDC_DIFFERENT,IDS_FILTER_DIFFERENT},{IDC_SINGLE,IDS_FILTER_SINGLE},
         {IDC_TORIGHT,IDS_FILTER_RIGHT},{IDC_TOLEFT,IDS_FILTER_LEFT},{IDC_LIST,0}}) {
@@ -689,6 +697,21 @@ void SizeStatus(HWND window)
     RECT client{};GetClientRect(window,&client);
     int parts[]={client.right*44/100,-1};
     SendMessageW(bar,SB_SETPARTS,2,LPARAM(parts));
+    // Native status-bar height can differ from the resource's nominal DU height.
+    // Join the list to its actual top edge at every size, with no outer margins.
+    HWND list=GetDlgItem(window,IDC_LIST);RECT bounds{},status{};
+    if(list && GetWindowRect(list,&bounds) && GetWindowRect(bar,&status)) {
+        MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&bounds),2);
+        MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&status),2);
+        MoveWindow(list,0,bounds.top,client.right,std::max(0L,status.top-bounds.top),TRUE);
+    }
+}
+bool PendingOptions(const Preview& p)
+{
+    return p.result.snapshot && (Checked(p.window,IDC_RECURSIVE)!=p.options.recursive ||
+        Checked(p.window,IDC_CONTENT)!=p.options.content || Checked(p.window,IDC_IGNORE)!=p.options.ignoreDate ||
+        Checked(p.window,IDC_ASYMMETRIC)!=p.options.asymmetric || Checked(p.window,IDC_EMPTY)!=p.options.emptyDirectories ||
+        Checked(p.window,IDC_SELECTED)!=p.options.onlySelected);
 }
 void Status(Preview& p)
 {
@@ -711,16 +734,26 @@ void Status(Preview& p)
         if(p.hasCopyReport || p.hasRecoveryReport || p.hasOverwriteReport || p.hasDeleteReport) state=Text(IDS_UI_FINISHED);
         else if(p.result.stale && !p.result.cancelled) state=Text(IDS_STALE);
         else if(p.failed || p.result.cancelled) state=Text(p.failed?IDS_FAILED:IDS_CANCELLED);
-        else state=Text(p.result.snapshot?IDS_UI_COMPLETE:IDS_UI_READY);
+        else state=Text(PendingOptions(p)?IDS_OPTIONS_PENDING:p.result.snapshot?IDS_UI_COMPLETE:IDS_UI_READY);
         uint64_t blocked=0;
         for(const auto& row:p.result.rows) if(row.state==dirsync::State::Blocked || row.state==dirsync::State::Conflict) ++blocked;
         swprintf_s(counts,Text(IDS_UI_ROWS).c_str(),uint64_t(p.result.rows.size()),uint64_t(p.visible.size()),uint64_t(p.result.rows.size()-p.visible.size()),blocked);
     }
     StatusPane(p.window,0,state);StatusPane(p.window,1,counts);
 }
+bool RowVisible(const dirsync::Row& row,const std::array<bool,5>& filters)
+{
+    if(row.state==dirsync::State::Blocked || row.state==dirsync::State::Conflict) return true;
+    bool show=filters[row.state==dirsync::State::Equal?0:
+        (row.state==dirsync::State::LeftOnly || row.state==dirsync::State::RightOnly)?2:1];
+    if(row.action==dirsync::Action::CopyRight) show &= filters[3];
+    if(row.action==dirsync::Action::CopyLeft) show &= filters[4];
+    return show;
+}
 void Filter(Preview& p)
 {
     HWND list=GetDlgItem(p.window,IDC_LIST);
+    SendMessageW(ListView_GetToolTips(list),TTM_POP,0,0);
     std::vector<size_t> selected;
     int focused=ListView_GetNextItem(list,-1,LVNI_FOCUSED);
     size_t focus=focused>=0 && size_t(focused)<p.visible.size()?p.visible[size_t(focused)]:SIZE_MAX;
@@ -730,17 +763,7 @@ void Filter(Preview& p)
     p.visible.clear();
     for (size_t i = 0; i < p.result.rows.size(); ++i)
     {
-        const auto& row = p.result.rows[i];
-        bool show = true;
-        if (row.state != dirsync::State::Blocked && row.state != dirsync::State::Conflict)
-        {
-            if (row.state == dirsync::State::Equal) show = Checked(p.window, IDC_EQUAL);
-            else if (row.state == dirsync::State::LeftOnly || row.state == dirsync::State::RightOnly) show = Checked(p.window, IDC_SINGLE);
-            else show = Checked(p.window, IDC_DIFFERENT);
-            if (row.action == dirsync::Action::CopyRight) show &= Checked(p.window, IDC_TORIGHT);
-            if (row.action == dirsync::Action::CopyLeft) show &= Checked(p.window, IDC_TOLEFT);
-        }
-        if (show) p.visible.push_back(i);
+        if (RowVisible(p.result.rows[i],p.filterChecks)) p.visible.push_back(i);
     }
     ListView_SetItemCountEx(GetDlgItem(p.window, IDC_LIST), int(p.visible.size()), LVSICF_NOSCROLL);
     for(size_t i=0;i<p.visible.size();++i) {
@@ -783,45 +806,12 @@ void InvalidatePlan(Preview& p)
     ListView_SetItemCount(GetDlgItem(p.window, IDC_LIST), 0);
     Status(p);
 }
-struct DiscardChoice {bool suppress=false;};
-INT_PTR CALLBACK DiscardDialog(HWND window,UINT message,WPARAM w,LPARAM l)
-{
-    if(message==WM_INITDIALOG) {
-        SetWindowLongPtrW(window,DWLP_USER,l);
-        general->MultiMonCenterWindow(window,GetParent(window),FALSE);
-        ConfigureDark(window);return TRUE;
-    }
-    LRESULT brush=0;if(dark && DarkModeHandleCtlColor(message,w,l,brush)) return brush;
-    if(message==WM_CLOSE) {EndDialog(window,IDCANCEL);return TRUE;}
-    if(message==WM_COMMAND) {
-        if(LOWORD(w)==IDOK) {
-            auto* choice=reinterpret_cast<DiscardChoice*>(GetWindowLongPtrW(window,DWLP_USER));
-            choice->suppress=Checked(window,IDC_DONT_ASK);EndDialog(window,IDOK);return TRUE;
-        }
-        if(LOWORD(w)==IDCANCEL) {EndDialog(window,IDCANCEL);return TRUE;}
-    }
-    return FALSE;
-}
-bool ChangeScanOption(Preview& p,int id)
-{
-    // An auto-checkbox has already toggled when BN_CLICKED arrives. Restore
-    // its previous value before asking, including on Cancel or dialog failure.
-    bool wanted=Checked(p.window,id);
-    CheckDlgButton(p.window,id,wanted?BST_UNCHECKED:BST_CHECKED);
-    if(p.running) return false;
-    if(settings.confirmDiscardResults && !p.result.rows.empty()) {
-        DiscardChoice choice;
-        INT_PTR answer=DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_DISCARD_RESULTS),p.window,DiscardDialog,LPARAM(&choice));
-        ConfigureDark(p.window);
-        if(answer!=IDOK) return false;
-        if(choice.suppress) {settings.confirmDiscardResults=false;PersistSettings(p.window);}
-    }
-    CheckDlgButton(p.window,id,wanted?BST_CHECKED:BST_UNCHECKED);
-    return true;
-}
 void Start(Preview& p)
 {
     if (p.running) return;
+    if(Checked(p.window,IDC_SELECTED)) {
+        SetDlgItemTextW(p.window,IDC_LEFT,p.panelLeft.c_str());SetDlgItemTextW(p.window,IDC_RIGHT,p.panelRight.c_str());
+    }
     p.left = ControlText(p.window, IDC_LEFT); p.right = ControlText(p.window, IDC_RIGHT);
     p.options.mask = ControlText(p.window, IDC_MASK);
     p.options.recursive = Checked(p.window, IDC_RECURSIVE);
@@ -1418,7 +1408,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_BROWSE_RIGHT) {r.left+=dx;r.right+=dx;}
                 else if (id == IDC_RIGHT) { r.left += dx/2; r.right += dx; }
                 else if (id == IDC_RIGHT_LABEL) { r.left += dx/2; r.right += dx/2; }
-                else if (id == IDC_SYNCHRONIZE || id == IDC_STOP_SYNC || id == IDCANCEL) {r.left+=dx;r.right+=dx;}
+                else if (id == IDC_COMPARE || id == IDC_STOP || id == IDC_SYNCHRONIZE || id == IDC_STOP_SYNC || id == IDCANCEL) {r.left+=dx;r.right+=dx;}
                 else if (id==IDC_EQUAL || id==IDC_DIFFERENT || id==IDC_SINGLE || id==IDC_TORIGHT || id==IDC_TOLEFT)
                 {r.left+=dx/2;r.right+=dx/2;}
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
@@ -1509,14 +1499,8 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 CheckDlgButton(window,LOWORD(w),Checked(window,LOWORD(w))?BST_UNCHECKED:BST_CHECKED);Filter(*p);
             }
             return TRUE;
-        case IDC_SELECTED:
-            if(HIWORD(w)!=BN_CLICKED || !ChangeScanOption(*p,IDC_SELECTED)) return TRUE;
-            if (Checked(window, IDC_SELECTED))
-            { SetDlgItemTextW(window, IDC_LEFT, p->panelLeft.c_str()); SetDlgItemTextW(window, IDC_RIGHT, p->panelRight.c_str()); }
-            Busy(*p, false); InvalidatePlan(*p); return TRUE;
-        case IDC_RECURSIVE: case IDC_CONTENT: case IDC_IGNORE: case IDC_ASYMMETRIC: case IDC_EMPTY:
-            if(HIWORD(w)!=BN_CLICKED || !ChangeScanOption(*p,LOWORD(w))) return TRUE;
-            InvalidatePlan(*p); return TRUE;
+        case IDC_SELECTED: case IDC_RECURSIVE: case IDC_CONTENT: case IDC_IGNORE: case IDC_ASYMMETRIC: case IDC_EMPTY:
+            if(HIWORD(w)==BN_CLICKED && !p->running) {Busy(*p,false);Status(*p);} return TRUE;
         case IDC_LEFT: case IDC_RIGHT: case IDC_MASK:
             if (HIWORD(w) == EN_CHANGE) InvalidatePlan(*p); return TRUE;
         }
@@ -1554,15 +1538,19 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         }
         if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_ITEMCHANGED) {
             int index=ListView_GetNextItem(GetDlgItem(window,IDC_LIST),-1,LVNI_FOCUSED);
-            if(!p->running && index>=0 && size_t(index)<p->visible.size())
-                StatusPane(window,0,Text(IDS_ACTION+int(p->result.rows[p->visible[size_t(index)]].action)));
+            if(!p->running && index>=0 && size_t(index)<p->visible.size()) {
+                if(PendingOptions(*p)) Status(*p);
+                else StatusPane(window,0,Text(IDS_ACTION+int(p->result.rows[p->visible[size_t(index)]].action)));
+            }
         }
         if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==NM_CUSTOMDRAW) {
             auto* draw=reinterpret_cast<NMLVCUSTOMDRAW*>(l);
             LRESULT result=CDRF_DODEFAULT;
             if(draw->nmcd.dwDrawStage==(CDDS_ITEMPREPAINT|CDDS_SUBITEM) &&
+               draw->nmcd.dwItemSpec<p->visible.size() &&
                !(ListView_GetItemState(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),LVIS_SELECTED)&LVIS_SELECTED))
-                draw->clrText=ListView_GetTextColor(draw->nmcd.hdr.hwndFrom);
+                draw->clrText=PreviewColor(p->result.rows[p->visible[size_t(draw->nmcd.dwItemSpec)]],draw->iSubItem,
+                    ListView_GetBkColor(draw->nmcd.hdr.hwndFrom),ListView_GetTextColor(draw->nmcd.hdr.hwndFrom));
             if(draw->nmcd.dwDrawStage==CDDS_PREPAINT) result=CDRF_NOTIFYITEMDRAW;
             else if(draw->nmcd.dwDrawStage==CDDS_ITEMPREPAINT) result=CDRF_NOTIFYSUBITEMDRAW;
             else if((draw->iSubItem==3 || draw->iSubItem==6) && draw->nmcd.dwItemSpec<p->visible.size()) {
@@ -1570,7 +1558,6 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 Mark mark=RowMark(row,draw->iSubItem==3);
                 bool selected=(ListView_GetItemState(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),LVIS_SELECTED)&LVIS_SELECTED)!=0;
                 if(draw->nmcd.dwDrawStage==(CDDS_ITEMPREPAINT|CDDS_SUBITEM)) {
-                    if(!selected) draw->clrText=MarkColor(mark);
                     result=CDRF_NOTIFYPOSTPAINT;
                 } else if(draw->nmcd.dwDrawStage==(CDDS_ITEMPOSTPAINT|CDDS_SUBITEM)) {
                     RECT cell{};
@@ -1583,7 +1570,8 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                             if(bg==CLR_INVALID) bg=ListView_GetBkColor(draw->nmcd.hdr.hwndFrom);
                             HBRUSH fill=CreateSolidBrush(bg);FillRect(draw->nmcd.hdc,&cell,fill);DeleteObject(fill);
                         }
-                        COLORREF color=MarkColor(mark);
+                        COLORREF color=PreviewColor(row,draw->iSubItem,ListView_GetBkColor(draw->nmcd.hdr.hwndFrom),
+                            ListView_GetTextColor(draw->nmcd.hdr.hwndFrom));
                         if(selected) color=GetFocus()==draw->nmcd.hdr.hwndFrom?GetSysColor(COLOR_HIGHLIGHTTEXT):ListView_GetTextColor(draw->nmcd.hdr.hwndFrom);
                         PaintMark(draw->nmcd.hdc,cell,mark,color,iconOnly);
                     }

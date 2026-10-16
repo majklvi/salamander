@@ -60,3 +60,7 @@ Debug i Release x64 produkční build s warnings-as-errors prošel; v obou konfi
 ## 2026-10-16 — přesun rozsahu do nabídek
 
 Aktuální rozložení už nemá dolní tlačítka ani Proposal/Apply. Návrhy se upravují přes výběrové kontextové menu/zkratky, operační příkazy přes horní Synchronize… nebo oddělenou podnabídku Visible plan. Všechny dříve ověřené zásady rozsahu a potvrzení zůstávají: operace mají celý viditelný způsobilý plán, nezávisle na zvýraznění, a běží odděleně. GUI bez výběru ověřilo potvrzení jednoho přepisu / 6 B, následně Cancel, a Plan summary 1 / 6. Nevznikl nový smíšený executor. Podrobnosti v aktuálním návodu a poslední GUI/menu evidenci.
+
+## 2026-10-16 — volby příštího porovnání
+
+Aktuální checkboxy Subfolders/By content/Ignore date/Asymmetric/Panel selection/Empty folders nemění ani nemažou zobrazený plán. Použijí se až příštím Compare; do té doby i kontextové a operační příkazy používají snapshot a režim původního porovnání. Stav hlásí čekající volby. Původní potvrzení ztráty výsledků a jeho preference byly odstraněny. Samotná textová změna masky nebo kořenové cesty zůstává přímým zneplatněním. Filtry jsou nezávislé kombinovatelné přepínače, nikoli volba jediné kategorie; GUI i nativní test kombinací potvrdily zachování ostatních stavů. Skip je šedý s tlumeným odstínem State; tabulka sahá až k bokům a status baru.

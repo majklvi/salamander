@@ -107,6 +107,72 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeProposalRules(const wchar_
     } catch(...) {return 0;}
     return checks;
 }
+// Real native toggle states, option handlers and list/status geometry; no executor.
+extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t* left,const wchar_t* right)
+{
+    struct Template {DLGTEMPLATE dialog;WORD menu=0,cls=0,title=0;} dialog{};
+    dialog.dialog.style=WS_POPUP;dialog.dialog.cx=610;dialog.dialog.cy=470;
+    HWND window=CreateDialogIndirectParamW(GetModuleHandleW(nullptr),&dialog.dialog,nullptr,EmptyDialog,0);
+    if(!window) return FALSE;
+    bool ok=true;Preview p;p.window=window;p.left=left;p.right=right;p.panelLeft=L"panel-left";p.panelRight=L"panel-right";
+    SetWindowLongPtrW(window,DWLP_USER,reinterpret_cast<LONG_PTR>(&p));
+    const int filters[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
+    for(size_t i=0;i<5;++i) {
+        HWND button=CreateWindowExW(0,L"BUTTON",L"",WS_CHILD|BS_ICON,0,0,24,24,window,HMENU(INT_PTR(filters[i])),instance,nullptr);
+        ok &= button!=nullptr;SetWindowSubclass(button,FilterButton,1,reinterpret_cast<DWORD_PTR>(&p.filterChecks[i]));
+    }
+    for(int id:{IDC_RECURSIVE,IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_EMPTY,IDC_SELECTED})
+        ok &= CreateWindowExW(0,L"BUTTON",L"",WS_CHILD|BS_AUTOCHECKBOX,0,0,20,20,window,HMENU(INT_PTR(id)),instance,nullptr)!=nullptr;
+    for(int id:{IDC_LEFT,IDC_RIGHT})
+        ok &= CreateWindowExW(0,L"EDIT",id==IDC_LEFT?left:right,WS_CHILD,0,0,20,20,window,HMENU(INT_PTR(id)),instance,nullptr)!=nullptr;
+    HWND list=CreateWindowExW(0,WC_LISTVIEWW,L"",WS_CHILD|LVS_REPORT|LVS_OWNERDATA,8,100,500,300,window,HMENU(INT_PTR(IDC_LIST)),instance,nullptr);
+    HWND bar=CreateWindowExW(0,STATUSCLASSNAMEW,L"",WS_CHILD,0,440,610,30,window,HMENU(INT_PTR(IDC_STATUS)),instance,nullptr);
+    ok &= list!=nullptr && bar!=nullptr;
+    p.result=dirsync::Compare(left,right,p.options,p.cancel,p.progress);auto snapshot=p.result.snapshot;
+    dirsync::Row row;row.path=L"skipped-漢字.txt";row.state=dirsync::State::Different;row.action=dirsync::Action::None;
+    p.result.rows={row};p.defaults={dirsync::Action::CopyRight};p.visible={0};ListView_SetItemCount(list,1);
+    CheckDlgButton(window,IDC_RECURSIVE,BST_CHECKED);p.options.selection={{L"item",false}};
+    for(int id:{IDC_RECURSIVE,IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_EMPTY,IDC_SELECTED}) {
+        CheckDlgButton(window,id,Checked(window,id)?BST_UNCHECKED:BST_CHECKED);
+        DialogBody(window,WM_COMMAND,MAKEWPARAM(id,BN_CLICKED),0);
+        ok &= p.result.snapshot==snapshot && p.result.rows.size()==1 && p.result.rows[0].action==dirsync::Action::None &&
+            p.defaults[0]==dirsync::Action::CopyRight && ListView_GetItemCount(list)==1;
+    }
+    ok &= PendingOptions(p) && !p.options.asymmetric && !p.options.content && !p.options.onlySelected && p.options.recursive;
+    ok &= ControlText(window,IDC_LEFT)==left && ControlText(window,IDC_RIGHT)==right;
+    for(unsigned bits=0;bits<32;++bits) {
+        for(size_t i=0;i<5;++i) CheckDlgButton(window,filters[i],bits&(1u<<i)?BST_CHECKED:BST_UNCHECKED);
+        for(size_t i=0;i<5;++i) {
+            HWND button=GetDlgItem(window,filters[i]);SendMessageW(button,WM_KILLFOCUS,0,0);SendMessageW(button,WM_PAINT,0,0);
+            ok &= Checked(window,filters[i])==((bits&(1u<<i))!=0);
+            if(bits&(1u<<i)) ok &= (SendMessageW(button,BM_GETSTATE,0,0)&BST_PUSHED)!=0;
+        }
+    }
+    // Categories combine by union; direction switches further restrict copies.
+    std::array<bool,5> mixed{false,true,true,true,false};
+    row.action=dirsync::Action::CopyRight;ok &= RowVisible(row,mixed);
+    row.state=dirsync::State::LeftOnly;ok &= RowVisible(row,mixed);
+    row.action=dirsync::Action::CopyLeft;ok &= !RowVisible(row,mixed);
+    mixed[4]=true;ok &= RowVisible(row,mixed);
+    row.state=dirsync::State::Equal;row.action=dirsync::Action::None;ok &= !RowVisible(row,mixed);
+    mixed[0]=true;ok &= RowVisible(row,mixed);
+    row.state=dirsync::State::Blocked;mixed.fill(false);ok &= RowVisible(row,mixed);
+    for(COLORREF bg:{RGB(255,255,255),RGB(32,32,32)}) {
+        row.state=dirsync::State::Different;row.action=dirsync::Action::None;
+        ok &= PreviewColor(row,0,bg,RGB(1,2,3))==MarkColor(Mark::Skip);
+        COLORREF base=MarkColor(Mark::Different),faded=PreviewColor(row,6,bg,RGB(1,2,3));
+        ok &= GetRValue(faded)==(GetRValue(base)+GetRValue(bg))/2 &&
+            GetGValue(faded)==(GetGValue(base)+GetGValue(bg))/2 && GetBValue(faded)==(GetBValue(base)+GetBValue(bg))/2;
+        row.action=dirsync::Action::CopyRight;ok &= PreviewColor(row,6,bg,RGB(1,2,3))==base;
+    }
+    for(int width:{900,1200}) {
+        SetWindowPos(window,nullptr,0,0,width,600,SWP_NOMOVE|SWP_NOZORDER);SizeStatus(window);
+        RECT client{},bounds{},status{};GetClientRect(window,&client);GetWindowRect(list,&bounds);GetWindowRect(bar,&status);
+        MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&bounds),2);MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&status),2);
+        ok &= bounds.left==0 && bounds.right==client.right && bounds.bottom==status.top;
+    }
+    DestroyWindow(window);p.window=nullptr;return ok;
+}
 // Exercise the real SDK configuration callbacks without touching user registry data.
 extern "C" __declspec(dllexport) BOOL WINAPI ProbeStopControls()
 {
@@ -170,18 +236,13 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
     try {
         HKEY key=reinterpret_cast<HKEY>(UINT_PTR(1)); // opaque key used only by the fake SDK registry
         plugin.LoadConfiguration(nullptr,nullptr,&registry);
-        check(settings.keepOriginals && settings.recoveryRoot.empty() && settings.confirmDiscardResults);
+        check(settings.keepOriginals && settings.recoveryRoot.empty());
         std::wstring root=L"C:\\obnova-漢字\\"+std::wstring(200,L'階')+L"\\😀";
-        settings.keepOriginals=false; settings.recoveryRoot=root;settings.confirmDiscardResults=false;
+        settings.keepOriginals=false; settings.recoveryRoot=root;
         settings.actionLabels=true;settings.colors[0][2]=RGB(12,34,56);settings.colors[1][6]=RGB(98,76,54);
         plugin.SaveConfiguration(nullptr,key,&registry);
         settings={}; plugin.LoadConfiguration(nullptr,key,&registry);
         check(!settings.keepOriginals && settings.recoveryRoot==root);
-        check(!settings.confirmDiscardResults);
-        registry.values["ConfirmDiscardResults"].bytes={2,0,0,0};
-        plugin.LoadConfiguration(nullptr,key,&registry);check(settings.confirmDiscardResults);
-        plugin.SaveConfiguration(nullptr,key,&registry);settings.confirmDiscardResults=false;
-        plugin.LoadConfiguration(nullptr,key,&registry);check(settings.confirmDiscardResults);
         check(settings.actionLabels && settings.colors[0][2]==RGB(12,34,56) && settings.colors[1][6]==RGB(98,76,54));
         registry.values["ActionLabels"].bytes={2,0,0,0};
         registry.values["DarkColorsV1"].bytes={0,0,0,0};

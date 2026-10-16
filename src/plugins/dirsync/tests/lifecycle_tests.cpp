@@ -90,7 +90,7 @@ void Run(const std::wstring& dll,Fixture& f,bool content)
 {
     Module module(dll);
     auto settingsTest=reinterpret_cast<Module::Status>(GetProcAddress(module.handle,"ProbeSettingsTest"));
-    Check(settingsTest && settingsTest()==18,"persistent recovery, appearance and warning settings: round trips, long Unicode paths and malformed values");
+    Check(settingsTest && settingsTest()==15,"persistent recovery and appearance settings: round trips, long Unicode paths and malformed values");
     Check(module.release(FALSE)==1,"idle normal release succeeds");
     Check(module.start(f.left.c_str(),f.right.c_str(),content)!=FALSE,"start module worker");
     ULONGLONG deadline=GetTickCount64()+5000; unsigned status=0;
@@ -271,6 +271,9 @@ int main()
             using StopTest=BOOL (WINAPI*)();
             auto stops=reinterpret_cast<StopTest>(GetProcAddress(module.handle,"ProbeStopControls"));
             Check(stops && stops(),"only the appropriate adjacent Stop can cancel scanning, validation or file operations");
+            using PreviewTest=BOOL (WINAPI*)(const wchar_t*,const wchar_t*);
+            auto preview=reinterpret_cast<PreviewTest>(GetProcAddress(module.handle,"ProbePreviewControls"));
+            Check(preview && preview(scan.left.c_str(),scan.right.c_str()),"independent toggle combinations, retained results/options, muted Skip and edge-to-edge list");
         }
         Fixture content; content.Sparse(content.left+L"\\same.bin"); content.Sparse(content.right+L"\\same.bin");
         for(int pass=0;pass<3;++pass) { Run(dll,scan,false); Run(dll,content,true); }
