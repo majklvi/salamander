@@ -87,6 +87,14 @@ void Test(int dialog)
             Check(control(id).y==control(IDC_RECURSIVE).y,"scan choices in one row");
         Check(control(IDC_MASK).y+2==control(IDC_RECURSIVE).y && control(IDC_MASK).width<=60,"compact mask shares scan row");
         Check(control(IDC_LIST).height>height/2,"file list gets majority of initial height");
+        for(const auto& c:controls) Check(c.id!=IDC_KEEP_ORIGINALS && c.id!=IDC_RECOVERY_ROOT,"recovery settings only in preferences");
+    }
+    if(dialog==IDD_APPEARANCE) {
+        auto control=[&](DWORD id)->const Control& {for(const auto& c:controls) if(c.id==id) return c;throw std::runtime_error("missing preference control");};
+        Check(control(IDC_COLOR_BUTTON_FIRST).y==control(IDC_COLOR_BUTTON_FIRST+4).y &&
+            control(IDC_COLOR_BUTTON_FIRST+4).x>control(IDC_COLOR_BUTTON_FIRST).x,"two columns of color choices");
+        Check(control(IDC_KEEP_ORIGINALS).y>control(IDC_COLOR_BUTTON_FIRST+3).y,"recovery settings below colors");
+        Check(control(IDC_RECOVERY_ROOT).width>=200,"usable Unicode recovery path editor");
     }
     for (int dpi : {96, 120, 144, 192, 240})
     {

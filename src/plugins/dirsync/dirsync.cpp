@@ -445,6 +445,12 @@ struct Appearance {
     int theme=0;
     std::array<CGUIColorArrowButtonAbstract*,7> buttons{};
 };
+void Tooltips(HWND window);
+void RecoveryControls(HWND window)
+{
+    bool keep=Checked(window,IDC_KEEP_ORIGINALS);
+    for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL}) EnableWindow(GetDlgItem(window,id),keep);
+}
 void AppearanceSample(HWND window,Appearance& appearance)
 {
     for(int item=0;item<7;++item) {
@@ -461,6 +467,10 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
         SetWindowLongPtrW(window,DWLP_USER,l);
         ConfigureDark(window);appearance->theme=dark?1:0;
         CheckDlgButton(window,IDC_ACTION_LABELS,appearance->draft.actionLabels?BST_CHECKED:BST_UNCHECKED);
+        CheckDlgButton(window,IDC_KEEP_ORIGINALS,appearance->draft.keepOriginals?BST_CHECKED:BST_UNCHECKED);
+        SendDlgItemMessageW(window,IDC_RECOVERY_ROOT,EM_SETLIMITTEXT,32759,0);
+        SetDlgItemTextW(window,IDC_RECOVERY_ROOT,appearance->draft.recoveryRoot.c_str());
+        RecoveryControls(window);Tooltips(window);
         for(int item=0;item<7;++item) {
             SetDlgItemTextW(window,IDC_COLOR_BUTTON_FIRST+item,Text(IDS_COLOR_FIRST+item).c_str());
             if(gui) appearance->buttons[item]=gui->AttachColorArrowButton(window,IDC_COLOR_BUTTON_FIRST+item,TRUE);
@@ -469,6 +479,12 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
     }
     if(!appearance) return FALSE;
     LRESULT brush=0;if(dark && DarkModeHandleCtlColor(message,w,l,brush)) return brush;
+    if(message==WM_HELP) {
+        auto* help=reinterpret_cast<HELPINFO*>(l);
+        int id=help?GetDlgCtrlID(reinterpret_cast<HWND>(help->hItemHandle)):0;
+        if(id==IDC_KEEP_ORIGINALS || id==IDC_RECOVERY_ROOT) Message(window,id==IDC_KEEP_ORIGINALS?IDS_TIP_KEEP:IDS_SAVE_ROOT);
+        return TRUE;
+    }
     if(message==WM_DRAWITEM && w>=IDC_COLOR_SAMPLE_FIRST && w<IDC_COLOR_SAMPLE_FIRST+7) {
         auto* draw=reinterpret_cast<DRAWITEMSTRUCT*>(l);
         int item=int(w)-IDC_COLOR_SAMPLE_FIRST;
@@ -488,10 +504,14 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             AppearanceSample(window,*appearance);return TRUE;
         }
         switch(id) {
+        case IDC_KEEP_ORIGINALS: RecoveryControls(window);return TRUE;
         case IDC_COLOR_RESET:
             appearance->draft.colors[appearance->theme]=DefaultPalette(appearance->theme!=0);
             AppearanceSample(window,*appearance);return TRUE;
         case IDOK:
+            appearance->draft.recoveryRoot=ControlText(window,IDC_RECOVERY_ROOT);
+            settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS);
+            settings.recoveryRoot=std::move(appearance->draft.recoveryRoot);
             settings.actionLabels=Checked(window,IDC_ACTION_LABELS);
             settings.colors[appearance->theme]=appearance->draft.colors[appearance->theme];
             PersistSettings(window);EndDialog(window,IDOK);return TRUE;
@@ -511,17 +531,18 @@ void ConfigureAppearance(HWND parent)
     DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_APPEARANCE),parent,AppearanceDialog,LPARAM(&appearance));
     ConfigureDark(nullptr);
 }
-void PreviewTooltips(HWND window)
+void Tooltips(HWND window)
 {
     HWND tip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
         CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,window,nullptr,instance,nullptr);
     if(!tip) return;
     SendMessageW(tip,TTM_SETMAXTIPWIDTH,0,420);
-    for(auto entry:{std::pair<int,int>{IDC_MASK,IDS_TIP_MASK},{IDC_KEEP_ORIGINALS,IDS_TIP_KEEP},
+    for(auto entry:{std::pair<int,int>{IDC_MASK,IDS_TIP_MASK},{IDC_KEEP_ORIGINALS,IDS_TIP_KEEP},{IDC_RECOVERY_ROOT,IDS_SAVE_ROOT},
         {IDC_DELETE_FILES,IDS_TIP_DELETE},{IDC_COPY_NEW,IDS_TIP_SCOPE},{IDC_OVERWRITE,IDS_TIP_SCOPE},
         {IDC_SAVE_ORIGINALS,IDS_TIP_SCOPE},{IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},{IDC_LIST,0}}) {
         TOOLINFOW tool{};tool.cbSize=sizeof(tool);tool.uFlags=TTF_IDISHWND|TTF_SUBCLASS;
         tool.hwnd=window;tool.uId=UINT_PTR(GetDlgItem(window,entry.first));tool.hinst=language;
+        if(!tool.uId) continue;
         tool.lpszText=entry.second?MAKEINTRESOURCEW(entry.second):LPSTR_TEXTCALLBACKW;SendMessageW(tip,TTM_ADDTOOLW,0,LPARAM(&tool));
     }
     DarkModeApplyWindow(tip);
@@ -597,9 +618,9 @@ void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
                    IDC_EMPTY, IDC_COMPARE, IDC_ACTION, IDC_APPLY, IDC_SUMMARY, IDC_EQUAL,
-                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS, IDC_OVERWRITE, IDC_DELETE_FILES})
+                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_OVERWRITE, IDC_DELETE_FILES})
         EnableWindow(GetDlgItem(p.window, id), !busy);
-    for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL,IDC_SAVE_ORIGINALS})
+    for(int id:{IDC_SAVE_ORIGINALS})
         EnableWindow(GetDlgItem(p.window,id),!busy && settings.keepOriginals);
     EnableWindow(GetDlgItem(p.window, IDC_SELECTED), !busy && !p.options.selection.empty());
     bool locked = Checked(p.window, IDC_SELECTED);
@@ -798,7 +819,7 @@ void RecoverySummary(Preview& p)
 void SaveOriginals(Preview& p)
 {
     if(!settings.keepOriginals) { Message(p.window,IDS_RECOVERY_DISABLED); return; }
-    p.recoveryRoot=ControlText(p.window,IDC_RECOVERY_ROOT);
+    p.recoveryRoot=settings.recoveryRoot;
     if (p.recoveryRoot.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
     p.copyRows.clear(); uint64_t bytes=0,omitted=0;
     for (size_t i:p.visible) {
@@ -871,7 +892,7 @@ void Overwrite(Preview& p)
         } else if(row.action!=dirsync::Action::None) ++omitted;
     }
     if(p.copyRows.empty()) { Message(p.window,IDS_OVERWRITE_EMPTY); return; }
-    const bool keep=settings.keepOriginals; const auto root=ControlText(p.window,IDC_RECOVERY_ROOT);
+    const bool keep=settings.keepOriginals; const auto root=settings.recoveryRoot;
     if(keep && root.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
     InfoRows fields;Field(fields,IDS_UI_FILES,uint64_t(p.copyRows.size()));Field(fields,IDS_UI_BYTES,bytes);
     Field(fields,IDS_UI_ORIGINAL_BYTES,originalBytes);Field(fields,IDS_UI_OMITTED,omitted);
@@ -938,7 +959,7 @@ void DeleteFiles(Preview& p)
         else if(row.action!=dirsync::Action::None) ++omitted;
     }
     if(p.copyRows.empty()) { Message(p.window,IDS_DELETE_EMPTY); return; }
-    const bool keep=settings.keepOriginals; const auto root=ControlText(p.window,IDC_RECOVERY_ROOT);
+    const bool keep=settings.keepOriginals; const auto root=settings.recoveryRoot;
     if(keep && root.empty()) { Message(p.window,IDS_SAVE_ROOT); return; }
     InfoRows fields;Field(fields,IDS_UI_FILES,uint64_t(p.copyRows.size()));Field(fields,IDS_UI_ORIGINAL_BYTES,bytes);
     Field(fields,IDS_UI_OMITTED,omitted);Field(fields,IDS_UI_RECOVERY,Text(keep?IDS_UI_ON:IDS_UI_OFF));
@@ -972,9 +993,6 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         p = reinterpret_cast<Preview*>(l); p->window = window;
         SetWindowLongPtrW(window, DWLP_USER, reinterpret_cast<LONG_PTR>(p));
         SetDlgItemTextW(window, IDC_LEFT, p->left.c_str()); SetDlgItemTextW(window, IDC_RIGHT, p->right.c_str());
-        SendDlgItemMessageW(window,IDC_RECOVERY_ROOT,EM_SETLIMITTEXT,32759,0);
-        SetDlgItemTextW(window,IDC_RECOVERY_ROOT,settings.recoveryRoot.c_str());
-        CheckDlgButton(window,IDC_KEEP_ORIGINALS,settings.keepOriginals?BST_CHECKED:BST_UNCHECKED);
         SetDlgItemTextW(window, IDC_MASK, L"*.*");
         CheckDlgButton(window, IDC_RECURSIVE, BST_CHECKED);
         CheckDlgButton(window, IDC_SELECTED, p->options.selection.empty() ? BST_UNCHECKED : BST_CHECKED);
@@ -1003,7 +1021,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             RECT bounds{}; GetWindowRect(child, &bounds); MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&bounds), 2);
             p->controls.push_back({child, bounds});
         }
-        ConfigureDark(window); PreviewTooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
+        ConfigureDark(window); Tooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
     LRESULT brush = 0;
@@ -1033,10 +1051,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_LEFT) r.right += dx/2;
                 else if (id == IDC_RIGHT) { r.left += dx/2; r.right += dx; }
                 else if (id == IDC_RIGHT_LABEL) { r.left += dx/2; r.right += dx/2; }
-                else if (id == IDC_RECOVERY_ROOT) { r.top += dy; r.bottom += dy; r.right += dx; }
-                else if (id == IDC_SAVE_ORIGINALS) { r.top += dy; r.bottom += dy; r.left += dx; r.right += dx; }
-                else if (id == IDC_RECOVERY_LABEL) { r.top += dy; r.bottom += dy; }
-                else if (id == IDC_KEEP_ORIGINALS || id == IDC_RECOVERY_SPACE || id == IDC_DELETE_FILES || id == IDC_DELETE_SCOPE) { r.top += dy; r.bottom += dy; }
+                else if (id == IDC_SAVE_ORIGINALS || id == IDC_DELETE_FILES) { r.top += dy; r.bottom += dy; }
                 else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDC_OVERWRITE || id == IDCANCEL)
                 { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
@@ -1064,14 +1079,14 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             p->overwriting=false; p->hasOverwriteReport=true; p->result.stale=true; p->result.snapshot.reset();
             Status(*p);
             for(const auto& path:{p->left,p->right}) NotifyPath(path);
-            if(!p->overwriteReport.recovery.runDirectory.empty()) NotifyPath(ControlText(window,IDC_RECOVERY_ROOT));
+            if(!p->overwriteReport.recovery.runDirectory.empty()) NotifyPath(settings.recoveryRoot);
             if(!p->closing) { if(p->failed) Message(window,IDS_OVERWRITE_FAILED); else OverwriteSummary(*p); }
         }
         if(p->deleting) {
             p->deleting=false; p->hasDeleteReport=true; p->result.stale=true; p->result.snapshot.reset();
             Status(*p);
             NotifyPath(p->right);
-            if(!p->deleteReport.recovery.runDirectory.empty()) NotifyPath(ControlText(window,IDC_RECOVERY_ROOT));
+            if(!p->deleteReport.recovery.runDirectory.empty()) NotifyPath(settings.recoveryRoot);
             if(!p->closing) { if(p->failed) Message(window,IDS_DELETE_FAILED); else DeleteSummary(*p); }
         }
         if (p->closing) { PersistSettings(window); EndDialog(window, 0); }
@@ -1113,12 +1128,6 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_SAVE_ORIGINALS: ValidatePreview(*p, Preview::Intent::Save); return TRUE;
         case IDC_OVERWRITE: ValidatePreview(*p,Preview::Intent::Overwrite); return TRUE;
         case IDC_DELETE_FILES: ValidatePreview(*p,Preview::Intent::Delete); return TRUE;
-        case IDC_KEEP_ORIGINALS:
-            if(!p->running) { settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS); Busy(*p,false); PersistSettings(window); }
-            return TRUE;
-        case IDC_RECOVERY_ROOT:
-            if(HIWORD(w)==EN_CHANGE && !p->running) settings.recoveryRoot=ControlText(window,IDC_RECOVERY_ROOT);
-            return TRUE;
         case IDC_EQUAL: case IDC_DIFFERENT: case IDC_SINGLE: case IDC_TORIGHT: case IDC_TOLEFT:
             if (!p->running) Filter(*p); return TRUE;
         case IDC_SELECTED:
