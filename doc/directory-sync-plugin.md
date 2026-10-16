@@ -78,6 +78,7 @@ Výchozí návrh se pamatuje pouze pro aktuální porovnání; nový Compare zah
 | Schválená rozhodnutí a pozdější změny rozsahu | [Návrh](directory-sync-plugin-design.md), [mapování jádra/SDK](directory-sync-plugin-core-adapter.md) |
 | Rozhraní, DPI, klávesnice, schránka | [GUI evidence](directory-sync-plugin-ui.md) |
 | Souvislý pracovní postup a rozsah tlačítek | [GUI workflow](directory-sync-plugin-workflow.md) |
+| Větší místní sada, dávky kopií/přepisů a omezení UI Automation | [NTFS pilot](directory-sync-plugin-pilot.md) |
 | Implementace, build a historické etapy | [Implementační záznam](directory-sync-plugin-implementation.md) |
 | Technický formát a ověření zápisů | [Nové kopie](directory-sync-plugin-copy-new.md), [obnova](directory-sync-plugin-recovery.md), [přepisy](directory-sync-plugin-overwrite.md), [mazání souborů](directory-sync-plugin-delete.md) |
 | Přerušení a nedostatek místa | [Stop/Close](directory-sync-plugin-copy-cancellation.md), [uvolnění](directory-sync-plugin-copy-unload.md), [chyby místa](directory-sync-plugin-copy-space.md), [skutečný VHD test](directory-sync-plugin-vhd-results.md) |

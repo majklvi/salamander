@@ -787,6 +787,10 @@ int StopControl(const Preview& p)
 }
 void Busy(Preview& p, bool busy)
 {
+    // A list infotip can otherwise remain topmost over the operation dialog.
+    HWND listTip=ListView_GetToolTips(GetDlgItem(p.window,IDC_LIST));
+    if(busy) SendMessageW(listTip,TTM_POP,0,0);
+    SendMessageW(listTip,TTM_ACTIVATE,!busy,0);
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
                    IDC_EMPTY, IDC_COMPARE, IDC_SYNCHRONIZE, IDC_SETTINGS, IDC_EQUAL,
                    IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT})

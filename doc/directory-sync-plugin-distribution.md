@@ -127,3 +127,7 @@ Rozbalením ověřeno všech 10 manifestových hashů a přesný inventář 11 s
 Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\dark-responsive-dpi-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
 SHA256: `a8e25e52b1e55a4ff9fc55f25adf55aa7b2f1171307e94ff94eb712350f56bdd`.
 Rozbalením ověřeno všech 10 hashů manifestu a přesný inventář 11 souborů. Produkční SPL/SLG stejného sestavení byly použity v soukromém tmavém 0.16 x64 hostiteli pro drag přechod dvou řad filtrů do jedné a zpět, zachování a změny filtrů přes myš/klávesnici a obnovu původních výsledků. Návod výslovně odděluje testy fontových DPI metrik od dosud neprovedeného běhu na dalších systémových DPI a přechodu mezi monitory. Nová čistá instalace se neopakovala.
+## 2026-10-16 — balíček po větším NTFS pilotu
+
+Aktualizovaný nepodepsaný ruční x64 ZIP: `C:\Samandarin\builds\dirsync-distribution\large-pilot-20261016\plugin_5.0_dirsync_0.1_x64.zip`, SHA-256 `8457898bc5752f21784d7d05c5335fc4d20343c88b942d7871e5e28d35ab5f3f`. Obsahuje opravu schování infotipu seznamu během práce a aktuální návod včetně odkazu na evidenci většího pilotu. Rozbalení ověřilo všech 10 hashů manifestu a přesný počet 11 souborů. Produkční SPL bylo načteno v soukromém hostiteli 0.16 x64; potvrzení přepisu a Cancel na malé sadě prošly bez překrývajícího infotipu. Nejde o nové kompletní ověření čisté instalace/restartů této revize ZIP; předchozí evidence zůstává datovaná. [Větší pilot](directory-sync-plugin-pilot.md) rozlišuje původní datový běh, následnou opravu a známé omezení velkých UI Automation seznamů.
+
