@@ -97,8 +97,11 @@ void Test(int dialog)
         Check(control(IDC_ASYMMETRIC).x==control(IDC_RECURSIVE).x &&
               control(IDC_SELECTED).x==control(IDC_CONTENT).x &&
               control(IDC_EMPTY).x==control(IDC_IGNORE).x,"aligned scan option columns");
-        Check(control(IDC_COMPARE).x==control(IDC_SYNCHRONIZE).x && control(IDCANCEL).x==control(IDC_COMPARE).x &&
-            control(IDC_COMPARE).y<control(IDC_SYNCHRONIZE).y && control(IDC_SYNCHRONIZE).y<control(IDCANCEL).y,"Compare, Synchronize and Close stacked on right");
+        Check(control(IDC_COMPARE).x==control(IDC_SYNCHRONIZE).x &&
+            control(IDC_COMPARE).y<control(IDC_SYNCHRONIZE).y &&
+            control(IDCANCEL).x>control(IDC_STOP).x+control(IDC_STOP).width &&
+            control(IDCANCEL).y>control(IDC_COMPARE).y && control(IDCANCEL).y<control(IDC_SYNCHRONIZE).y,
+            "Close beside stacked Compare and Synchronize");
         for(auto pair:{std::pair<DWORD,DWORD>{IDC_COMPARE,IDC_STOP},{IDC_SYNCHRONIZE,IDC_STOP_SYNC}}) {
             const auto& start=control(pair.first);const auto& stop=control(pair.second);
             Check(stop.y==start.y && stop.x==start.x+start.width && stop.height==start.height,"joined native start/Stop parts without a gap");
@@ -107,9 +110,13 @@ void Test(int dialog)
         Check(control(IDCANCEL).x+control(IDCANCEL).width==width-8,"Close in top-right operation group");
         for(DWORD id:{IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT}) {
             const auto& filter=control(id);
-            Check((filter.style&BS_ICON)!=0 && (filter.style&WS_TABSTOP)!=0 && filter.width<=20 && !filter.text.empty(),
+            Check((filter.style&BS_ICON)!=0 && (filter.style&BS_PUSHLIKE)!=0 && (filter.style&BS_TYPEMASK)==BS_CHECKBOX &&
+                (filter.style&WS_TABSTOP)!=0 && filter.width<=20 && !filter.text.empty(),
                 "compact native icon toggle retains accessible name");
         }
+        Check(control(IDC_EQUAL).y==control(IDC_DIFFERENT).y && control(IDC_EQUAL).y==control(IDC_SINGLE).y &&
+            control(IDC_TORIGHT).y==control(IDC_TOLEFT).y && control(IDC_TORIGHT).y>control(IDC_EQUAL).y &&
+            control(IDC_TORIGHT).x==control(IDC_EQUAL).x && control(IDC_TOLEFT).x==control(IDC_DIFFERENT).x,"filters in two aligned rows");
         Check(control(IDC_EQUAL).x>width/3 && control(IDC_TOLEFT).x<control(IDC_SYNCHRONIZE).x,"filters between center and operation group");
         Check(control(IDC_LIST).height>height*3/4 && control(IDC_LIST).y+control(IDC_LIST).height==control(IDC_STATUS).y && control(IDC_LIST).x==0 && control(IDC_LIST).width==width,"file list touches side edges and status bar");
         for(const auto& c:controls) Check(c.id!=IDC_ACTION && c.id!=IDC_APPLY && c.id!=IDC_SUMMARY && c.id!=IDC_COPY_NEW && c.id!=IDC_OVERWRITE && c.id!=IDC_SAVE_ORIGINALS && c.id!=IDC_DELETE_FILES && c.text!=L"Show:","secondary commands live in menus, no filter label");

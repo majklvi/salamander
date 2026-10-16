@@ -10,6 +10,7 @@
 #include "delete.h"
 #include "resource.h"
 #include "spl_gui.h"
+#include "../../third_party/darkmodelib/include/Darkmodelib.h"
 #include <thread>
 #include <memory>
 #include <algorithm>
@@ -503,28 +504,15 @@ void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color,bool centered=false)
     RestoreDC(dc,saved);
     SelectObject(dc,old);DeleteObject(pen);
 }
-LRESULT CALLBACK FilterButton(HWND window,UINT message,WPARAM w,LPARAM l,UINT_PTR id,DWORD_PTR data)
-{
-    auto* checked=reinterpret_cast<bool*>(data);
-    if(message==BM_GETCHECK) return *checked?BST_CHECKED:BST_UNCHECKED;
-    if(message==BM_SETCHECK) {
-        *checked=w==BST_CHECKED;DefSubclassProc(window,BM_SETSTATE,*checked,0);
-        InvalidateRect(window,nullptr,TRUE);return 0;
-    }
-    if(message==BM_SETSTATE && *checked) w=TRUE;
-    // Dialog default-button/focus handling can reset the native pressed bit
-    // directly, without BM_SETSTATE. Keep each toggle's independent model state.
-    if(message==WM_PAINT && *checked && !(DefSubclassProc(window,BM_GETSTATE,0,0)&BST_PUSHED))
-        DefSubclassProc(window,BM_SETSTATE,TRUE,0);
-    if(message==WM_NCDESTROY) RemoveWindowSubclass(window,FilterButton,id);
-    return DefSubclassProc(window,message,w,l);
-}
 void ButtonIcons(Preview& p)
 {
     HWND window=p.window;HDC dc=GetDC(window);int size=MulDiv(16,GetDeviceCaps(dc,LOGPIXELSX),96);
     const int ids[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT,IDC_STOP,IDC_STOP_SYNC};
     const Mark marks[]={Mark::Equal,Mark::Different,Mark::Single,Mark::Right,Mark::Left,Mark::Delete,Mark::Delete};
     for(size_t i=0;i<p.buttonIcons.size();++i) {
+        // The host helper explicitly subclasses every checkbox. Its glyph/text
+        // painter is for ordinary checkboxes, not native push-like icon toggles.
+        if(i<5) dmlib::removeCheckboxOrRadioBtnCtrlSubclass(GetDlgItem(window,ids[i]));
         BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=size;
         info.bmiHeader.biHeight=-size;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
         void* data=nullptr;HBITMAP bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&data,nullptr,0);
@@ -1350,7 +1338,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         CheckDlgButton(window, IDC_SELECTED, p->options.selection.empty() ? BST_UNCHECKED : BST_CHECKED);
         const int filters[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
         for(size_t i=0;i<p->filterChecks.size();++i) {
-            SetWindowSubclass(GetDlgItem(window,filters[i]),FilterButton,1,reinterpret_cast<DWORD_PTR>(&p->filterChecks[i]));
+            p->filterChecks[i]=true;
             CheckDlgButton(window,filters[i],BST_CHECKED);
         }
         HWND list = GetDlgItem(window, IDC_LIST);
@@ -1379,6 +1367,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         ConfigureDark(window);ButtonIcons(*p); Tooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
+    if(message==WM_CTLCOLORBTN && (GetWindowLongPtrW(reinterpret_cast<HWND>(l),GWL_STYLE)&BS_PUSHLIKE)) {
+        // Keep the native push-like painter; the general color helper would
+        // reinstall the ordinary checkbox subclass during every paint.
+        HDC dc=reinterpret_cast<HDC>(w);SetBkMode(dc,TRANSPARENT);
+        return reinterpret_cast<INT_PTR>(backgroundBrush?backgroundBrush:GetSysColorBrush(COLOR_BTNFACE));
+    }
     LRESULT brush = 0;
     if (dark && DarkModeHandleCtlColor(message, w, l, brush)) return brush;
     switch (message)
@@ -1411,10 +1405,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_COMPARE || id == IDC_STOP || id == IDC_SYNCHRONIZE || id == IDC_STOP_SYNC || id == IDCANCEL) {r.left+=dx;r.right+=dx;}
                 else if (id==IDC_EQUAL || id==IDC_DIFFERENT || id==IDC_SINGLE || id==IDC_TORIGHT || id==IDC_TOLEFT)
                 {r.left+=dx/2;r.right+=dx/2;}
-                MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
+                MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, FALSE);
             }
         }
         SizeStatus(window);
+        // Erase exposed old child bounds as well as repainting the moved controls.
+        RedrawWindow(window,nullptr,nullptr,RDW_INVALIDATE|RDW_ERASE|RDW_ALLCHILDREN);
         return TRUE;
     case WM_TIMER: Status(*p); return TRUE;
     case Done:
@@ -1496,7 +1492,13 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_DELETE_FILES: ValidatePreview(*p,Preview::Intent::Delete); return TRUE;
         case IDC_EQUAL: case IDC_DIFFERENT: case IDC_SINGLE: case IDC_TORIGHT: case IDC_TOLEFT:
             if (!p->running && HIWORD(w)==BN_CLICKED) {
-                CheckDlgButton(window,LOWORD(w),Checked(window,LOWORD(w))?BST_UNCHECKED:BST_CHECKED);Filter(*p);
+                const int filters[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
+                for(size_t i=0;i<p->filterChecks.size();++i) if(filters[i]==LOWORD(w)) {
+                    p->filterChecks[i]=!p->filterChecks[i];
+                    CheckDlgButton(window,filters[i],p->filterChecks[i]?BST_CHECKED:BST_UNCHECKED);
+                    break;
+                }
+                Filter(*p);
             }
             return TRUE;
         case IDC_SELECTED: case IDC_RECURSIVE: case IDC_CONTENT: case IDC_IGNORE: case IDC_ASYMMETRIC: case IDC_EMPTY:

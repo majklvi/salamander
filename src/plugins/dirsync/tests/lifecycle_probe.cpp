@@ -112,14 +112,18 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
 {
     struct Template {DLGTEMPLATE dialog;WORD menu=0,cls=0,title=0;} dialog{};
     dialog.dialog.style=WS_POPUP;dialog.dialog.cx=610;dialog.dialog.cy=470;
-    HWND window=CreateDialogIndirectParamW(GetModuleHandleW(nullptr),&dialog.dialog,nullptr,EmptyDialog,0);
+    auto procedure=+[](HWND window,UINT message,WPARAM w,LPARAM l)->INT_PTR {
+        return message==WM_COMMAND?DialogBody(window,message,w,l):FALSE;
+    };
+    HWND window=CreateDialogIndirectParamW(GetModuleHandleW(nullptr),&dialog.dialog,nullptr,procedure,0);
     if(!window) return FALSE;
     bool ok=true;Preview p;p.window=window;p.left=left;p.right=right;p.panelLeft=L"panel-left";p.panelRight=L"panel-right";
     SetWindowLongPtrW(window,DWLP_USER,reinterpret_cast<LONG_PTR>(&p));
     const int filters[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
     for(size_t i=0;i<5;++i) {
-        HWND button=CreateWindowExW(0,L"BUTTON",L"",WS_CHILD|BS_ICON,0,0,24,24,window,HMENU(INT_PTR(filters[i])),instance,nullptr);
-        ok &= button!=nullptr;SetWindowSubclass(button,FilterButton,1,reinterpret_cast<DWORD_PTR>(&p.filterChecks[i]));
+        HWND button=CreateWindowExW(0,L"BUTTON",L"",WS_CHILD|BS_CHECKBOX|BS_PUSHLIKE|BS_ICON,0,0,24,24,window,HMENU(INT_PTR(filters[i])),instance,nullptr);
+        ok &= button!=nullptr;
+        p.filterChecks[i]=true;CheckDlgButton(window,filters[i],BST_CHECKED);
     }
     for(int id:{IDC_RECURSIVE,IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_EMPTY,IDC_SELECTED})
         ok &= CreateWindowExW(0,L"BUTTON",L"",WS_CHILD|BS_AUTOCHECKBOX,0,0,20,20,window,HMENU(INT_PTR(id)),instance,nullptr)!=nullptr;
@@ -141,13 +145,23 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     ok &= PendingOptions(p) && !p.options.asymmetric && !p.options.content && !p.options.onlySelected && p.options.recursive;
     ok &= ControlText(window,IDC_LEFT)==left && ControlText(window,IDC_RIGHT)==right;
     for(unsigned bits=0;bits<32;++bits) {
-        for(size_t i=0;i<5;++i) CheckDlgButton(window,filters[i],bits&(1u<<i)?BST_CHECKED:BST_UNCHECKED);
+        // Reach every combination through native click notification delivery,
+        // not by assigning the desired model/check state directly.
+        for(size_t i=0;i<5;++i) if(p.filterChecks[i]!=((bits&(1u<<i))!=0))
+            SendDlgItemMessageW(window,filters[i],BM_CLICK,0,0);
         for(size_t i=0;i<5;++i) {
             HWND button=GetDlgItem(window,filters[i]);SendMessageW(button,WM_KILLFOCUS,0,0);SendMessageW(button,WM_PAINT,0,0);
             ok &= Checked(window,filters[i])==((bits&(1u<<i))!=0);
-            if(bits&(1u<<i)) ok &= (SendMessageW(button,BM_GETSTATE,0,0)&BST_PUSHED)!=0;
+            ok &= p.filterChecks[i]==((bits&(1u<<i))!=0);
+            ok &= (SendMessageW(button,BM_GETSTATE,0,0)&BST_PUSHED)==0;
         }
+        ok &= p.visible.size()==((bits&2u)?1u:0u) && ListView_GetItemCount(list)==int(p.visible.size());
     }
+    for(int pass=0;pass<3;++pass) for(bool enabled:{false,true}) for(int id:filters) {
+        SendDlgItemMessageW(window,id,BM_CLICK,0,0);
+        ok &= Checked(window,id)==enabled;
+    }
+    for(bool enabled:p.filterChecks) ok &= enabled;
     // Categories combine by union; direction switches further restrict copies.
     std::array<bool,5> mixed{false,true,true,true,false};
     row.action=dirsync::Action::CopyRight;ok &= RowVisible(row,mixed);

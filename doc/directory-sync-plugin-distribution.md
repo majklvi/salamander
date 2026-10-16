@@ -106,3 +106,9 @@ Po rozbalení ověřeno všech 10 hashů a přesný inventář 11 souborů. Fin�
 Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\checkbox-grid-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
 SHA256: `52d6ce87b4c937fba6118bb70d5843a2fd41242fcd55a3a2f2b29ae8a9d76d8c`.
 Po rozbalení ověřeno všech 10 hashů manifestu a přesný inventář 11 souborů. Změna upravuje pouze geometrii šesti voleb; instalace ani nastavení se nemění. Dřívější instalační ověření platí pro předchozí balíček; tento balíček nebyl nově ručně načten v GUI.
+
+## 2026-10-16 — opravené nativní filtry
+
+Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\native-filters-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
+SHA256: `2c6725dbdf7aa361967bfa0f7d13e88b155050c405fe739a0292569077da0b44`.
+Po rozbalení ověřeno všech 10 hashů manifestu a přesný inventář 11 souborů. Balíček obsahuje aktuální návod, nativní ikonové přepínače ve dvou řádcích, opravené překreslování a Close vedle operačních tlačítek. Produkční SPL a hlavní dialog s finální geometrií byly ověřeny v soukromém 0.16 x64 hostiteli s tmavým schématem; poslední resource build pouze vrátil nezměněný styl informačního dialogu. Nová čistá instalace se neopakovala.

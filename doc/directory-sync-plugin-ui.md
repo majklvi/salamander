@@ -211,3 +211,15 @@ Release x64 warnings-as-errors prošel. Resource/font sada Debug i Release: **1 
 Šest checkboxů má společné začátky sloupců 91/164/248 DU a stejné šířky v rámci každého sloupce. Rozteč řádků klesla z 18 na 13 DU; při nativní výšce 12 DU zůstává jen 1 DU mezera, stejně jako u kompaktních voleb jádra Salamanderu. Chování voleb se nemění.
 
 Release x64 warnings-as-errors a resource/font regrese Debug i Release prošly: **1 925 kontrol** v každé konfiguraci, včetně zarovnání všech tří sloupců, rozteče řádků a měření popisků/překryvů při 96/120/144/192/240 DPI. Jde o kontrolu sestavených resources a fontových metrik, nikoli nové ruční GUI ověření nebo změnu monitoru za běhu.
+
+## 2026-10-16 — nativní stav filtrů, překreslení a dva řádky
+
+Dosavadní přepínače nahrazovaly stav checkboxu trvale stisknutým stavem obyčejných tlačítek a měnily jej i ve WM_PAINT. To kolidovalo s nativní obsluhou focusu a překreslením. Pět filtrů nyní používá BS_CHECKBOX | BS_PUSHLIKE | BS_ICON; samostatný model se přepíná pouze v BN_CLICKED a nativní BST_CHECKED řídí vzhled i přístupnost. BST_PUSHED zůstává pouze přechodným stavem fyzického stisku. Odstraněn FilterButton subclass a veškeré vynucování BM_SETSTATE.
+
+V tmavém schématu helper jádra vnucoval i push-like tlačítkům kreslení běžného checkboxu. Plugin pouze u svých pěti filtrů odstraní tento subclass přes existující darkmodelib API a v WM_CTLCOLORBTN ponechá nativní themed painter; obecná obsluha ostatních ovládání zůstává. Bez změny jádra, sdíleného helperu a SDK. Při resize se ovládání přesunou bez průběžného překreslování, poté se zneplatní i staré oblasti a všechny děti. Náhled používá WS_CLIPCHILDREN.
+
+Filtry mají horní řádek = / ≠ / jednostranné a dolní → / ←. Compare a Synchronize zůstávají pod sebou se samostatnými Stop částmi, Close je vedle nich napravo. Začátek seznamu se posunul z 82 na 70 DU a seznam získal dalších 12 DU výšky.
+
+Release x64 warnings-as-errors prošel. Resource/font regrese Debug i Release: **1 926 kontrol** při 96/120/144/192/240 DPI. Lifecycle sada: **2 356 kontrol**; všech 32 kombinací se nyní dosahuje přes BM_CLICK doručené skutečnému dialogovému handleru, ověřuje se model, nativní checked stav i počet viditelných řádků, focus/paint a tři cykly vše OFF → vše ON. Dřívější test nastavoval požadované stavy přímo a nedokazoval funkčnost klikání.
+
+Computer Use, soukromý 0.16 x64 s tmavým schématem: porovnání dvou syntetických souborů; postupné vypnutí všech pěti filtrů, opětovné zapnutí myší a Alt+Q/D/N/G/H, návrat obou výsledků a všech aktivních ikon. Dvě maximalizace a návraty na původní velikost zachovaly výsledky, zarovnání i čisté pozadí bez zbytků tlačítek. Ve zvětšeném okně vypnutí Different myší a zapnutí mezerníkem obnovilo původní dva řádky. Přesunuté Close zavřelo náhled. Pokus o tažení mimo bounds byl helperem odmítnut; další tah velikost nezměnil, takže tato evidence potvrzuje resize maximalizací/obnovením, nikoli plynulý resize tahem. Světlé schéma nebylo v této etapě znovu ručně ověřeno. Bez nových GUI souborových operací, mazání složek, SMB testů a změn SDK.
