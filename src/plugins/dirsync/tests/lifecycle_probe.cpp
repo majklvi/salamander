@@ -84,8 +84,60 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeProposalRules(const wchar_
         check(PreviewHit(list.value,{10,(bounds.top+bounds.bottom)/2})==5);
         check(PreviewHit(list.value,{10,bounds.bottom+10})==-1);
         check(PreviewHit(list.value,{-1,bounds.top})==-1);
+        check(!PlanEnabled(p,PlanSummary));
+        p.result.snapshot=dirsync::Compare(left,right,p.options,p.cancel,p.progress).snapshot;
+        check(PlanEnabled(p,PlanSummary));
+        check(!PlanEnabled(p,PlanCopy) && !PlanEnabled(p,PlanOverwrite));
+        for(auto& row:p.result.rows) row.left.identified=row.right.identified=true;
+        p.visible={1};check(PlanEnabled(p,PlanCopy));
+        check(!PlanEnabled(p,PlanOverwrite) && !PlanEnabled(p,PlanSave));
+        p.visible={0};check(PlanEnabled(p,PlanOverwrite));
+        const bool keep=settings.keepOriginals;settings.keepOriginals=true;
+        bool saveOn=PlanEnabled(p,PlanSave);settings.keepOriginals=false;
+        bool saveOff=PlanEnabled(p,PlanSave);settings.keepOriginals=keep;
+        check(saveOn && !saveOff);
+        p.visible={2};p.result.rows[2].action=A::DeleteRight;
+        check(PlanEnabled(p,PlanDelete) && !PlanEnabled(p,PlanCopy));
+        p.result.stale=true;check(!PlanEnabled(p,PlanSummary) && !PlanEnabled(p,PlanDelete));p.result.stale=false;
+        p.result.cancelled=true;check(!PlanEnabled(p,PlanSummary));p.result.cancelled=false;
+        p.failed=true;check(!PlanEnabled(p,PlanDelete));p.failed=false;
+        p.running=true;check(!PlanEnabled(p,PlanSummary));p.running=false;
+        p.options.asymmetric=false;p.result.snapshot=dirsync::Compare(left,right,p.options,p.cancel,p.progress).snapshot;
+        check(!PlanEnabled(p,PlanDelete));
     } catch(...) {return 0;}
     return checks;
+}
+// Exercise the real SDK configuration callbacks without touching user registry data.
+extern "C" __declspec(dllexport) BOOL WINAPI ProbeStopControls()
+{
+    struct Template {DLGTEMPLATE dialog;WORD menu=0,cls=0,title=0;} dialog{};
+    dialog.dialog.style=WS_POPUP;dialog.dialog.cx=100;dialog.dialog.cy=80;
+    HWND window=CreateDialogIndirectParamW(GetModuleHandleW(nullptr),&dialog.dialog,nullptr,EmptyDialog,0);
+    if(!window) return FALSE;
+    bool ok=true;Preview p;p.window=window;
+    SetWindowLongPtrW(window,DWLP_USER,reinterpret_cast<LONG_PTR>(&p));
+    for(int id:{IDC_STOP,IDC_STOP_SYNC,IDC_COMPARE,IDC_SYNCHRONIZE})
+        ok &= CreateWindowExW(0,L"BUTTON",L"",WS_CHILD,0,0,30,15,window,HMENU(INT_PTR(id)),GetModuleHandleW(nullptr),nullptr)!=nullptr;
+    auto enabled=[&](int id) {return IsWindowEnabled(GetDlgItem(window,id))!=FALSE;};
+    Busy(p,false);ok &= !enabled(IDC_STOP) && !enabled(IDC_STOP_SYNC) && enabled(IDC_COMPARE) && enabled(IDC_SYNCHRONIZE);
+    for(auto intent:{Preview::Intent::None,Preview::Intent::Apply,Preview::Intent::Summary,Preview::Intent::Copy,
+        Preview::Intent::Save,Preview::Intent::Overwrite,Preview::Intent::Delete}) {
+        p.running=true;p.validating=intent!=Preview::Intent::None;p.intent=intent;p.cancel=false;
+        Busy(p,true);int activeStop=StopControl(p),inactiveStop=activeStop==IDC_STOP?IDC_STOP_SYNC:IDC_STOP;
+        const bool files=intent==Preview::Intent::Copy || intent==Preview::Intent::Save || intent==Preview::Intent::Overwrite || intent==Preview::Intent::Delete;
+        ok &= activeStop==(files?IDC_STOP_SYNC:IDC_STOP) && enabled(activeStop) && !enabled(inactiveStop);
+        ok &= !enabled(IDC_COMPARE) && !enabled(IDC_SYNCHRONIZE);
+        DialogBody(window,WM_COMMAND,inactiveStop,0);ok &= !p.cancel;
+        DialogBody(window,WM_COMMAND,activeStop,0);ok &= p.cancel;
+    }
+    p.validating=false;p.intent=Preview::Intent::None;
+    for(bool* flag:{&p.copying,&p.saving,&p.overwriting,&p.deleting}) {
+        *flag=true;Busy(p,true);ok &= enabled(IDC_STOP_SYNC) && !enabled(IDC_STOP);*flag=false;
+    }
+    p.running=false;p.cancel=false;Busy(p,false);
+    DialogBody(window,WM_COMMAND,IDC_STOP_SYNC,0);DialogBody(window,WM_COMMAND,IDC_STOP,0);
+    ok &= !p.cancel && !enabled(IDC_STOP) && !enabled(IDC_STOP_SYNC);
+    DestroyWindow(window);p.window=nullptr;return ok;
 }
 // Exercise the real SDK configuration callbacks without touching user registry data.
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
@@ -228,7 +280,7 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeDeleteFinish(unsigned mode
         if(!plugin.Release(nullptr,FALSE) && !probe->cancel && !finished) status|=1;
         if(plugin.Release(nullptr,TRUE)) status|=2;
     } else {
-        DialogBody(probe->window,(mode&256)?WM_CLOSE:WM_COMMAND,(mode&256)?0:IDC_STOP,0);
+        DialogBody(probe->window,(mode&256)?WM_CLOSE:WM_COMMAND,(mode&256)?0:IDC_STOP_SYNC,0);
         if(probe->cancel) status|=1;
         if(probe->closing==((mode&256)!=0)) status|=2;
         probe->Join();
@@ -270,7 +322,7 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeCopyCancel(BOOL close)
 {
     if(!probe) return 0;
     // Same handler called by the dialog message loop, on its owner thread.
-    DialogBody(probe->window,close?WM_CLOSE:WM_COMMAND,close?0:IDC_STOP,0);
+    DialogBody(probe->window,close?WM_CLOSE:WM_COMMAND,close?0:IDC_STOP_SYNC,0);
     unsigned status=probe->cancel?1u:0u;
     if(probe->closing==(close!=FALSE)) status|=2;
     probe->Join();

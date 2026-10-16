@@ -653,8 +653,8 @@ void Tooltips(HWND window)
     HDC dc=GetDC(window);int dpi=GetDeviceCaps(dc,LOGPIXELSX);ReleaseDC(window,dc);
     SendMessageW(tip,TTM_SETMAXTIPWIDTH,0,MulDiv(420,dpi,96));
     for(auto entry:{std::pair<int,int>{IDC_MASK,IDS_TIP_MASK},{IDC_KEEP_ORIGINALS,IDS_TIP_KEEP},{IDC_RECOVERY_ROOT,IDS_SAVE_ROOT},
-        {IDC_DELETE_FILES,IDS_TIP_DELETE},{IDC_COPY_NEW,IDS_TIP_SCOPE},{IDC_OVERWRITE,IDS_TIP_SCOPE},
-        {IDC_SAVE_ORIGINALS,IDS_TIP_SCOPE},{IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},
+        {IDC_SYNCHRONIZE,IDS_TIP_SCOPE},{IDC_STOP,IDS_TIP_STOP_COMPARE},{IDC_STOP_SYNC,IDS_TIP_STOP_SYNC},
+        {IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},
         {IDC_BROWSE_LEFT,IDS_BROWSE_LEFT},{IDC_BROWSE_RIGHT,IDS_BROWSE_RIGHT},{IDC_BROWSE_RECOVERY,IDS_BROWSE_RECOVERY},
         {IDC_EQUAL,IDS_FILTER_EQUAL},{IDC_DIFFERENT,IDS_FILTER_DIFFERENT},{IDC_SINGLE,IDS_FILTER_SINGLE},
         {IDC_TORIGHT,IDS_FILTER_RIGHT},{IDC_TOLEFT,IDS_FILTER_LEFT},{IDC_LIST,0}}) {
@@ -749,20 +749,25 @@ void Filter(Preview& p)
     InvalidateRect(GetDlgItem(p.window, IDC_LIST), nullptr, TRUE);
     Status(p);
 }
+int StopControl(const Preview& p)
+{
+    const bool files=p.copying || p.saving || p.overwriting || p.deleting ||
+        (p.validating && (p.intent==Preview::Intent::Copy || p.intent==Preview::Intent::Save ||
+            p.intent==Preview::Intent::Overwrite || p.intent==Preview::Intent::Delete));
+    return files?IDC_STOP_SYNC:IDC_STOP;
+}
 void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
-                   IDC_EMPTY, IDC_COMPARE, IDC_ACTION, IDC_APPLY, IDC_SUMMARY, IDC_EQUAL,
-                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_OVERWRITE, IDC_DELETE_FILES})
+                   IDC_EMPTY, IDC_COMPARE, IDC_SYNCHRONIZE, IDC_EQUAL,
+                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT})
         EnableWindow(GetDlgItem(p.window, id), !busy);
-    for(int id:{IDC_SAVE_ORIGINALS})
-        EnableWindow(GetDlgItem(p.window,id),!busy && settings.keepOriginals);
     EnableWindow(GetDlgItem(p.window, IDC_SELECTED), !busy && !p.options.selection.empty());
     bool locked = Checked(p.window, IDC_SELECTED);
     EnableWindow(GetDlgItem(p.window, IDC_LEFT), !busy && !locked);
     EnableWindow(GetDlgItem(p.window, IDC_RIGHT), !busy && !locked);
     for(int id:{IDC_BROWSE_LEFT,IDC_BROWSE_RIGHT}) EnableWindow(GetDlgItem(p.window,id),!busy && !locked);
-    EnableWindow(GetDlgItem(p.window, IDC_STOP), busy);
+    for(int id:{IDC_STOP,IDC_STOP_SYNC}) EnableWindow(GetDlgItem(p.window,id),busy && id==StopControl(p));
 }
 void InvalidatePlan(Preview& p)
 {
@@ -828,7 +833,7 @@ void Start(Preview& p)
     p.running = true; Busy(p, true);
     // Disabling the focused input/Compare otherwise leaves the modal dialog
     // without a keyboard target. Keep cancellation reachable during work.
-    SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_STOP)), TRUE);
+    SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, StopControl(p))), TRUE);
     try
     {
         p.worker = std::thread([&p]() {
@@ -857,11 +862,11 @@ void ValidatePreview(Preview& p, Preview::Intent intent,const std::vector<size_t
     if (!p.result.snapshot || p.result.cancelled || p.result.stale || p.failed)
     { Message(p.window, IDS_STALE); return; }
     p.requestedRows=rows?*rows:SelectedRows(p);
-    p.requestedAction=action>=0?action:int(SendDlgItemMessageW(p.window,IDC_ACTION,CB_GETCURSEL,0,0));
+    p.requestedAction=action;
     p.cancel = false; p.progress.scanned = 0; p.progress.compared = 0; p.progress.readBytes = 0;
     p.validating = true; p.intent = intent; p.running = true; p.checkedResult = {};
     Busy(p, true);
-    SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_STOP)), TRUE);
+    SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, StopControl(p))), TRUE);
     try
     {
         p.worker = std::thread([&p]() {
@@ -880,7 +885,7 @@ void ValidatePreview(Preview& p, Preview::Intent intent,const std::vector<size_t
         SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_COMPARE)), TRUE);
     }
 }
-// Values 0..4 match the existing proposal combo. Restore/reverse are menu-only.
+// Values 0..4 match Action. All proposal changes are selection-scoped menu commands.
 constexpr int RestoreProposal=5,ReverseProposal=6;
 bool Proposal(const Preview& p,size_t index,int command,dirsync::Action& action)
 {
@@ -934,9 +939,56 @@ std::wstring RowPaths(const Preview& p,const std::vector<size_t>& rows,int side)
     }
     return text;
 }
+// These commands always use the visible plan, even with no highlighted rows.
+constexpr int PlanSummary=30,PlanSave=31,PlanCopy=32,PlanOverwrite=33,PlanDelete=34;
+Preview::Intent PlanIntent(int command)
+{
+    switch(command) {
+    case PlanSummary:return Preview::Intent::Summary;case PlanSave:return Preview::Intent::Save;
+    case PlanCopy:return Preview::Intent::Copy;case PlanOverwrite:return Preview::Intent::Overwrite;
+    case PlanDelete:return Preview::Intent::Delete;default:return Preview::Intent::None;
+    }
+}
+bool PlanEnabled(const Preview& p,int command)
+{
+    if(p.running || !p.result.snapshot || p.result.stale || p.result.cancelled || p.failed) return false;
+    if(command==PlanSummary) return true;
+    if(command==PlanSave && !settings.keepOriginals) return false;
+    for(size_t index:p.visible) if(index<p.result.rows.size()) {
+        const auto& row=p.result.rows[index];
+        if(command==PlanCopy && dirsync::IsNewFileCopy(row)) return true;
+        if((command==PlanOverwrite || command==PlanSave) && dirsync::IsFileOverwrite(row)) return true;
+        if(command==PlanDelete && dirsync::SnapshotAsymmetric(p.result) && dirsync::IsFileDeletion(row)) return true;
+    }
+    return false;
+}
+void EnablePlanMenu(CGUIMenuPopupAbstract* menu,const Preview& p)
+{
+    for(int command=PlanSummary;command<=PlanDelete;++command) menu->EnableItem(command+1,FALSE,PlanEnabled(p,command));
+}
+void SynchronizeMenu(Preview& p)
+{
+    if(!gui || p.running) return;
+    MENU_TEMPLATE_ITEM items[]={{MNTT_PB,0,0,0,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_COPY_NEW,MNTS_B|MNTS_I|MNTS_A,PlanCopy+1,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_OVERWRITE,MNTS_B|MNTS_I|MNTS_A,PlanOverwrite+1,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_DELETE_FILES,MNTS_B|MNTS_I|MNTS_A,PlanDelete+1,-1,0,nullptr},
+        {MNTT_PE,0,0,0,-1,0,nullptr}};
+    auto* menu=gui->CreateMenuPopup();if(!menu) return;DWORD command=0;
+    if(menu->LoadFromTemplate(language,items,nullptr,nullptr,nullptr)) {
+        EnablePlanMenu(menu,p);RECT r{};GetWindowRect(GetDlgItem(p.window,IDC_SYNCHRONIZE),&r);
+        command=menu->Track(MENU_TRACK_RETURNCMD|MENU_TRACK_NONOTIFY,r.left,r.bottom,p.window,nullptr);
+    }
+    gui->DestroyMenuPopup(menu);
+    if(command && PlanEnabled(p,int(command)-1)) ValidatePreview(p,PlanIntent(int(command)-1));
+}
 void PreviewCommand(Preview& p,const std::vector<size_t>& rows,int command)
 {
-    if(p.running || rows.empty()) return;
+    if(p.running) return;
+    if(PlanIntent(command)!=Preview::Intent::None) {
+        if(PlanEnabled(p,command)) ValidatePreview(p,PlanIntent(command));return;
+    }
+    if(rows.empty()) return;
     if(command>=10 && command<=12) {
         auto text=RowPaths(p,rows,command-10);
         if(!text.empty() && (text.size()>INT_MAX || !general->CopyTextToClipboardW(text.c_str(),int(text.size()),FALSE,p.window)))
@@ -983,9 +1035,20 @@ void PreviewMenu(Preview& p,LPARAM position)
         {MNTT_IT,IDS_MENU_RELATIVE,MNTS_B|MNTS_I|MNTS_A,11,-1,0,nullptr},
         {MNTT_IT,IDS_MENU_FULL_LEFT,MNTS_B|MNTS_I|MNTS_A,12,-1,0,nullptr},
         {MNTT_IT,IDS_MENU_FULL_RIGHT,MNTS_B|MNTS_I|MNTS_A,13,-1,0,nullptr},
+        {MNTT_PE,0,0,0,-1,0,nullptr},
+        {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
+        {MNTT_PB,IDS_MENU_PLAN,MNTS_B|MNTS_I|MNTS_A,21,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_SUMMARY,MNTS_B|MNTS_I|MNTS_A,PlanSummary+1,-1,0,nullptr},
+        {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_COPY_NEW,MNTS_B|MNTS_I|MNTS_A,PlanCopy+1,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_OVERWRITE,MNTS_B|MNTS_I|MNTS_A,PlanOverwrite+1,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_DELETE_FILES,MNTS_B|MNTS_I|MNTS_A,PlanDelete+1,-1,0,nullptr},
+        {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_SAVE,MNTS_B|MNTS_I|MNTS_A,PlanSave+1,-1,0,nullptr},
         {MNTT_PE,0,0,0,-1,0,nullptr},{MNTT_PE,0,0,0,-1,0,nullptr}};
     auto* menu=gui->CreateMenuPopup();if(!menu) return;DWORD command=0;
     if(menu->LoadFromTemplate(language,items,nullptr,nullptr,nullptr)) {
+        if(auto* plan=menu->GetSubMenu(21,FALSE)) EnablePlanMenu(plan,p);
         for(int proposal:{0,1,2,3,RestoreProposal,ReverseProposal}) {
             bool enabled=false;dirsync::Action action{};
             if(p.result.snapshot && !p.result.stale && !p.result.cancelled && !p.failed)
@@ -1074,7 +1137,7 @@ void CopyNew(Preview& p)
     p.cancel=false; p.failed=false; p.copying=true; p.running=true; p.hasCopyReport=false;
     p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
     p.copyProgress.phase=dirsync::CopyPhase::Checking; p.copyReport={};
-    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP)),TRUE);
+    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,StopControl(p))),TRUE);
     try {
         // Freeze all visible rows, including omitted actions for an accurate report.
         const auto rows=p.visible;
@@ -1130,7 +1193,7 @@ void SaveOriginals(Preview& p)
     p.cancel=false; p.failed=false; p.saving=true; p.running=true; p.hasCopyReport=false; p.hasRecoveryReport=false;
     p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
     p.copyProgress.phase=dirsync::CopyPhase::Checking; p.recoveryReport={};
-    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP)),TRUE);
+    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,StopControl(p))),TRUE);
     try {
         const auto rows=p.visible; const auto root=p.recoveryRoot;
         p.worker=std::thread([&p,rows,root]() {
@@ -1200,7 +1263,7 @@ void Overwrite(Preview& p)
     p.transferCount=uint64_t(p.copyRows.size())*(keep?2:1);
     p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
     p.copyProgress.phase=dirsync::CopyPhase::Checking;
-    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP)),TRUE);
+    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,StopControl(p))),TRUE);
     try {
         const auto rows=p.visible;
         p.worker=std::thread([&p,rows,keep,root]() {
@@ -1267,7 +1330,7 @@ void DeleteFiles(Preview& p)
     p.transferCount=uint64_t(p.copyRows.size())*(keep?2:1);
     p.copyProgress.copied=0; p.copyProgress.verified=0; p.copyProgress.completed=0; p.copyProgress.item=0;
     p.copyProgress.phase=dirsync::CopyPhase::Checking;
-    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP)),TRUE);
+    Busy(p,true); SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,StopControl(p))),TRUE);
     try {
         const auto rows=p.visible;
         p.worker=std::thread([&p,rows,keep,root]() {
@@ -1311,8 +1374,6 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         // Column captions and actions always come from the language module.
         for (int i = 0; i < 9; ++i)
         { std::wstring title = Text(IDS_COLUMNS + i); LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH; c.pszText = &title[0]; c.cx = MulDiv(widths[i], dpi, 96); SendMessageW(list, LVM_INSERTCOLUMNW, i, LPARAM(&c)); }
-        for (int i = 0; i < 5; ++i) SendDlgItemMessageW(window, IDC_ACTION, CB_ADDSTRING, 0, LPARAM(Text(IDS_ACTION + i).c_str()));
-        SendDlgItemMessageW(window, IDC_ACTION, CB_SETCURSEL, 0, 0);
         RECT client{}, outer{}; GetClientRect(window, &client); GetWindowRect(window, &outer);
         p->initialClient = {client.right, client.bottom};
         p->minimumWindow = {outer.right - outer.left, outer.bottom - outer.top};
@@ -1333,7 +1394,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         auto* help=reinterpret_cast<HELPINFO*>(l);
         int id=help?GetDlgCtrlID(reinterpret_cast<HWND>(help->hItemHandle)):0;
         Message(window,id==IDC_MASK?IDS_TIP_MASK:id==IDC_KEEP_ORIGINALS?IDS_TIP_KEEP:
-            id==IDC_DELETE_FILES?IDS_TIP_DELETE:(id==IDC_COPY_NEW || id==IDC_OVERWRITE || id==IDC_SAVE_ORIGINALS)?IDS_TIP_SCOPE:IDS_HELP);
+            id==IDC_STOP?IDS_TIP_STOP_COMPARE:id==IDC_STOP_SYNC?IDS_TIP_STOP_SYNC:id==IDC_SYNCHRONIZE?IDS_TIP_SCOPE:IDS_HELP);
         return TRUE;
     }
     case WM_GETMINMAXINFO:
@@ -1354,9 +1415,9 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_BROWSE_RIGHT) {r.left+=dx;r.right+=dx;}
                 else if (id == IDC_RIGHT) { r.left += dx/2; r.right += dx; }
                 else if (id == IDC_RIGHT_LABEL) { r.left += dx/2; r.right += dx/2; }
-                else if (id == IDC_SAVE_ORIGINALS || id == IDC_DELETE_FILES) { r.top += dy; r.bottom += dy; }
-                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDC_OVERWRITE || id == IDCANCEL)
-                { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
+                else if (id == IDC_SYNCHRONIZE || id == IDC_STOP_SYNC || id == IDCANCEL) {r.left+=dx;r.right+=dx;}
+                else if (id==IDC_EQUAL || id==IDC_DIFFERENT || id==IDC_SINGLE || id==IDC_TORIGHT || id==IDC_TOLEFT)
+                {r.left+=dx/2;r.right+=dx/2;}
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
             }
         }
@@ -1399,7 +1460,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         else
         {
             HWND focused = GetFocus();
-            bool restoreFocus = !focused || focused == GetDlgItem(window, IDC_STOP);
+            bool restoreFocus = !focused || focused == GetDlgItem(window, IDC_STOP) || focused == GetDlgItem(window, IDC_STOP_SYNC);
             Busy(*p, false); Filter(*p);
             if (restoreFocus)
                 SendMessageW(window, WM_NEXTDLGCTL,
@@ -1431,9 +1492,10 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_COMPARE: Start(*p); return TRUE;
         case IDC_BROWSE_LEFT: BrowseFolder(window,IDC_LEFT,IDS_BROWSE_LEFT);return TRUE;
         case IDC_BROWSE_RIGHT: BrowseFolder(window,IDC_RIGHT,IDS_BROWSE_RIGHT);return TRUE;
-        case IDC_STOP: p->Stop(); Status(*p); return TRUE;
+        case IDC_STOP: case IDC_STOP_SYNC:
+            if(p->running && LOWORD(w)==StopControl(*p)) {p->Stop();Status(*p);} return TRUE;
+        case IDC_SYNCHRONIZE: SynchronizeMenu(*p);return TRUE;
         case IDCANCEL: SendMessageW(window, WM_CLOSE, 0, 0); return TRUE;
-        case IDC_APPLY: ValidatePreview(*p, Preview::Intent::Apply); return TRUE;
         case IDC_SUMMARY: ValidatePreview(*p, Preview::Intent::Summary); return TRUE;
         case IDC_COPY_NEW: ValidatePreview(*p, Preview::Intent::Copy); return TRUE;
         case IDC_SAVE_ORIGINALS: ValidatePreview(*p, Preview::Intent::Save); return TRUE;

@@ -267,7 +267,10 @@ int main()
             Check(chosen.size()>260 && folderTest && folderTest(chosen.c_str())==3,"folder picker preserves long Unicode names and expands shell aliases; missing folder is refused");
             using ProposalTest=unsigned (WINAPI*)(const wchar_t*,const wchar_t*);
             auto proposals=reinterpret_cast<ProposalTest>(GetProcAddress(module.handle,"ProbeProposalRules"));
-            Check(proposals && proposals(scan.left.c_str(),scan.right.c_str())==64,"proposal eligibility, selection scope, restore/reverse, hit testing and long Unicode path lists");
+            Check(proposals && proposals(scan.left.c_str(),scan.right.c_str())==77,"proposal eligibility, selected/visible plan scope, menu availability, restore/reverse, hit testing and long Unicode path lists");
+            using StopTest=BOOL (WINAPI*)();
+            auto stops=reinterpret_cast<StopTest>(GetProcAddress(module.handle,"ProbeStopControls"));
+            Check(stops && stops(),"only the appropriate adjacent Stop can cancel scanning, validation or file operations");
         }
         Fixture content; content.Sparse(content.left+L"\\same.bin"); content.Sparse(content.right+L"\\same.bin");
         for(int pass=0;pass<3;++pass) { Run(dll,scan,false); Run(dll,content,true); }
