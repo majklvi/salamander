@@ -21,7 +21,9 @@ Maska má krátké pole vedle všech šesti voleb skenu; delší masky lze stál
 
 Okno **Preferences** otevřete výhradně přes předvolby pluginu ve **Plugins Manager → Configure…** (Preferences podle jazyka hostitele). Náhled synchronizace nemá vlastní tlačítko konfigurace. **Show action labels** zapne text vedle symbolů a rozšíří sloupec Action; výchozí je vypnuto. Sekce **Appearance** má barvy ve dvou sloupcích a všech sedm významů je vidět současně: shoda, rozdíl, směr doprava/doleva, Skip, mazání a rozhodnutí/blokování. Každý řádek má barevné tlačítko Salamanderu a ukázku symbolu. Světlý/tmavý režim se automaticky řídí hlavním nastavením Salamanderu; v pluginu se nepřepíná. **Restore defaults** obnoví barvy aktuálního režimu. Sekce **Other settings**, oddělená vodorovnou čarou, obsahuje **Keep originals** a **Recovery folder**. **OK** uloží vzhled i tyto volby; **Cancel/Escape** rozepsané změny zahodí. Nastavení druhého režimu zůstane zachované. Volby se pamatují přes běžnou konfiguraci hostitele stejně jako uchování originálů. Tvar symbolu rozlišuje význam nezávisle na barvě a zvýrazněné položky používají barvy výběru.
 
-Dialog lze ovládat Tab/Shift+Tab. Alt+L přepíná popisky; Alt+E/D/R/F/S/T/B otevře volbu barvy příslušného řádku. Alt+U obnoví výchozí barvy vzhledu, Alt+K přepne uchování originálů a Alt+O zaměří cestu obnovy. Enter uloží a Escape zruší všechny rozepsané změny.
+Dialog lze ovládat Tab/Shift+Tab. Alt+L přepíná popisky; Alt+E/D/R/F/S/T/B otevře volbu barvy příslušného řádku. Alt+U obnoví výchozí barvy vzhledu, Alt+K přepne uchování originálů a Alt+O zaměří cestu obnovy. Alt+W přepne **Warn before discarding comparison results** v Other settings. Enter uloží a Escape zruší všechny rozepsané změny.
+
+Změna některé ze šesti voleb vedle Masks při existujících výsledcích nejprve vyžádá potvrzení **Discard comparison results?**, i když jsou všechny řádky skryté. **Cancel**, Escape, křížek i výchozí Enter ponechají původní volbu, výsledky a ruční návrhy. **Change option** změnu přijme a vyprázdní výsledky; poté spusťte nové Compare. **Do not ask again** potlačí příští dotazy pouze při potvrzení změny a pamatuje se i po restartu. Dotaz obnovíte zapnutím **Warn before discarding comparison results** v Preferences → Other settings. Pouhé filtrování výsledky neruší a neptá se. Úpravy textu masky či cest nadále zneplatňují plán přímo; toto potvrzení se týká šesti voleb skenu.
 
 ## Běžný postup
 
@@ -57,6 +59,16 @@ Obnovovací kopie jsou nezávislá data, nikoli hardlinky. Dědí oprávnění o
 - První chyba nebo Stop zastaví zbytek. Hotové kopie/přepisy/odstranění se automaticky nevracejí. Vlastní nedokončený staging se uklidí, pokud je to možné; případný zbytek je nutné prohlédnout podle ohlášené cesty. Mohou zůstat vytvořené prázdné rodičovské složky a neúplné protokoly.
 - Při OFF není v této verzi trvalý prováděcí protokol. Chyba zápisu protokolu při ON zastaví další operace, ale již provedenou změnu nevrátí. Nejde o transakční zálohování ani záruku při pádu napájení či libovolných souběžných změnách.
 - ZIP a čistá konfigurace jsou ověřené pro x64; podepsaná katalogová distribuce a celý Inno instalátor nejsou součástí tohoto ověření. Předchozí mizení registrace opravuje kratší registrační popis: hostitel 0.16 přijímá nejvýše 259 bajtů textu. Pokud starý preview plugin již zmizel z nabídky, po aktualizaci souborů jej znovu přidejte přes Plugins Manager; starší obnovy nemažte. Kontroly rozložení při více DPI nenahrazují runtime přechod mezi monitory. Podrobná evidence rozlišuje skutečné GUI testy od řízených chybových testů.
+
+## Další plán: kontextové menu výsledků
+
+Náhled souborů zatím vlastní kontextové menu nemá. Existující nabídka pro kopírování v tabulkových souhrnech je jiná funkce. Další samostatný krok:
+
+1. Na izolované sadě prozkoumat nabídku synchronizace referenčního správce souborů: dostupné příkazy a jejich aktivaci podle stavu řádku, chování pravého kliknutí oproti více zvýrazněným řádkům, prázdnému místu a klávesnici.
+2. Zdokumentovat skutečně pozorované chování, rozsah příkazů a nejmenší vhodné mapování na současné SDK 0.16. Předem neodvozovat neověřené funkce ani rozšiřovat schválený rozsah operací.
+3. Implementovat nativní nabídku včetně Shift+F10 / klávesy Menu. Ověřit zřetelné rozlišení práce s označenými řádky od operačních tlačítek pro viditelné návrhy, dále skryté/Skip/blokované položky, Unicode cesty a běžné ovládání klávesnicí.
+
+V této úpravě je menu pouze naplánované; průzkum a implementace ještě neproběhly. Mazání složek, SMB testy a změny SDK zůstávají mimo rozsah.
 
 ## Mapa dokumentace
 

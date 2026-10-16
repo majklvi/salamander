@@ -50,13 +50,18 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
     try {
         HKEY key=reinterpret_cast<HKEY>(UINT_PTR(1)); // opaque key used only by the fake SDK registry
         plugin.LoadConfiguration(nullptr,nullptr,&registry);
-        check(settings.keepOriginals && settings.recoveryRoot.empty());
+        check(settings.keepOriginals && settings.recoveryRoot.empty() && settings.confirmDiscardResults);
         std::wstring root=L"C:\\obnova-漢字\\"+std::wstring(200,L'階')+L"\\😀";
-        settings.keepOriginals=false; settings.recoveryRoot=root;
+        settings.keepOriginals=false; settings.recoveryRoot=root;settings.confirmDiscardResults=false;
         settings.actionLabels=true;settings.colors[0][2]=RGB(12,34,56);settings.colors[1][6]=RGB(98,76,54);
         plugin.SaveConfiguration(nullptr,key,&registry);
         settings={}; plugin.LoadConfiguration(nullptr,key,&registry);
         check(!settings.keepOriginals && settings.recoveryRoot==root);
+        check(!settings.confirmDiscardResults);
+        registry.values["ConfirmDiscardResults"].bytes={2,0,0,0};
+        plugin.LoadConfiguration(nullptr,key,&registry);check(settings.confirmDiscardResults);
+        plugin.SaveConfiguration(nullptr,key,&registry);settings.confirmDiscardResults=false;
+        plugin.LoadConfiguration(nullptr,key,&registry);check(settings.confirmDiscardResults);
         check(settings.actionLabels && settings.colors[0][2]==RGB(12,34,56) && settings.colors[1][6]==RGB(98,76,54));
         registry.values["ActionLabels"].bytes={2,0,0,0};
         registry.values["DarkColorsV1"].bytes={0,0,0,0};

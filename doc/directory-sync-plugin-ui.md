@@ -115,3 +115,27 @@ Náhled už nemá checkbox obnovy ani její editor; seznam získal 44 DU výšky
 Release x64 build prošel. Debug i Release resource testy mají 2122 kontrol při 96/120/144/192/240 font DPI, včetně dvou sloupců, oddělení nastavení a nepřítomnosti obnovovacích ovladačů v náhledu. Release lifecycle prošlo 2343 kontrolami včetně existujícího round trip nastavení a dlouhých Unicode cest.
 
 Computer Use v soukromém preferences-20261016-host (Samandarin 0.16 x64, hlavní tmavé schéma) ověřilo obě čáry, dvě kolony, sedm barevných ovladačů a samostatnou sekci obnovy. Alt+K vypnulo obnovu a znepřístupnilo editor; Escape a nové otevření zachovalo původní ON. Nová cesta obnova-žluťoučký-漢字 byla uložena Enterem. Náhled nastavení neobsahoval, Compare vytvořilo jeden návrh přepisu; jeho potvrzení ukázalo ON a po maximalizaci celou přesnou novou Unicode cestu. Potvrzení bylo zrušeno, žádná souborová operace se neprovedla. Soubory source/target i obnovovací složka zůstaly beze změny. Bez úklidu záloh, mazání složek, SMB a změn SDK.
+## 2026-10-16 — úplné tooltipy a potvrzení zahození výsledků
+
+V Preferences se dlouhé statické tooltipy předávají jako úplné Unicode řetězce s životností svázanou s oknem tooltipu, místo odkazu na string resource. Maximální šířka pro zalamování se přepočítává podle DPI. V GUI bylo ověřeno celé znění Keep originals včetně závěru „existing backups are kept.“ a Recovery folder včetně „plugin preferences.“; samostatné popup snímky i text přístupnosti obsahovaly konec obou textů. Popup může přesahovat úzké Preferences; nejde o text omezený hranicí tohoto dialogu.
+
+Změna Subfolders, By content, Ignore date, Asymmetric, Panel selection nebo Empty folders při neprázdných výsledcích nyní předchází dialog Discard comparison results?. Původní stav auto-checkboxu je před dotazem obnoven. Jen Change option aplikuje požadovanou změnu a zneplatní plán. Cancel, výchozí Enter, Escape, křížek nebo neúspěšné vytvoření dialogu nechají volbu i výsledky zachované. Dotaz se řídí všemi řádky, nikoli pouze viditelnými. Do not ask again se ukládá pouze s potvrzenou změnou. Preferences → Other settings → Warn before discarding comparison results jej znovu zapne; výchozí stav je ON. Filtry nemění plán a dotaz nevyvolávají. Textové editace masky a kořenů zůstávají mimo tuto změnu.
+
+Skutečný Computer Use průchod v izolovaném Samandarinu 0.16 x64: C:\Samandarin\builds\dirsync-distribution\discard-warning-20261016-host. Dvojice equal.txt a same-漢字.txt měla shodu a návrh kopie doprava. Nebyla provedena žádná operace nad daty.
+
+| Případ | Pozorovaný výsledek |
+| --- | --- |
+| Ruční Skip na Unicode řádku; změna Subfolders; Enter | Cancel zachoval Subfolders ON, oba řádky a ruční Skip. |
+| Filtry Equal a Different vypnuty | Rows 2 / visible 0 / hidden 2, bez dotazu a bez ztráty plánu. |
+| By content při všech skrytých výsledcích; Do not ask again; Escape | Dotaz se zobrazil; výsledky zůstaly skryté, By content OFF. |
+| Následná změna Asymmetric | Dotaz se znovu zobrazil: předchozí Escape potlačení neuložil. |
+| Asymmetric; Do not ask again; Change option | Asymmetric ON, Rows 0; potlačení uloženo. Po novém Compare změna Ignore date zrušila plán bez dotazu. |
+| Normální restart hostitele; Configure v manageru | Plugin zůstal registrovaný; varování v Preferences OFF. V souborové konfiguraci nezávisle ověřeno ConfirmDiscardResults=0. |
+| Alt+W a Enter v Preferences | Varování obnoveno a uloženo, ostatní nastavení zachována. |
+| Označení souboru v panelu, nový náhled a Compare | Panel selection ON, uzamčené kořeny, jeden Unicode výsledek. |
+| Změna Panel selection po obnově varování; Escape | Dotaz opět funkční; původní cesty zůstaly uzamčené, výsledek zachován. |
+| Empty folders; zavření potvrzení křížkem | Empty folders OFF a původní jeden výsledek zachován. |
+
+Preferences mají 306 × 219 DU, varování 280 × 99 DU, MS Shell Dlg 8. Kompilované dialogy v Debug i Release prošly 2 506 kontrolami geometrie, úplnosti popisků, mnemonik a Tab při 96/120/144/192/240 DPI, včetně výchozího Cancel a nové volby v Preferences. Nejde o runtime přepínání mezi monitory. Release lifecycle regrese prošla 2 343 kontrolami; mock skutečných SDK callbacků zahrnuje ON/OFF/obnovení i neplatnou hodnotu ConfirmDiscardResults vedle dosavadního nastavení obnovy/vzhledu. Testovací host byl řádně ukončen; běžící uživatelské instance nebyly měněny.
+
+Kontextové menu samotných souborových výsledků bylo zařazeno do dalšího plánu v aktuálním návodu: průzkum referenčního chování, zápis pozorování a následná implementace se současným SDK. V této etapě se neimplementuje. Bez mazání složek, SMB testů a změn SDK.

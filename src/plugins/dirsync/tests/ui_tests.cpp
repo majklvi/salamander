@@ -71,8 +71,10 @@ void Test(int dialog)
         }
         if (c.id == IDC_LIST || c.id == IDC_ACTION || c.id == IDC_COMPARE || c.id == IDC_COPY_NEW ||
             c.id == IDC_RECOVERY_ROOT || c.id == IDC_SAVE_ORIGINALS || c.id == IDC_KEEP_ORIGINALS || c.id == IDC_OVERWRITE || c.id == IDC_DELETE_FILES || c.id == IDCANCEL ||
-            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_NOTES || c.id == IDOK)
+            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_NOTES || c.id == IDC_CONFIRM_DISCARD || c.id == IDC_DONT_ASK || c.id == IDOK)
             Check((c.style & WS_TABSTOP) != 0, "primary controls reachable by Tab");
+        if(dialog==IDD_DISCARD_RESULTS && c.id==IDCANCEL)
+            Check((c.style&BS_TYPEMASK)==BS_DEFPUSHBUTTON,"discard warning defaults to Cancel");
         if(c.id==IDC_STATUS) Check(c.className==L"msctls_statusbar32", "real native status bar");
         if(c.id==IDC_INFO_NOTES)
             Check((c.style&ES_READONLY)!=0 && (c.style&ES_MULTILINE)!=0 && (c.style&WS_VSCROLL)!=0,"selectable scrolling read-only details");
@@ -150,7 +152,7 @@ int main()
             int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text,n,nullptr,0,nullptr,nullptr);
             Check(bytes>0 && bytes<260,"registration metadata fits existing host UTF-8 limit including terminator");
         }
-        Test(IDD_PREVIEW); Test(IDD_INFORMATION);Test(IDD_APPEARANCE); std::cout << checks << " resource/layout checks passed\n"; return 0;
+        Test(IDD_PREVIEW); Test(IDD_INFORMATION);Test(IDD_APPEARANCE);Test(IDD_DISCARD_RESULTS); std::cout << checks << " resource/layout checks passed\n"; return 0;
     }
     catch (const std::exception& e) { std::cerr << "FAILED: " << e.what() << "\n"; return 1; }
 }

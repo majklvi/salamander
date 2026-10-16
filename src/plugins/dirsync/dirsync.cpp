@@ -36,6 +36,7 @@ Palette DefaultPalette(bool night)
 struct Settings {
     bool keepOriginals=true;
     bool actionLabels=false;
+    bool confirmDiscardResults=true;
     std::array<Palette,2> colors{DefaultPalette(false),DefaultPalette(true)};
     std::wstring recoveryRoot;
 } settings;
@@ -49,6 +50,9 @@ void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     enabled=0;
     if(registry->GetValue(key,"ActionLabels",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
         settings.actionLabels=enabled!=0;
+    enabled=1;
+    if(registry->GetValue(key,"ConfirmDiscardResults",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
+        settings.confirmDiscardResults=enabled!=0;
     for(int theme=0;theme<2;++theme) {
         Palette palette{};DWORD size=0;const char* name=theme?"DarkColorsV1":"LightColorsV1";
         if(registry->GetSize(key,name,REG_BINARY,size) && size==sizeof(palette) &&
@@ -76,7 +80,9 @@ bool StoreSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     bool appearance=registry->SetValue(key,"ActionLabels",REG_DWORD,&labels,sizeof(labels))!=FALSE;
     for(int theme=0;theme<2;++theme)
         appearance=(registry->SetValue(key,theme?"DarkColorsV1":"LightColorsV1",REG_BINARY,settings.colors[theme].data(),sizeof(Palette))!=FALSE) && appearance;
-    return mode && path && appearance;
+    DWORD confirm=settings.confirmDiscardResults?1:0;
+    bool warning=registry->SetValue(key,"ConfirmDiscardResults",REG_DWORD,&confirm,sizeof(confirm))!=FALSE;
+    return mode && path && appearance && warning;
 }
 void WINAPI SettingsCallback(BOOL load,HKEY key,CSalamanderRegistryAbstract* registry,void* param)
 {
@@ -468,6 +474,7 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
         ConfigureDark(window);appearance->theme=dark?1:0;
         CheckDlgButton(window,IDC_ACTION_LABELS,appearance->draft.actionLabels?BST_CHECKED:BST_UNCHECKED);
         CheckDlgButton(window,IDC_KEEP_ORIGINALS,appearance->draft.keepOriginals?BST_CHECKED:BST_UNCHECKED);
+        CheckDlgButton(window,IDC_CONFIRM_DISCARD,appearance->draft.confirmDiscardResults?BST_CHECKED:BST_UNCHECKED);
         SendDlgItemMessageW(window,IDC_RECOVERY_ROOT,EM_SETLIMITTEXT,32759,0);
         SetDlgItemTextW(window,IDC_RECOVERY_ROOT,appearance->draft.recoveryRoot.c_str());
         RecoveryControls(window);Tooltips(window);
@@ -513,6 +520,7 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS);
             settings.recoveryRoot=std::move(appearance->draft.recoveryRoot);
             settings.actionLabels=Checked(window,IDC_ACTION_LABELS);
+            settings.confirmDiscardResults=Checked(window,IDC_CONFIRM_DISCARD);
             settings.colors[appearance->theme]=appearance->draft.colors[appearance->theme];
             PersistSettings(window);EndDialog(window,IDOK);return TRUE;
         case IDCANCEL: EndDialog(window,IDCANCEL);return TRUE;
@@ -531,19 +539,35 @@ void ConfigureAppearance(HWND parent)
     DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_APPEARANCE),parent,AppearanceDialog,LPARAM(&appearance));
     ConfigureDark(nullptr);
 }
+LRESULT CALLBACK TooltipLifetime(HWND window,UINT message,WPARAM w,LPARAM l,UINT_PTR id,DWORD_PTR data)
+{
+    if(message==WM_NCDESTROY) {
+        RemoveWindowSubclass(window,TooltipLifetime,id);
+        delete reinterpret_cast<std::vector<std::wstring>*>(data);
+    }
+    return DefSubclassProc(window,message,w,l);
+}
 void Tooltips(HWND window)
 {
     HWND tip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
         CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,window,nullptr,instance,nullptr);
     if(!tip) return;
-    SendMessageW(tip,TTM_SETMAXTIPWIDTH,0,420);
+    auto texts=std::make_unique<std::vector<std::wstring>>();texts->reserve(11);
+    if(!SetWindowSubclass(tip,TooltipLifetime,1,reinterpret_cast<DWORD_PTR>(texts.get()))) {DestroyWindow(tip);return;}
+    auto* storage=texts.release();
+    HDC dc=GetDC(window);int dpi=GetDeviceCaps(dc,LOGPIXELSX);ReleaseDC(window,dc);
+    SendMessageW(tip,TTM_SETMAXTIPWIDTH,0,MulDiv(420,dpi,96));
     for(auto entry:{std::pair<int,int>{IDC_MASK,IDS_TIP_MASK},{IDC_KEEP_ORIGINALS,IDS_TIP_KEEP},{IDC_RECOVERY_ROOT,IDS_SAVE_ROOT},
         {IDC_DELETE_FILES,IDS_TIP_DELETE},{IDC_COPY_NEW,IDS_TIP_SCOPE},{IDC_OVERWRITE,IDS_TIP_SCOPE},
         {IDC_SAVE_ORIGINALS,IDS_TIP_SCOPE},{IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},{IDC_LIST,0}}) {
         TOOLINFOW tool{};tool.cbSize=sizeof(tool);tool.uFlags=TTF_IDISHWND|TTF_SUBCLASS;
         tool.hwnd=window;tool.uId=UINT_PTR(GetDlgItem(window,entry.first));tool.hinst=language;
         if(!tool.uId) continue;
-        tool.lpszText=entry.second?MAKEINTRESOURCEW(entry.second):LPSTR_TEXTCALLBACKW;SendMessageW(tip,TTM_ADDTOOLW,0,LPARAM(&tool));
+        // Resource-backed native tooltips can truncate long strings. Keep the
+        // complete Unicode text alive until the tooltip itself is destroyed.
+        if(entry.second) {storage->push_back(Text(entry.second));tool.lpszText=storage->back().data();}
+        else tool.lpszText=LPSTR_TEXTCALLBACKW;
+        SendMessageW(tip,TTM_ADDTOOLW,0,LPARAM(&tool));
     }
     DarkModeApplyWindow(tip);
 }
@@ -638,6 +662,38 @@ void InvalidatePlan(Preview& p)
     p.hasDeleteReport = false;
     ListView_SetItemCount(GetDlgItem(p.window, IDC_LIST), 0);
     Status(p);
+}
+struct DiscardChoice {bool suppress=false;};
+INT_PTR CALLBACK DiscardDialog(HWND window,UINT message,WPARAM w,LPARAM l)
+{
+    if(message==WM_INITDIALOG) {SetWindowLongPtrW(window,DWLP_USER,l);ConfigureDark(window);return TRUE;}
+    LRESULT brush=0;if(dark && DarkModeHandleCtlColor(message,w,l,brush)) return brush;
+    if(message==WM_CLOSE) {EndDialog(window,IDCANCEL);return TRUE;}
+    if(message==WM_COMMAND) {
+        if(LOWORD(w)==IDOK) {
+            auto* choice=reinterpret_cast<DiscardChoice*>(GetWindowLongPtrW(window,DWLP_USER));
+            choice->suppress=Checked(window,IDC_DONT_ASK);EndDialog(window,IDOK);return TRUE;
+        }
+        if(LOWORD(w)==IDCANCEL) {EndDialog(window,IDCANCEL);return TRUE;}
+    }
+    return FALSE;
+}
+bool ChangeScanOption(Preview& p,int id)
+{
+    // An auto-checkbox has already toggled when BN_CLICKED arrives. Restore
+    // its previous value before asking, including on Cancel or dialog failure.
+    bool wanted=Checked(p.window,id);
+    CheckDlgButton(p.window,id,wanted?BST_UNCHECKED:BST_CHECKED);
+    if(p.running) return false;
+    if(settings.confirmDiscardResults && !p.result.rows.empty()) {
+        DiscardChoice choice;
+        INT_PTR answer=DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_DISCARD_RESULTS),p.window,DiscardDialog,LPARAM(&choice));
+        ConfigureDark(p.window);
+        if(answer!=IDOK) return false;
+        if(choice.suppress) {settings.confirmDiscardResults=false;PersistSettings(p.window);}
+    }
+    CheckDlgButton(p.window,id,wanted?BST_CHECKED:BST_UNCHECKED);
+    return true;
 }
 void Start(Preview& p)
 {
@@ -1131,10 +1187,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_EQUAL: case IDC_DIFFERENT: case IDC_SINGLE: case IDC_TORIGHT: case IDC_TOLEFT:
             if (!p->running) Filter(*p); return TRUE;
         case IDC_SELECTED:
+            if(HIWORD(w)!=BN_CLICKED || !ChangeScanOption(*p,IDC_SELECTED)) return TRUE;
             if (Checked(window, IDC_SELECTED))
             { SetDlgItemTextW(window, IDC_LEFT, p->panelLeft.c_str()); SetDlgItemTextW(window, IDC_RIGHT, p->panelRight.c_str()); }
             Busy(*p, false); InvalidatePlan(*p); return TRUE;
         case IDC_RECURSIVE: case IDC_CONTENT: case IDC_IGNORE: case IDC_ASYMMETRIC: case IDC_EMPTY:
+            if(HIWORD(w)!=BN_CLICKED || !ChangeScanOption(*p,LOWORD(w))) return TRUE;
             InvalidatePlan(*p); return TRUE;
         case IDC_LEFT: case IDC_RIGHT: case IDC_MASK:
             if (HIWORD(w) == EN_CHANGE) InvalidatePlan(*p); return TRUE;

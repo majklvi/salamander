@@ -221,3 +221,9 @@ Navrženy běžné testy T1–T12 a první budoucí etapa pouze s kopiemi do nov
 - SMB runtime nebylo podle pokynu uživatele použito. ARM64/Win32 jsou sestavené, ale GUI běželo pouze na x64. Příslušné CI se vyhodnotí až pro publikovaný aktuální commit; lokální build není výsledek vzdáleného draft PR.
 
 Resource-only jazykový projekt má vypnuté inkrementální linkování. Při opakovaném Debug buildu MSVC 14.51 došlo k internímu pádu IMAGE::EmitRelocations. Původní zákaz v `lang_dirsync.props` přepisoval pozdější import sdíleného `lang_debug.props`; čisté sestavení toto neodhalilo. Nastavení je nyní až za importy v `lang_dirsync.vcxproj`, vyhodnocená vlastnost `LinkIncremental` je `false`. Čisté Debug buildy všech tří architektur, následný běžný x64 Build a Release x64 prošly. Sdílené props ani workflow se neměnily.
+
+## 2026-10-16 — tooltipy a ochrana aktuálního porovnání
+
+Statické tooltipy používají úplné Unicode řetězce a šířku podle DPI. Šest voleb skenu má potvrzení před zahozením existujících výsledků; Cancel zachovává také ruční návrhy a stav kořenů při Panel selection. Zapamatované potlačení dotazu lze obnovit v Preferences → Other settings. Výchozí varování je zapnuté, filtrům se nepotvrzuje. Evidence GUI a regresí: závěrečný záznam v [UI ověření](directory-sync-plugin-ui.md).
+
+Do [dalšího plánu](directory-sync-plugin.md#další-plán-kontextové-menu-výsledků) přidáno kontextové menu náhledu: nejprve prozkoumat skutečné chování referenčního správce, zdokumentovat rozsah a potom implementovat přes existující SDK. Dosavadní kontextové menu tabulkových souhrnů není kontextovým menu souborových výsledků. Průzkum ani implementace této nabídky zatím neproběhly. Bez mazání složek, SMB testů a změn SDK.
