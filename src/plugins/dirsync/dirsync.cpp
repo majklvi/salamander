@@ -442,16 +442,16 @@ void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color,bool centered=false)
 }
 struct Appearance {
     Settings draft=settings;
-    CGUIColorArrowButtonAbstract* button=nullptr;
+    int theme=0;
+    std::array<CGUIColorArrowButtonAbstract*,7> buttons{};
 };
 void AppearanceSample(HWND window,Appearance& appearance)
 {
-    int theme=int(SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_GETCURSEL,0,0));
-    int item=int(SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_GETCURSEL,0,0));
-    if(theme<0 || theme>1 || item<0 || item>6) return;
-    if(appearance.button) appearance.button->SetColor(appearance.draft.colors[theme][item],
-        theme?RGB(32,32,32):RGB(255,255,255));
-    InvalidateRect(GetDlgItem(window,IDC_COLOR_SAMPLE),nullptr,TRUE);
+    for(int item=0;item<7;++item) {
+        if(appearance.buttons[item]) appearance.buttons[item]->SetColor(appearance.draft.colors[appearance.theme][item],
+            appearance.theme?RGB(32,32,32):RGB(255,255,255));
+        InvalidateRect(GetDlgItem(window,IDC_COLOR_SAMPLE_FIRST+item),nullptr,TRUE);
+    }
 }
 INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
 {
@@ -459,47 +459,41 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
     if(message==WM_INITDIALOG) {
         appearance=reinterpret_cast<Appearance*>(l);
         SetWindowLongPtrW(window,DWLP_USER,l);
+        ConfigureDark(window);appearance->theme=dark?1:0;
         CheckDlgButton(window,IDC_ACTION_LABELS,appearance->draft.actionLabels?BST_CHECKED:BST_UNCHECKED);
-        for(int id:{IDS_THEME_LIGHT,IDS_THEME_DARK}) SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_ADDSTRING,0,LPARAM(Text(id).c_str()));
-        for(int i=0;i<7;++i) SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_ADDSTRING,0,LPARAM(Text(IDS_COLOR_FIRST+i).c_str()));
-        SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_SETCURSEL,dark?1:0,0);
-        SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_SETCURSEL,0,0);
-        if(gui) appearance->button=gui->AttachColorArrowButton(window,IDC_COLOR_BUTTON,TRUE);
-        ConfigureDark(window);AppearanceSample(window,*appearance);return TRUE;
+        for(int item=0;item<7;++item) {
+            SetDlgItemTextW(window,IDC_COLOR_BUTTON_FIRST+item,Text(IDS_COLOR_FIRST+item).c_str());
+            if(gui) appearance->buttons[item]=gui->AttachColorArrowButton(window,IDC_COLOR_BUTTON_FIRST+item,TRUE);
+        }
+        AppearanceSample(window,*appearance);return TRUE;
     }
     if(!appearance) return FALSE;
     LRESULT brush=0;if(dark && DarkModeHandleCtlColor(message,w,l,brush)) return brush;
-    if(message==WM_DRAWITEM && w==IDC_COLOR_SAMPLE) {
+    if(message==WM_DRAWITEM && w>=IDC_COLOR_SAMPLE_FIRST && w<IDC_COLOR_SAMPLE_FIRST+7) {
         auto* draw=reinterpret_cast<DRAWITEMSTRUCT*>(l);
-        int theme=int(SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_GETCURSEL,0,0));
-        int item=int(SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_GETCURSEL,0,0));
-        if(theme<0 || theme>1 || item<0 || item>6) return TRUE;
-        HBRUSH bg=CreateSolidBrush(theme?RGB(32,32,32):RGB(255,255,255));
+        int item=int(w)-IDC_COLOR_SAMPLE_FIRST;
+        HBRUSH bg=CreateSolidBrush(appearance->theme?RGB(32,32,32):RGB(255,255,255));
         FillRect(draw->hDC,&draw->rcItem,bg);DeleteObject(bg);
-        PaintMark(draw->hDC,draw->rcItem,Mark(item),appearance->draft.colors[theme][item],true);return TRUE;
+        PaintMark(draw->hDC,draw->rcItem,Mark(item),appearance->draft.colors[appearance->theme][item],true);return TRUE;
     }
     if(message==WM_CLOSE) {EndDialog(window,IDCANCEL);return TRUE;}
     if(message==WM_COMMAND) {
-        switch(LOWORD(w)) {
-        case IDC_COLOR_THEME:case IDC_COLOR_ITEM: AppearanceSample(window,*appearance);return TRUE;
-        case IDC_COLOR_RESET: {
-            int theme=int(SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_GETCURSEL,0,0));
-            if(theme>=0 && theme<2) appearance->draft.colors[theme]=DefaultPalette(theme!=0);
-            AppearanceSample(window,*appearance);return TRUE;
-        }
-        case IDC_COLOR_BUTTON: {
-            int theme=int(SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_GETCURSEL,0,0));
-            int item=int(SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_GETCURSEL,0,0));
-            if(theme<0 || theme>1 || item<0 || item>6) return TRUE;
+        int id=LOWORD(w);
+        if(id>=IDC_COLOR_BUTTON_FIRST && id<IDC_COLOR_BUTTON_FIRST+7) {
+            int item=id-IDC_COLOR_BUTTON_FIRST;
             COLORREF custom[16]{};CHOOSECOLOR choose{};choose.lStructSize=sizeof(choose);choose.hwndOwner=window;
-            choose.rgbResult=appearance->draft.colors[theme][item];choose.lpCustColors=custom;choose.Flags=CC_FULLOPEN|CC_RGBINIT;
+            choose.rgbResult=appearance->draft.colors[appearance->theme][item];choose.lpCustColors=custom;choose.Flags=CC_FULLOPEN|CC_RGBINIT;
             DarkModePrepareChooseColor(&choose);
-            if(ChooseColor(&choose)) appearance->draft.colors[theme][item]=choose.rgbResult;
+            if(ChooseColor(&choose)) appearance->draft.colors[appearance->theme][item]=choose.rgbResult;
             AppearanceSample(window,*appearance);return TRUE;
         }
+        switch(id) {
+        case IDC_COLOR_RESET:
+            appearance->draft.colors[appearance->theme]=DefaultPalette(appearance->theme!=0);
+            AppearanceSample(window,*appearance);return TRUE;
         case IDOK:
-            appearance->draft.actionLabels=Checked(window,IDC_ACTION_LABELS);
-            settings.actionLabels=appearance->draft.actionLabels;settings.colors=appearance->draft.colors;
+            settings.actionLabels=Checked(window,IDC_ACTION_LABELS);
+            settings.colors[appearance->theme]=appearance->draft.colors[appearance->theme];
             PersistSettings(window);EndDialog(window,IDOK);return TRUE;
         case IDCANCEL: EndDialog(window,IDCANCEL);return TRUE;
         }
@@ -515,7 +509,7 @@ void ConfigureAppearance(HWND parent)
 {
     Appearance appearance;
     DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_APPEARANCE),parent,AppearanceDialog,LPARAM(&appearance));
-    ConfigureDark(parent);
+    ConfigureDark(nullptr);
 }
 void PreviewTooltips(HWND window)
 {
@@ -603,7 +597,7 @@ void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
                    IDC_EMPTY, IDC_COMPARE, IDC_ACTION, IDC_APPLY, IDC_SUMMARY, IDC_EQUAL,
-                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS, IDC_OVERWRITE, IDC_DELETE_FILES, IDC_APPEARANCE})
+                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS, IDC_OVERWRITE, IDC_DELETE_FILES})
         EnableWindow(GetDlgItem(p.window, id), !busy);
     for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL,IDC_SAVE_ORIGINALS})
         EnableWindow(GetDlgItem(p.window,id),!busy && settings.keepOriginals);
@@ -1043,8 +1037,8 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_SAVE_ORIGINALS) { r.top += dy; r.bottom += dy; r.left += dx; r.right += dx; }
                 else if (id == IDC_RECOVERY_LABEL) { r.top += dy; r.bottom += dy; }
                 else if (id == IDC_KEEP_ORIGINALS || id == IDC_RECOVERY_SPACE || id == IDC_DELETE_FILES || id == IDC_DELETE_SCOPE) { r.top += dy; r.bottom += dy; }
-                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDC_OVERWRITE || id == IDCANCEL || id==IDC_APPEARANCE)
-                { r.top += dy; r.bottom += dy; if (id == IDCANCEL || id==IDC_APPEARANCE) { r.left += dx; r.right += dx; } }
+                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDC_OVERWRITE || id == IDCANCEL)
+                { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
             }
         }
@@ -1109,9 +1103,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
     case WM_COMMAND:
         switch (LOWORD(w))
         {
-        case IDC_APPEARANCE:
-            if(!p->running) { ConfigureAppearance(window);ActionColumn(window);InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,TRUE); }
-            return TRUE;
+
         case IDC_COMPARE: Start(*p); return TRUE;
         case IDC_STOP: p->Stop(); Status(*p); return TRUE;
         case IDCANCEL: SendMessageW(window, WM_CLOSE, 0, 0); return TRUE;
