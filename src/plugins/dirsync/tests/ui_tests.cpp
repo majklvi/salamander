@@ -95,6 +95,12 @@ void Test(int dialog)
         for(DWORD id:{IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_SELECTED,IDC_EMPTY})
             Check(control(id).y==control(IDC_RECURSIVE).y,"scan choices in one row");
         Check(control(IDC_MASK).y+2==control(IDC_RECURSIVE).y && control(IDC_MASK).width<=60,"compact mask shares scan row");
+        Check(control(IDC_COMPARE).y==control(IDC_MASK).y,"Compare grouped with mask and scan choices");
+        for(DWORD id:{IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT}) {
+            const auto& filter=control(id);
+            Check((filter.style&BS_ICON)!=0 && (filter.style&WS_TABSTOP)!=0 && filter.width<=20 && !filter.text.empty(),
+                "compact native icon toggle retains accessible name");
+        }
         Check(control(IDC_LIST).height>height/2,"file list gets majority of initial height");
         for(const auto& c:controls) Check(c.id!=IDC_KEEP_ORIGINALS && c.id!=IDC_RECOVERY_ROOT,"recovery settings only in preferences");
     }
@@ -128,7 +134,7 @@ void Test(int dialog)
                 MulDiv(c.x + c.width, baseX, 4), MulDiv(c.y + h, baseY, 8)};
             for (const RECT& other : bounds) { RECT intersection{}; fits &= !IntersectRect(&intersection, &box, &other); }
             bounds.push_back(box);
-            if (c.text.empty()) continue;
+            if (c.text.empty() || (c.type==0x80 && (c.style&BS_ICON))) continue;
             auto text = Caption(c.text); SIZE size{};
             Check(GetTextExtentPoint32W(dc, text.c_str(), int(text.size()), &size) != FALSE, "caption metrics");
             int padding = c.type == 0x80 ? MulDiv((c.style & 0xf) == BS_AUTOCHECKBOX ? 20 : 12, dpi, 96) : 0;

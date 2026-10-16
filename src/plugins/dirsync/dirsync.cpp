@@ -16,6 +16,7 @@
 #include <exception>
 #include <utility>
 #include <array>
+#include <climits>
 #include <shlobj.h>
 #pragma comment(lib,"comdlg32.lib")
 #pragma comment(lib,"shell32.lib")
@@ -177,7 +178,7 @@ void BrowseFolder(HWND parent,int edit,int title)
     // the legacy SDK's narrow/MAX_PATH browse boundary cannot truncate paths.
     FolderChoice choice{parent,ControlText(parent,edit),Text(title)};
     BROWSEINFOW browse{};browse.hwndOwner=parent; browse.lpszTitle=choice.title.c_str();
-    browse.ulFlags=BIF_RETURNONLYFSDIRS; browse.lpfn=FolderCallback; browse.lParam=LPARAM(&choice);
+    browse.ulFlags=BIF_RETURNONLYFSDIRS|BIF_NEWDIALOGSTYLE; browse.lpfn=FolderCallback; browse.lParam=LPARAM(&choice);
     struct FreePidl {using pointer=PIDLIST_ABSOLUTE;void operator()(pointer p) const {ILFree(p);}};
     std::unique_ptr<ITEMIDLIST_ABSOLUTE,FreePidl> item(SHBrowseForFolderW(&browse));
     ConfigureDark(parent);
@@ -392,6 +393,9 @@ struct Preview
     std::vector<size_t> requestedRows;
     int requestedAction = 0;
     std::vector<size_t> visible;
+    std::vector<dirsync::Action> defaults;
+    std::array<HICON,5> filterIcons{};
+    std::array<bool,5> filterChecks{};
     std::atomic<bool> cancel{false};
     dirsync::Progress progress;
     dirsync::CopyProgress copyProgress;
@@ -410,7 +414,7 @@ struct Preview
     SIZE initialClient{}, minimumWindow{};
     std::vector<std::pair<HWND, RECT>> controls;
     bool running = false, closing = false, failed = false, validating = false;
-    ~Preview() { Stop(); Join(); }
+    ~Preview() { Stop(); Join(); for(auto icon:filterIcons) if(icon) DestroyIcon(icon); }
     void Stop()
     {
         cancel = true;
@@ -448,7 +452,7 @@ std::wstring Cell(const dirsync::Row& row, int column)
 }
 // Draw simple geometric marks so their shape does not depend on font coverage.
 // Text remains available to accessibility clients, and selection keeps native colors.
-enum class Mark { Equal, Different, Right, Left, Skip, Delete, Warning };
+enum class Mark { Equal, Different, Right, Left, Skip, Delete, Warning, Single };
 Mark RowMark(const dirsync::Row& row,bool action)
 {
     if(!action) {
@@ -490,9 +494,51 @@ void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color,bool centered=false)
     case Mark::Delete: line(1,-4,9,4);line(1,4,9,-4);break;
     case Mark::Skip: line(3,-4,3,4);line(7,-4,7,4);break;
     case Mark::Warning: line(5,-5,5,1);line(5,3,5,5);break;
+    case Mark::Single: line(2,-5,8,-5);line(8,-5,8,5);line(8,5,2,5);line(2,5,2,-5);break;
     }
     RestoreDC(dc,saved);
     SelectObject(dc,old);DeleteObject(pen);
+}
+LRESULT CALLBACK FilterButton(HWND window,UINT message,WPARAM w,LPARAM l,UINT_PTR id,DWORD_PTR data)
+{
+    auto* checked=reinterpret_cast<bool*>(data);
+    if(message==BM_GETCHECK) return *checked?BST_CHECKED:BST_UNCHECKED;
+    if(message==BM_SETCHECK) {
+        *checked=w==BST_CHECKED;DefSubclassProc(window,BM_SETSTATE,*checked,0);
+        InvalidateRect(window,nullptr,TRUE);return 0;
+    }
+    if(message==BM_SETSTATE && *checked) w=TRUE;
+    if(message==WM_NCDESTROY) RemoveWindowSubclass(window,FilterButton,id);
+    return DefSubclassProc(window,message,w,l);
+}
+void FilterIcons(Preview& p)
+{
+    HWND window=p.window;HDC dc=GetDC(window);int size=MulDiv(16,GetDeviceCaps(dc,LOGPIXELSX),96);
+    const int ids[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
+    const Mark marks[]={Mark::Equal,Mark::Different,Mark::Single,Mark::Right,Mark::Left};
+    for(size_t i=0;i<p.filterIcons.size();++i) {
+        BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=size;
+        info.bmiHeader.biHeight=-size;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+        void* data=nullptr;HBITMAP bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&data,nullptr,0);
+        HDC memory=CreateCompatibleDC(dc);HBITMAP mask=CreateBitmap(size,size,1,1,nullptr);
+        HICON icon=nullptr;
+        if(bitmap && data && memory && mask) {
+            memset(data,0,size_t(size)*size*4);auto old=SelectObject(memory,bitmap);
+            RECT cell{0,0,size,size};PaintMark(memory,cell,marks[i],RGB(255,255,255),true);
+            SelectObject(memory,old);
+            COLORREF color=MarkColor(marks[i]==Mark::Single?Mark::Different:marks[i]);
+            DWORD pixel=0xff000000|(DWORD(GetRValue(color))<<16)|(DWORD(GetGValue(color))<<8)|GetBValue(color);
+            auto* pixels=static_cast<DWORD*>(data);
+            for(int n=0;n<size*size;++n) if(pixels[n]&0xffffff) pixels[n]=pixel;
+            ICONINFO ii{};ii.fIcon=TRUE;ii.hbmColor=bitmap;ii.hbmMask=mask;icon=CreateIconIndirect(&ii);
+        }
+        if(memory) DeleteDC(memory);if(bitmap) DeleteObject(bitmap);if(mask) DeleteObject(mask);
+        if(icon) {
+            SendDlgItemMessageW(window,ids[i],BM_SETIMAGE,IMAGE_ICON,LPARAM(icon));
+            if(p.filterIcons[i]) DestroyIcon(p.filterIcons[i]);p.filterIcons[i]=icon;
+        }
+    }
+    ReleaseDC(window,dc);
 }
 struct Appearance {
     Settings draft=settings;
@@ -601,7 +647,7 @@ void Tooltips(HWND window)
     HWND tip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
         CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,window,nullptr,instance,nullptr);
     if(!tip) return;
-    auto texts=std::make_unique<std::vector<std::wstring>>();texts->reserve(14);
+    auto texts=std::make_unique<std::vector<std::wstring>>();texts->reserve(20);
     if(!SetWindowSubclass(tip,TooltipLifetime,1,reinterpret_cast<DWORD_PTR>(texts.get()))) {DestroyWindow(tip);return;}
     auto* storage=texts.release();
     HDC dc=GetDC(window);int dpi=GetDeviceCaps(dc,LOGPIXELSX);ReleaseDC(window,dc);
@@ -609,7 +655,9 @@ void Tooltips(HWND window)
     for(auto entry:{std::pair<int,int>{IDC_MASK,IDS_TIP_MASK},{IDC_KEEP_ORIGINALS,IDS_TIP_KEEP},{IDC_RECOVERY_ROOT,IDS_SAVE_ROOT},
         {IDC_DELETE_FILES,IDS_TIP_DELETE},{IDC_COPY_NEW,IDS_TIP_SCOPE},{IDC_OVERWRITE,IDS_TIP_SCOPE},
         {IDC_SAVE_ORIGINALS,IDS_TIP_SCOPE},{IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},
-        {IDC_BROWSE_LEFT,IDS_BROWSE_LEFT},{IDC_BROWSE_RIGHT,IDS_BROWSE_RIGHT},{IDC_BROWSE_RECOVERY,IDS_BROWSE_RECOVERY},{IDC_LIST,0}}) {
+        {IDC_BROWSE_LEFT,IDS_BROWSE_LEFT},{IDC_BROWSE_RIGHT,IDS_BROWSE_RIGHT},{IDC_BROWSE_RECOVERY,IDS_BROWSE_RECOVERY},
+        {IDC_EQUAL,IDS_FILTER_EQUAL},{IDC_DIFFERENT,IDS_FILTER_DIFFERENT},{IDC_SINGLE,IDS_FILTER_SINGLE},
+        {IDC_TORIGHT,IDS_FILTER_RIGHT},{IDC_TOLEFT,IDS_FILTER_LEFT},{IDC_LIST,0}}) {
         TOOLINFOW tool{};tool.cbSize=sizeof(tool);tool.uFlags=TTF_IDISHWND|TTF_SUBCLASS;
         tool.hwnd=window;tool.uId=UINT_PTR(GetDlgItem(window,entry.first));tool.hinst=language;
         if(!tool.uId) continue;
@@ -669,6 +717,13 @@ void Status(Preview& p)
 }
 void Filter(Preview& p)
 {
+    HWND list=GetDlgItem(p.window,IDC_LIST);
+    std::vector<size_t> selected;
+    int focused=ListView_GetNextItem(list,-1,LVNI_FOCUSED);
+    size_t focus=focused>=0 && size_t(focused)<p.visible.size()?p.visible[size_t(focused)]:SIZE_MAX;
+    for(int i=ListView_GetNextItem(list,-1,LVNI_SELECTED);i>=0;i=ListView_GetNextItem(list,i,LVNI_SELECTED))
+        if(size_t(i)<p.visible.size()) selected.push_back(p.visible[size_t(i)]);
+    ListView_SetItemState(list,-1,0,LVIS_SELECTED|LVIS_FOCUSED);
     p.visible.clear();
     for (size_t i = 0; i < p.result.rows.size(); ++i)
     {
@@ -685,6 +740,12 @@ void Filter(Preview& p)
         if (show) p.visible.push_back(i);
     }
     ListView_SetItemCountEx(GetDlgItem(p.window, IDC_LIST), int(p.visible.size()), LVSICF_NOSCROLL);
+    for(size_t i=0;i<p.visible.size();++i) {
+        // Both lists retain ascending model indices; avoid quadratic Ctrl+A filtering.
+        UINT state=(std::binary_search(selected.begin(),selected.end(),p.visible[i])?LVIS_SELECTED:0)|
+            (p.visible[i]==focus?LVIS_FOCUSED:0);
+        if(state) ListView_SetItemState(list,int(i),state,LVIS_SELECTED|LVIS_FOCUSED);
+    }
     InvalidateRect(GetDlgItem(p.window, IDC_LIST), nullptr, TRUE);
     Status(p);
 }
@@ -706,7 +767,7 @@ void Busy(Preview& p, bool busy)
 void InvalidatePlan(Preview& p)
 {
     if (p.running) return;
-    p.result = {}; p.visible.clear(); p.failed = false;
+    p.result = {}; p.visible.clear(); p.defaults.clear(); p.failed = false;
     p.hasCopyReport = false;
     p.hasRecoveryReport = false;
     p.hasOverwriteReport = false;
@@ -783,16 +844,20 @@ void Start(Preview& p)
         SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_COMPARE)), TRUE);
     }
 }
-void ValidatePreview(Preview& p, Preview::Intent intent)
+std::vector<size_t> SelectedRows(const Preview& p)
+{
+    std::vector<size_t> rows;HWND list=GetDlgItem(p.window,IDC_LIST);
+    for(int i=ListView_GetNextItem(list,-1,LVNI_SELECTED);i>=0;i=ListView_GetNextItem(list,i,LVNI_SELECTED))
+        if(size_t(i)<p.visible.size()) rows.push_back(p.visible[size_t(i)]);
+    return rows;
+}
+void ValidatePreview(Preview& p, Preview::Intent intent,const std::vector<size_t>* rows=nullptr,int action=-1)
 {
     if (p.running) return;
     if (!p.result.snapshot || p.result.cancelled || p.result.stale || p.failed)
     { Message(p.window, IDS_STALE); return; }
-    p.requestedRows.clear();
-    p.requestedAction = int(SendDlgItemMessageW(p.window, IDC_ACTION, CB_GETCURSEL, 0, 0));
-    HWND list = GetDlgItem(p.window, IDC_LIST);
-    for (int i = ListView_GetNextItem(list, -1, LVNI_SELECTED); i >= 0; i = ListView_GetNextItem(list, i, LVNI_SELECTED))
-        p.requestedRows.push_back(p.visible[size_t(i)]);
+    p.requestedRows=rows?*rows:SelectedRows(p);
+    p.requestedAction=action>=0?action:int(SendDlgItemMessageW(p.window,IDC_ACTION,CB_GETCURSEL,0,0));
     p.cancel = false; p.progress.scanned = 0; p.progress.compared = 0; p.progress.readBytes = 0;
     p.validating = true; p.intent = intent; p.running = true; p.checkedResult = {};
     Busy(p, true);
@@ -815,24 +880,144 @@ void ValidatePreview(Preview& p, Preview::Intent intent)
         SendMessageW(p.window, WM_NEXTDLGCTL, WPARAM(GetDlgItem(p.window, IDC_COMPARE)), TRUE);
     }
 }
+// Values 0..4 match the existing proposal combo. Restore/reverse are menu-only.
+constexpr int RestoreProposal=5,ReverseProposal=6;
+bool Proposal(const Preview& p,size_t index,int command,dirsync::Action& action)
+{
+    if(index>=p.result.rows.size()) return false;
+    const auto& row=p.result.rows[index];
+    if(row.state==dirsync::State::Blocked || row.state==dirsync::State::Conflict ||
+        (row.hasLeft && row.left.directory) || (row.hasRight && row.right.directory)) return false;
+    if(command==RestoreProposal) {
+        if(index>=p.defaults.size()) return false;action=p.defaults[index];
+    } else if(command==ReverseProposal) {
+        if(p.options.asymmetric) return false;
+        if(row.action==dirsync::Action::CopyRight) action=dirsync::Action::CopyLeft;
+        else if(row.action==dirsync::Action::CopyLeft) action=dirsync::Action::CopyRight;
+        else return false;
+    } else {
+        if(command<0 || command>4) return false;action=static_cast<dirsync::Action>(command);
+    }
+    if(action==dirsync::Action::CopyRight && !row.hasLeft) return false;
+    if(action==dirsync::Action::CopyLeft && (!row.hasRight || p.options.asymmetric)) return false;
+    if(action==dirsync::Action::DeleteRight && (!p.options.asymmetric || !row.hasRight || row.hasLeft)) return false;
+    return action!=dirsync::Action::Blocked;
+}
+std::pair<uint64_t,uint64_t> ChangeProposals(Preview& p,const std::vector<size_t>& rows,int command)
+{
+    uint64_t changed=0,unchanged=0;
+    for (size_t index : rows)
+    {
+        dirsync::Action action{};
+        if(!Proposal(p,index,command,action) || p.result.rows[index].action==action) {++unchanged;continue;}
+        p.result.rows[index].action=action;++changed;
+    }
+    return {changed,unchanged};
+}
 void Apply(Preview& p)
 {
-    int value = p.requestedAction;
-    if (value < 0 || value > 4) return;
-    auto action = static_cast<dirsync::Action>(value);
-    bool found = false;
-    for (size_t index : p.requestedRows)
-    {
-        found = true;
-        auto& row = p.result.rows[index];
-        if (row.state == dirsync::State::Blocked || row.state == dirsync::State::Conflict) continue;
-        if (action == dirsync::Action::CopyRight && !row.hasLeft) continue;
-        if (action == dirsync::Action::CopyLeft && (!row.hasRight || p.options.asymmetric)) continue;
-        if (action == dirsync::Action::DeleteRight && (!p.options.asymmetric || !row.hasRight || row.hasLeft)) continue;
-        row.action = action;
-    }
-    if (!found) Message(p.window, IDS_SELECT_ROW);
+    const auto counts=ChangeProposals(p,p.requestedRows,p.requestedAction);
+    if(p.requestedRows.empty()) Message(p.window, IDS_SELECT_ROW);
     Filter(p);
+    wchar_t status[256]{};swprintf_s(status,Text(IDS_PROPOSALS_CHANGED).c_str(),counts.first,counts.second);StatusPane(p.window,0,status);
+}
+std::wstring RowPaths(const Preview& p,const std::vector<size_t>& rows,int side)
+{
+    std::wstring text,root;
+    if(side && !dirsync::NormalizeRoot(side==1?p.left:p.right,root)) return text;
+    for(size_t index:rows) {
+        if(index>=p.result.rows.size()) continue;const auto& row=p.result.rows[index];
+        if((side==1 && !row.hasLeft) || (side==2 && !row.hasRight)) continue;
+        if(!text.empty()) text+=L"\r\n";
+        if(side) {text+=root;if(root.back()!=L'\\') text+=L"\\";}
+        text+=row.path;
+    }
+    return text;
+}
+void PreviewCommand(Preview& p,const std::vector<size_t>& rows,int command)
+{
+    if(p.running || rows.empty()) return;
+    if(command>=10 && command<=12) {
+        auto text=RowPaths(p,rows,command-10);
+        if(!text.empty() && (text.size()>INT_MAX || !general->CopyTextToClipboardW(text.c_str(),int(text.size()),FALSE,p.window)))
+            Message(p.window,IDS_UI_CLIPBOARD_ERROR);
+    } else ValidatePreview(p,Preview::Intent::Apply,&rows,command);
+}
+int PreviewHit(HWND list,POINT point)
+{
+    RECT client{};GetClientRect(list,&client);if(!PtInRect(&client,point)) return -1;
+    int count=ListView_GetItemCount(list),first=ListView_GetTopIndex(list);
+    int end=std::min(count,first+ListView_GetCountPerPage(list)+2);
+    for(int i=first;i<end;++i) {
+        RECT row{};
+        if(ListView_GetItemRect(list,i,&row,LVIR_BOUNDS) && point.y>=row.top && point.y<row.bottom) return i;
+    }
+    return -1;
+}
+void PreviewMenu(Preview& p,LPARAM position)
+{
+    if(!gui || p.running) return;HWND list=GetDlgItem(p.window,IDC_LIST);
+    POINT point{static_cast<short>(LOWORD(position)),static_cast<short>(HIWORD(position))};
+    if(position==LPARAM(-1)) {
+        int index=ListView_GetNextItem(list,-1,LVNI_FOCUSED);RECT r{};
+        if(index>=0 && ListView_GetItemRect(list,index,&r,LVIR_BOUNDS)) point={r.left,r.bottom};else point={0,0};
+        ClientToScreen(list,&point);
+    } else {
+        POINT client=point;ScreenToClient(list,&client);
+        int index=PreviewHit(list,client);
+        if(index>=0 && !(ListView_GetItemState(list,index,LVIS_SELECTED)&LVIS_SELECTED)) {
+            ListView_SetItemState(list,-1,0,LVIS_SELECTED|LVIS_FOCUSED);
+            ListView_SetItemState(list,index,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+        }
+    }
+    const auto rows=SelectedRows(p);
+    MENU_TEMPLATE_ITEM items[]={ {MNTT_PB,0,0,0,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_RESTORE,MNTS_B|MNTS_I|MNTS_A,RestoreProposal+1,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_SKIP,MNTS_B|MNTS_I|MNTS_A,1,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_RIGHT,MNTS_B|MNTS_I|MNTS_A,2,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_LEFT,MNTS_B|MNTS_I|MNTS_A,3,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_REVERSE,MNTS_B|MNTS_I|MNTS_A,ReverseProposal+1,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_DELETE,MNTS_B|MNTS_I|MNTS_A,4,-1,0,nullptr},
+        {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
+        {MNTT_PB,IDS_MENU_PATHS,MNTS_B|MNTS_I|MNTS_A,20,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_RELATIVE,MNTS_B|MNTS_I|MNTS_A,11,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_FULL_LEFT,MNTS_B|MNTS_I|MNTS_A,12,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_FULL_RIGHT,MNTS_B|MNTS_I|MNTS_A,13,-1,0,nullptr},
+        {MNTT_PE,0,0,0,-1,0,nullptr},{MNTT_PE,0,0,0,-1,0,nullptr}};
+    auto* menu=gui->CreateMenuPopup();if(!menu) return;DWORD command=0;
+    if(menu->LoadFromTemplate(language,items,nullptr,nullptr,nullptr)) {
+        for(int proposal:{0,1,2,3,RestoreProposal,ReverseProposal}) {
+            bool enabled=false;dirsync::Action action{};
+            if(p.result.snapshot && !p.result.stale && !p.result.cancelled && !p.failed)
+                for(size_t index:rows) if(Proposal(p,index,proposal,action)) {enabled=true;break;}
+            menu->EnableItem(proposal+1,FALSE,enabled);
+        }
+        if(auto* paths=menu->GetSubMenu(20,FALSE))
+            for(int side=0;side<3;++side) paths->EnableItem(11+side,FALSE,std::any_of(rows.begin(),rows.end(),[&](size_t index) {
+                return index<p.result.rows.size() && (!side || (side==1?p.result.rows[index].hasLeft:p.result.rows[index].hasRight));
+            }));
+        command=menu->Track(MENU_TRACK_RETURNCMD|MENU_TRACK_RIGHTBUTTON|MENU_TRACK_NONOTIFY,point.x,point.y,p.window,nullptr);
+    }
+    gui->DestroyMenuPopup(menu);
+    if(command) PreviewCommand(p,rows,int(command)-1);
+}
+LRESULT CALLBACK PreviewList(HWND list,UINT message,WPARAM w,LPARAM l,UINT_PTR id,DWORD_PTR data)
+{
+    if(message==WM_RBUTTONDOWN) {
+        SetFocus(list);POINT point{static_cast<short>(LOWORD(l)),static_cast<short>(HIWORD(l))};
+        int index=PreviewHit(list,point);
+        if(index>=0 && !(ListView_GetItemState(list,index,LVIS_SELECTED)&LVIS_SELECTED)) {
+            ListView_SetItemState(list,-1,0,LVIS_SELECTED|LVIS_FOCUSED);
+            ListView_SetItemState(list,index,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+        }
+        return 0;
+    }
+    if(message==WM_RBUTTONUP) {
+        POINT point{static_cast<short>(LOWORD(l)),static_cast<short>(HIWORD(l))};ClientToScreen(list,&point);
+        SendMessageW(GetParent(list),WM_CONTEXTMENU,WPARAM(list),MAKELPARAM(point.x,point.y));return 0;
+    }
+    if(message==WM_NCDESTROY) RemoveWindowSubclass(list,PreviewList,id);
+    (void)data;return DefSubclassProc(list,message,w,l);
 }
 void Summary(Preview& p)
 {
@@ -1107,8 +1292,13 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         SetDlgItemTextW(window, IDC_MASK, L"*.*");
         CheckDlgButton(window, IDC_RECURSIVE, BST_CHECKED);
         CheckDlgButton(window, IDC_SELECTED, p->options.selection.empty() ? BST_UNCHECKED : BST_CHECKED);
-        for (int id : {IDC_EQUAL, IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT}) CheckDlgButton(window, id, BST_CHECKED);
+        const int filters[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
+        for(size_t i=0;i<p->filterChecks.size();++i) {
+            SetWindowSubclass(GetDlgItem(window,filters[i]),FilterButton,1,reinterpret_cast<DWORD_PTR>(&p->filterChecks[i]));
+            CheckDlgButton(window,filters[i],BST_CHECKED);
+        }
         HWND list = GetDlgItem(window, IDC_LIST);
+        SetWindowSubclass(list,PreviewList,1,0);
         // Existing darkmodelib opt-in forwards only this list's custom drawing
         // to the plugin, preserving the shared theming of all other controls.
         SetPropW(list,L"Salamander.DarkModeLib.CustomListView",HANDLE(1));
@@ -1132,7 +1322,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             RECT bounds{}; GetWindowRect(child, &bounds); MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&bounds), 2);
             p->controls.push_back({child, bounds});
         }
-        ConfigureDark(window); Tooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
+        ConfigureDark(window);FilterIcons(*p); Tooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
     LRESULT brush = 0;
@@ -1175,6 +1365,9 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
     case WM_TIMER: Status(*p); return TRUE;
     case Done:
         p->Join(); p->running = false; KillTimer(window, 1);
+        if(!p->validating && !p->copying && !p->saving && !p->overwriting && !p->deleting) {
+            p->defaults.clear();for(const auto& row:p->result.rows) p->defaults.push_back(row.action);
+        }
         if (p->validating) { p->result = std::move(p->checkedResult); p->validating = false; }
         if (p->copying) {
             p->copying=false; p->hasCopyReport=true; p->result.stale=true; p->result.snapshot.reset();
@@ -1227,7 +1420,10 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if (p->running) { p->closing = true; p->Stop(); }
         else { PersistSettings(window); EndDialog(window, 0); }
         return TRUE;
-    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ConfigureDark(window); return TRUE;
+    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ConfigureDark(window);FilterIcons(*p); return TRUE;
+    case WM_CONTEXTMENU:
+        if(reinterpret_cast<HWND>(w)==GetDlgItem(window,IDC_LIST)) {PreviewMenu(*p,l);return TRUE;}
+        break;
     case WM_COMMAND:
         switch (LOWORD(w))
         {
@@ -1244,7 +1440,10 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_OVERWRITE: ValidatePreview(*p,Preview::Intent::Overwrite); return TRUE;
         case IDC_DELETE_FILES: ValidatePreview(*p,Preview::Intent::Delete); return TRUE;
         case IDC_EQUAL: case IDC_DIFFERENT: case IDC_SINGLE: case IDC_TORIGHT: case IDC_TOLEFT:
-            if (!p->running) Filter(*p); return TRUE;
+            if (!p->running && HIWORD(w)==BN_CLICKED) {
+                CheckDlgButton(window,LOWORD(w),Checked(window,LOWORD(w))?BST_UNCHECKED:BST_CHECKED);Filter(*p);
+            }
+            return TRUE;
         case IDC_SELECTED:
             if(HIWORD(w)!=BN_CLICKED || !ChangeScanOption(*p,IDC_SELECTED)) return TRUE;
             if (Checked(window, IDC_SELECTED))
@@ -1258,6 +1457,18 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         }
         break;
     case WM_NOTIFY:
+        if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_KEYDOWN) {
+            auto* key=reinterpret_cast<NMLVKEYDOWN*>(l);
+            if((GetKeyState(VK_CONTROL)&0x8000) && !(GetKeyState(VK_MENU)&0x8000) && !(GetKeyState(VK_SHIFT)&0x8000)) {
+                int command=-1;
+                switch(key->wVKey) {
+                case 'D':command=RestoreProposal;break;case 'M':command=0;break;case 'L':command=1;break;
+                case 'R':command=2;break;case 'W':command=ReverseProposal;break;case 'C':command=10;break;
+                case 'A':if(!p->running) ListView_SetItemState(GetDlgItem(window,IDC_LIST),-1,LVIS_SELECTED,LVIS_SELECTED);return TRUE;
+                }
+                if(command>=0) {PreviewCommand(*p,SelectedRows(*p),command);return TRUE;}
+            }
+        }
         if(reinterpret_cast<NMHDR*>(l)->code==TTN_GETDISPINFOW) {
             auto* tip=reinterpret_cast<NMTTDISPINFOW*>(l);
             p->tipText.clear();POINT point{};GetCursorPos(&point);ScreenToClient(GetDlgItem(window,IDC_LIST),&point);

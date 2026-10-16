@@ -33,6 +33,60 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeFolderPath(const wchar_t* 
     if(FolderSelectionPath(std::wstring(expected)+L"\\missing-picker-folder",full) || !full.empty()) return 0;
     return 3;
 }
+// Check the production proposal/path helpers without executing file operations.
+extern "C" __declspec(dllexport) unsigned WINAPI ProbeProposalRules(const wchar_t* left,const wchar_t* right)
+{
+    Preview p;p.left=left;p.right=right;
+    unsigned checks=0;auto check=[&](bool ok) {if(!ok) throw std::runtime_error("proposal rule");++checks;};
+    try {
+        using A=dirsync::Action;using S=dirsync::State;
+        dirsync::Row pair;pair.hasLeft=pair.hasRight=true;pair.state=S::Different;pair.action=A::CopyRight;
+        pair.path=std::wstring(90,L'階')+L"\\"+std::wstring(90,L'長')+L"\\"+std::wstring(90,L'文')+L"\\žluťoučký-漢字.txt";
+        auto onlyLeft=pair;onlyLeft.hasRight=false;onlyLeft.state=S::LeftOnly;onlyLeft.path=L"left-漢字.txt";
+        auto onlyRight=pair;onlyRight.hasLeft=false;onlyRight.state=S::RightOnly;onlyRight.action=A::CopyLeft;onlyRight.path=L"right-ž.txt";
+        auto equal=pair;equal.state=S::Equal;equal.action=A::None;equal.path=L"equal.txt";
+        auto blocked=pair;blocked.state=S::Blocked;blocked.action=A::Blocked;
+        auto folder=onlyLeft;folder.left.directory=true;
+        p.result.rows={pair,onlyLeft,onlyRight,equal,blocked,folder};
+        for(const auto& row:p.result.rows) p.defaults.push_back(row.action);
+        A action{};
+        // Rows: two-sided, left-only, right-only, equal, blocked, directory.
+        const bool allowed[6][7]={{true,true,true,false,true,true,true},
+            {true,true,false,false,true,true,false},{true,false,true,false,true,true,false},
+            {true,true,true,false,true,true,false},{false,false,false,false,false,false,false},
+            {false,false,false,false,false,false,false}};
+        for(size_t row=0;row<6;++row) for(int command=0;command<7;++command)
+            check(Proposal(p,row,command,action)==allowed[row][command]);
+        check(!Proposal(p,99,0,action));
+        auto counts=ChangeProposals(p,{0,4,5},0);
+        check(counts.first==1 && counts.second==2);
+        check(p.result.rows[0].action==A::None && p.result.rows[1].action==A::CopyRight && p.result.rows[4].action==A::Blocked);
+        counts=ChangeProposals(p,{0},RestoreProposal);check(counts.first==1 && p.result.rows[0].action==A::CopyRight);
+        counts=ChangeProposals(p,{0},ReverseProposal);check(counts.first==1 && p.result.rows[0].action==A::CopyLeft);
+        p.options.asymmetric=true;
+        check(!Proposal(p,0,2,action) && !Proposal(p,0,ReverseProposal,action));
+        check(Proposal(p,2,3,action) && action==A::DeleteRight);
+        check(!Proposal(p,1,3,action) && !Proposal(p,0,3,action));
+        check(!Proposal(p,2,RestoreProposal,action)); // a mode change must discard old results
+        auto relative=RowPaths(p,{0,1,2},0);check(relative==pair.path+L"\r\n"+onlyLeft.path+L"\r\n"+onlyRight.path);
+        std::wstring root;check(dirsync::NormalizeRoot(left,root));
+        check(RowPaths(p,{0,1,2},1)==root+L"\\"+pair.path+L"\r\n"+root+L"\\"+onlyLeft.path);
+        check(dirsync::NormalizeRoot(right,root));
+        check(RowPaths(p,{0,1,2},2)==root+L"\\"+pair.path+L"\r\n"+root+L"\\"+onlyRight.path);
+        check(RowPaths(p,{},0).empty() && RowPaths(p,{99},1).empty() && RowPaths(p,{1},2).empty());
+        check(ChangeProposals(p,{},0).first==0);
+        INITCOMMONCONTROLSEX classes{sizeof(classes),ICC_LISTVIEW_CLASSES};check(InitCommonControlsEx(&classes)!=FALSE);
+        struct OwnedWindow {HWND value;~OwnedWindow(){if(value) DestroyWindow(value);}};
+        OwnedWindow list{CreateWindowExW(0,WC_LISTVIEWW,L"",WS_POPUP|LVS_REPORT|LVS_OWNERDATA,0,0,400,200,nullptr,nullptr,GetModuleHandleW(nullptr),nullptr)};
+        check(list.value!=nullptr);LVCOLUMNW column{};column.mask=LVCF_WIDTH;column.cx=400;
+        SendMessageW(list.value,LVM_INSERTCOLUMNW,0,LPARAM(&column));ListView_SetItemCount(list.value,6);
+        RECT bounds{};check(ListView_GetItemRect(list.value,5,&bounds,LVIR_BOUNDS)!=FALSE);
+        check(PreviewHit(list.value,{10,(bounds.top+bounds.bottom)/2})==5);
+        check(PreviewHit(list.value,{10,bounds.bottom+10})==-1);
+        check(PreviewHit(list.value,{-1,bounds.top})==-1);
+    } catch(...) {return 0;}
+    return checks;
+}
 // Exercise the real SDK configuration callbacks without touching user registry data.
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
 {

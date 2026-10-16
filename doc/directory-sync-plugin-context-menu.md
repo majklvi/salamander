@@ -1,6 +1,6 @@
 # Kontextové menu výsledků — průzkum a návrh
 
-Stav 16. října 2026. **Návrh k posouzení, menu v pluginu dosud není implementované.** Aktuální funkce a omezení popisuje [návod](directory-sync-plugin.md). Kontextová nabídka schránky v tabulkových souhrnech je samostatná existující funkce.
+Stav 16. října 2026. **První rozsah menu je implementovaný; níže zůstává původní průzkum a návrh, na konci je aktuální evidence.** Aktuální funkce a omezení popisuje [návod](directory-sync-plugin.md). Kontextová nabídka schránky v tabulkových souhrnech je samostatná existující funkce.
 
 ## Provedený průzkum
 
@@ -74,4 +74,27 @@ Pravidla rozsahu a aktivace:
 
 Prohlížení, porovnání obsahu, editace, přejmenování, kopírování vlastností, tisk a shellové nabídky doporučuji do první implementace menu nezahrnout. SDK má například `ExecuteAssociation` a `ViewFileInPluginViewer`, ale první neznamená interní View a druhá vyžaduje konkrétní prohlížecí plugin. Přímé univerzální volání interního porovnání/editoru tu nebylo nalezeno. Tyto příkazy proto potřebují nejprve konkrétní mapování na současný hostitel, včetně dlouhých Unicode cest a následného zneplatnění změněných výsledků. Není důvod kvůli nim nyní rozšiřovat SDK.
 
-Po odsouhlasení podoby menu zbývá implementovat a běžně ověřit: jeden a více řádků, pravé kliknutí na jiný řádek a do prázdna, klávesnice, filtrované/Skip/blokované položky, asymetrie, Unicode schránka a změněný snapshot. Tyto budoucí testy nejsou vydávané za hotové ověření pluginového menu. Bez mazání složek, SMB testů a změn SDK.
+Původní plán ověření první implementace zahrnoval: jeden a více řádků, pravé kliknutí na jiný řádek a do prázdna, klávesnice, filtrované/Skip/blokované položky, asymetrie, Unicode schránka a změněný snapshot. Aktuální provedené testy a jejich meze uvádí následující záznam. Bez mazání složek, SMB testů a změn SDK.
+
+## 2026-10-16 — implementace a ověření první nabídky
+
+Implementováno nativním menu současného SDK: všech šest návrhových příkazů z tabulky a podnabídka tří druhů cest, uvedené zkratky a Ctrl+A. Indexy zvýrazněných viditelných řádků se zachytí před menu a validací. Změny používají stávající background Revalidate/Apply; žádný příkaz menu nespouští executor. Výchozí akce jsou v samostatném vektoru aktuálního náhledu. Při filtrování se zvýraznění převádí podle modelových indexů, nikoli podle pořadí na obrazovce, a skryté řádky se z výběru odstraní. Pro velký výběr je převod přes binární hledání, nikoli kvadratické procházení. Dostupnost kopírování cest nevyžaduje předem sestavovat celý text schránky.
+
+Computer Use v izolovaném Samandarinu 0.16 x64, místní NTFS sada `C:\Samandarin\builds\dirsync-menu-impl-20261016`, šest logických souborových řádků:
+
+| Ověření | Výsledek |
+| --- | --- |
+| Jeden řádek / dvojice přes Shift+Down, Ctrl+L | Změna právě 1 / 2 návrhů; i shodný soubor lze explicitně označit. Ostatní návrhy zachované. |
+| Restore default z menu | U dvojice obnoveno původní Choose direction / Skip bez nového skenu. |
+| Shift+F10, Escape a pravé kliknutí do prázdna | Stejné menu; Escape beze změny; existující dvojice zůstala vybraná. |
+| Skrytí směru doprava, Ctrl+A a Ctrl+M | Tři viditelné řádky: 2 změněné, 1 už Skip. Tři skryté šipky doprava zůstaly po zobrazení zachované. Výběr se nepřenesl na jejich místa. |
+| Pravé kliknutí na jiný řádek včetně velmi dlouhého názvu | Výběr se nahradí jedním kliknutým řádkem. Původní SubItemHitTest u dlouhého názvu nedal správný výběr; finální zásah používá skutečné geometrické meze zobrazených řádků. Oprava opakovaně ověřena v GUI. |
+| Jednostranný dlouhý Unicode soubor | Chybějící směr, Reverse a pravá úplná cesta neaktivní. Copy paths → Left full paths vloženo zpět do textového pole a porovnáno: přesně **282 UTF-16 jednotek / 710 UTF-8 bajtů**. |
+| Ctrl+C nad stejným souborem | Přesná relativní cesta, **229 UTF-16 jednotek**, žádná ztráta CJK ani českého názvu. |
+| Asymetrický pravostranný soubor | Směry a Reverse neaktivní. Skip a následné Mark right-only files for deletion jen změnily návrh; fyzický soubor zůstal. |
+| Záměrná změna mtime testovacího newer.txt po skenu a Ctrl+M | Revalidace zneplatnila celý snapshot; všech šest řádků Blocked, žádná zamýšlená změna návrhu neprovedena. Menu změn neaktivní, Copy paths dostupné. |
+
+Regrese v testovací DLL zahrnuje **64 kontrol** skutečných produkčních helperů: matici způsobilosti šesti typů řádků a sedmi příkazů, chybějící strany, asymetrii, Restore/Reverse, smíšený výběr, prázdný výběr, dlouhé Unicode seznamy obou stran a zásah posledního řádku / prázdna / bodu mimo seznam. Celkem prošlo **2 354 lifecycle kontrol**. Resource/font testy Debug i Release prošly **2 477 kontrolami** při 96/120/144/192/240 font DPI; nejde o přepnutí monitoru za běhu.
+
+GUI průchod nespouštěl přenosy, přepisy ani mazání. Vytvoření prázdné složky pickerem je samostatný test níže v GUI evidenci; záměrně změněný čas newer.txt je výslovná fixture změna, ne činnost menu. Testovací hostitel byl běžně ukončen, uživatelské instance nedotčené. Runtime ostatních architektur, přechod DPI mezi monitory, klávesa Menu a všechny kombinace více vybraných cest ve skutečné schránce se tímto průchodem netestovaly; seznamy více cest mají nativní regresi. Bez mazání složek, SMB testů a změn SDK.
+Finální kontrola modulů z distribučního ZIP navíc ověřila nativní separátor a Reverse u jediného párového Unicode souboru: právě jedna změna doprava → doleva, bez přenosu dat. Viz [distribuční záznam](directory-sync-plugin-distribution.md).
