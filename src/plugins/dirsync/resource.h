@@ -1,6 +1,24 @@
 // SPDX-FileCopyrightText: 2026 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 #define IDD_PREVIEW 100
+#define IDD_APPEARANCE 102
+#define IDC_APPEARANCE 421
+#define IDC_ACTION_LABELS 422
+#define IDC_COLOR_ITEM 423
+#define IDC_COLOR_BUTTON 424
+#define IDC_COLOR_RESET 425
+#define IDC_COLOR_SAMPLE 426
+#define IDC_COLOR_THEME 427
+#define IDS_APPEARANCE 430
+#define IDS_TIP_MASK 431
+#define IDS_TIP_KEEP 432
+#define IDS_TIP_DELETE 433
+#define IDS_TIP_SCOPE 434
+#define IDS_TIP_SELECTION 435
+#define IDS_TIP_EMPTY 436
+#define IDS_COLOR_FIRST 440
+#define IDS_THEME_LIGHT 447
+#define IDS_THEME_DARK 448
 #define IDC_LEFT 101
 #define IDC_RIGHT 102
 #define IDC_MASK 103

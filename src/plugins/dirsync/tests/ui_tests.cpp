@@ -85,6 +85,7 @@ void Test(int dialog)
         Check(left.width==right.width,"equally sized root inputs");
         for(DWORD id:{IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_SELECTED,IDC_EMPTY})
             Check(control(id).y==control(IDC_RECURSIVE).y,"scan choices in one row");
+        Check(control(IDC_MASK).y+2==control(IDC_RECURSIVE).y && control(IDC_MASK).width<=60,"compact mask shares scan row");
         Check(control(IDC_LIST).height>height/2,"file list gets majority of initial height");
     }
     for (int dpi : {96, 120, 144, 192, 240})
@@ -141,7 +142,7 @@ int main()
             int bytes=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text,n,nullptr,0,nullptr,nullptr);
             Check(bytes>0 && bytes<260,"registration metadata fits existing host UTF-8 limit including terminator");
         }
-        Test(IDD_PREVIEW); Test(IDD_INFORMATION); std::cout << checks << " resource/layout checks passed\n"; return 0;
+        Test(IDD_PREVIEW); Test(IDD_INFORMATION);Test(IDD_APPEARANCE); std::cout << checks << " resource/layout checks passed\n"; return 0;
     }
     catch (const std::exception& e) { std::cerr << "FAILED: " << e.what() << "\n"; return 1; }
 }

@@ -17,37 +17,34 @@ BEGIN
     EDITTEXT IDC_LEFT, 62, 6, 236, 14, ES_AUTOHSCROLL
     LTEXT "&Right folder:", IDC_RIGHT_LABEL, 312, 9, 52, 10
     EDITTEXT IDC_RIGHT, 366, 6, 236, 14, ES_AUTOHSCROLL
-    LTEXT "&Masks:", -1, 8, 29, 52, 10
-    EDITTEXT IDC_MASK, 62, 26, 325, 14, ES_AUTOHSCROLL
-    LTEXT "Time tolerance: 3 seconds (inclusive)", -1, 398, 29, 204, 10
-    CONTROL "Sub&folders", IDC_RECURSIVE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 46, 80, 12
-    CONTROL "By c&ontent", IDC_CONTENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 95, 46, 75, 12
-    CONTROL "&Ignore date", IDC_IGNORE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 178, 46, 80, 12
-    CONTROL "&Asymmetric", IDC_ASYMMETRIC, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 266, 46, 80, 12
-    CONTROL "Scan panel &selection", IDC_SELECTED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 354, 46, 90, 12
-    CONTROL "&Empty folders", IDC_EMPTY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 452, 46, 100, 12
-    DEFPUSHBUTTON "&Compare", IDC_COMPARE, 8, 64, 70, 16
-    PUSHBUTTON "S&top", IDC_STOP, 86, 64, 60, 16
-    CONTROL "E&qual", IDC_EQUAL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 158, 66, 49, 12
-    CONTROL "&Different", IDC_DIFFERENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 209, 66, 58, 12
-    CONTROL "Si&ngle-sided", IDC_SINGLE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 269, 66, 74, 12
-    CONTROL "Left to ri&ght", IDC_TORIGHT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 345, 66, 79, 12
-    CONTROL "Rig&ht to left", IDC_TOLEFT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 426, 66, 79, 12
-    LTEXT "Operations use all visible eligible proposals, regardless of highlighted rows.", -1, 8, 84, 594, 10
-    CONTROL "", IDC_LIST, "SysListView32", LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 8, 98, 594, 246
+    LTEXT "&Masks:", -1, 8, 29, 28, 10
+    EDITTEXT IDC_MASK, 38, 26, 58, 14, ES_AUTOHSCROLL
+    CONTROL "Sub&folders", IDC_RECURSIVE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 104, 28, 71, 12
+    CONTROL "By c&ontent", IDC_CONTENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 180, 28, 70, 12
+    CONTROL "&Ignore date", IDC_IGNORE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 255, 28, 72, 12
+    CONTROL "&Asymmetric", IDC_ASYMMETRIC, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 332, 28, 77, 12
+    CONTROL "Panel &selection", IDC_SELECTED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 414, 28, 87, 12
+    CONTROL "&Empty folders", IDC_EMPTY, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 506, 28, 96, 12
+    DEFPUSHBUTTON "&Compare", IDC_COMPARE, 8, 46, 70, 16
+    PUSHBUTTON "S&top", IDC_STOP, 86, 46, 60, 16
+    CONTROL "E&qual", IDC_EQUAL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 158, 48, 49, 12
+    CONTROL "&Different", IDC_DIFFERENT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 209, 48, 58, 12
+    CONTROL "Si&ngle-sided", IDC_SINGLE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 269, 48, 74, 12
+    CONTROL "Left to ri&ght", IDC_TORIGHT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 345, 48, 79, 12
+    CONTROL "Rig&ht to left", IDC_TOLEFT, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 426, 48, 79, 12
+    CONTROL "", IDC_LIST, "SysListView32", LVS_REPORT | LVS_OWNERDATA | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 8, 70, 594, 274
     LTEXT "&Proposal:", IDC_PROPOSAL_LABEL, 8, 355, 39, 10
     COMBOBOX IDC_ACTION, 50, 352, 105, 90, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     PUSHBUTTON "Apply to highlighted ro&ws", IDC_APPLY, 162, 352, 110, 16
     PUSHBUTTON "Plan summar&y", IDC_SUMMARY, 280, 352, 90, 16
     PUSHBUTTON "Copy visible new files...", IDC_COPY_NEW, 378, 352, 115, 16
     PUSHBUTTON "Overwrite visible files...", IDC_OVERWRITE, 501, 352, 101, 16
-    CONTROL "&Keep originals (before overwrites/deletions)", IDC_KEEP_ORIGINALS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 375, 240, 12
-    LTEXT "Recovery copies use additional disk space.", IDC_RECOVERY_SPACE, 260, 376, 342, 10
+    CONTROL "&Keep originals", IDC_KEEP_ORIGINALS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 8, 375, 100, 12
     LTEXT "Recovery folder:", IDC_RECOVERY_LABEL, 8, 396, 74, 10
     EDITTEXT IDC_RECOVERY_ROOT, 86, 393, 389, 14, ES_AUTOHSCROLL
     PUSHBUTTON "Sa&ve visible originals...", IDC_SAVE_ORIGINALS, 483, 393, 119, 16
     PUSHBUTTON "Delete visible files...", IDC_DELETE_FILES, 8, 415, 115, 16
-    LTEXT "Visible right-only files in asymmetric mode. Folders are kept.", IDC_DELETE_SCOPE, 131, 418, 471, 10
+    PUSHBUTTON "Appearance...", IDC_APPEARANCE, 450, 437, 76, 16
     PUSHBUTTON "Close", IDCANCEL, 532, 437, 70, 16
     CONTROL "", IDC_STATUS, "msctls_statusbar32", SBARS_SIZEGRIP | SBARS_TOOLTIPS, 0, 454, 610, 16
 END
@@ -62,8 +59,41 @@ BEGIN
     PUSHBUTTON "&Continue", IDOK, 137, 167, 76, 14
     DEFPUSHBUTTON "Cancel", IDCANCEL, 219, 167, 74, 14
 END
+IDD_APPEARANCE DIALOGEX 0, 0, 274, 150
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Appearance"
+FONT 8, "MS Shell Dlg"
+BEGIN
+    CONTROL "Show action &labels", IDC_ACTION_LABELS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 7, 200, 12
+    LTEXT "&Palette:", -1, 7, 29, 48, 10
+    COMBOBOX IDC_COLOR_THEME, 59, 26, 208, 70, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT "&Item:", -1, 7, 51, 48, 10
+    COMBOBOX IDC_COLOR_ITEM, 59, 48, 208, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON "&Color...", IDC_COLOR_BUTTON, 7, 73, 76, 16
+    CONTROL "", IDC_COLOR_SAMPLE, "Static", SS_OWNERDRAW, 91, 73, 176, 16
+    PUSHBUTTON "&Restore defaults", IDC_COLOR_RESET, 7, 99, 100, 16
+    DEFPUSHBUTTON "OK", IDOK, 137, 127, 62, 16
+    PUSHBUTTON "Cancel", IDCANCEL, 205, 127, 62, 16
+END
 STRINGTABLE
 BEGIN
+    IDS_APPEARANCE "Appearance"
+    IDS_TIP_MASK "File masks, for example *.txt; separate masks with spaces or semicolons. Use | before exclusions."
+    IDS_TIP_KEEP "Save verified originals before overwrites and deletions. Uses additional disk space. When off, no new recovery copies are created; existing backups are kept."
+    IDS_TIP_DELETE "All visible eligible right-only files in asymmetric mode. Highlighting does not limit the operation. Hidden and Skip rows are excluded. Folders are kept."
+    IDS_TIP_SCOPE "All visible eligible proposals, regardless of highlighted rows. Hidden and Skip rows are excluded. Each operation requires confirmation."
+    IDS_TIP_SELECTION "Scan the selection originally captured from the file panels, not highlighted preview rows."
+    IDS_TIP_EMPTY "Include empty folders in the preview. Folder deletion is not supported."
+    IDS_COLOR_FIRST "Equal"
+    441 "Different"
+    442 "Copy to right"
+    443 "Copy to left"
+    444 "Skip"
+    445 "Delete"
+    446 "Decision / blocked"
+    IDS_THEME_LIGHT "Light"
+    IDS_THEME_DARK "Dark"
     IDS_UI_FIELD "Field"
     IDS_UI_VALUE "Value"
     IDS_UI_PLAN "Plan summary"

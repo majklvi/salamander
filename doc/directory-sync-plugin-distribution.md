@@ -55,3 +55,12 @@ Při startu této minimální kopie bylo nutné zavřít známé upozornění na
 Produkční Debug/Release x64 sestaveny s warnings-as-errors. **1 684 kompilovaných resource/layout kontrol** prošlo v každé konfiguraci při 96/120/144/192/240 DPI včetně nové regrese registračních metadat. U zápisových adaptérů a SDK nejsou změny, proto se neopakovala další chybová kampaň. Vzdálené CI je kontrolováno na aktuálním commitu interního draftu.
 
 Dokončena instalace rozbalením ZIP, automatická registrace, skutečné načtení po dvou běžných restartech a zapamatování ON/OFF i Unicode cesty v čisté místní konfiguraci 0.16 x64. Archiv je **nepodepsaný vývojový balíček pro ruční instalaci**, nikoli publikace do oficiálního katalogu. Katalogová metadata, podpis, celý Inno instalátor, Win32/ARM64 runtime, registry backend, nouzové ukončení a SMB nejsou tímto průchodem ověřené. První preview zůstává v rozsahu [aktuálního návodu](directory-sync-plugin.md), bez mazání složek, SMB testů a změn SDK.
+## 2026-10-16 — aktualizace vzhledu
+
+Nový aktuální x64 balíček: `C:\Samandarin\builds\dirsync-distribution\appearance-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
+
+SHA-256: `DA6F3F69B47959C7B7E53DEB370EB31B659E6D0BD2773263EBD85E4C8C601A2A`.
+
+Obsahuje kompaktní řádek masky/voleb, symboly Action a konfiguraci popisků a světlé/tmavé palety. README odpovídá aktuálnímu návodu. ZIP byl znovu rozbalen: 11 souborů, všech 10 hashů manifestu a úplnost inventáře ověřeny. Jde stále o lokální nepodepsaný vývojový ZIP pro ruční instalaci.
+
+Samandarin 0.16 x64 ve stejné izolované instalaci úspěšně načetl nové moduly a po restartu zachoval registraci i vlastní vzhled. Přístup přes Plugins Manager → Configure a uchování originálů/Unicode cesty zůstaly funkční. Podrobná evidence DPI, klávesnice, palet a Cancel je v závěrečném záznamu [UI ověření](directory-sync-plugin-ui.md). Finální barevný kontrast výběru a přísná kontrola délky uložené palety jsou součástí tohoto balíčku. Bez změn hostitele/SDK, SMB a mazání složek.

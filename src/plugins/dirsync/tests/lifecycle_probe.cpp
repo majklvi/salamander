@@ -53,9 +53,16 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
         check(settings.keepOriginals && settings.recoveryRoot.empty());
         std::wstring root=L"C:\\obnova-漢字\\"+std::wstring(200,L'階')+L"\\😀";
         settings.keepOriginals=false; settings.recoveryRoot=root;
+        settings.actionLabels=true;settings.colors[0][2]=RGB(12,34,56);settings.colors[1][6]=RGB(98,76,54);
         plugin.SaveConfiguration(nullptr,key,&registry);
         settings={}; plugin.LoadConfiguration(nullptr,key,&registry);
         check(!settings.keepOriginals && settings.recoveryRoot==root);
+        check(settings.actionLabels && settings.colors[0][2]==RGB(12,34,56) && settings.colors[1][6]==RGB(98,76,54));
+        registry.values["ActionLabels"].bytes={2,0,0,0};
+        registry.values["DarkColorsV1"].bytes={0,0,0,0};
+        registry.values["LightColorsV1"].bytes.back()=255;
+        plugin.LoadConfiguration(nullptr,key,&registry);
+        check(!settings.actionLabels && settings.colors[0]==DefaultPalette(false) && settings.colors[1]==DefaultPalette(true));
         check(registry.values["KeepOriginals"].type==REG_DWORD && registry.values["RecoveryRootUtf16"].type==REG_BINARY);
         check(WideCharToMultiByte(CP_UTF8,0,root.c_str(),-1,nullptr,0,nullptr,nullptr)>260);
         settings.recoveryRoot=L"C:\\"+std::wstring(300,L'x'); settings.keepOriginals=true;

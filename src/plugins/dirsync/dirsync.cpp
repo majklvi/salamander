@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <exception>
 #include <utility>
+#include <array>
+#pragma comment(lib,"comdlg32.lib")
 
 CSalamanderDebugAbstract* SalamanderDebug = nullptr;
 namespace
@@ -25,8 +27,16 @@ CSalamanderGUIAbstract* gui = nullptr;
 constexpr UINT Done = WM_APP + 41;
 HBRUSH backgroundBrush = nullptr;
 bool dark = false;
+using Palette = std::array<COLORREF,7>;
+Palette DefaultPalette(bool night)
+{
+    return night?Palette{RGB(109,220,144),RGB(244,209,105),RGB(109,220,144),RGB(112,190,255),RGB(185,185,185),RGB(255,148,133),RGB(255,148,133)}:
+        Palette{RGB(0,112,52),RGB(139,91,0),RGB(0,112,52),RGB(0,92,175),RGB(96,96,96),RGB(178,42,28),RGB(178,42,28)};
+}
 struct Settings {
     bool keepOriginals=true;
+    bool actionLabels=false;
+    std::array<Palette,2> colors{DefaultPalette(false),DefaultPalette(true)};
     std::wstring recoveryRoot;
 } settings;
 void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
@@ -36,6 +46,15 @@ void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     DWORD enabled=1,bytes=0;
     if(registry->GetValue(key,"KeepOriginals",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
         settings.keepOriginals=enabled!=0;
+    enabled=0;
+    if(registry->GetValue(key,"ActionLabels",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
+        settings.actionLabels=enabled!=0;
+    for(int theme=0;theme<2;++theme) {
+        Palette palette{};DWORD size=0;const char* name=theme?"DarkColorsV1":"LightColorsV1";
+        if(registry->GetSize(key,name,REG_BINARY,size) && size==sizeof(palette) &&
+            registry->GetValue(key,name,REG_BINARY,palette.data(),sizeof(palette)) &&
+            std::all_of(palette.begin(),palette.end(),[](COLORREF c){return c<=0xffffff;})) settings.colors[theme]=palette;
+    }
     // Explicit UTF-16 binary avoids the legacy SDK's byte-string/ACP boundary.
     if(registry->GetSize(key,"RecoveryRootUtf16",REG_BINARY,bytes) && bytes>=sizeof(wchar_t) &&
         bytes<=32760*sizeof(wchar_t) && bytes%sizeof(wchar_t)==0) {
@@ -53,7 +72,11 @@ bool StoreSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     bool mode=registry->SetValue(key,"KeepOriginals",REG_DWORD,&enabled,sizeof(enabled))!=FALSE;
     bool path=registry->SetValue(key,"RecoveryRootUtf16",REG_BINARY,settings.recoveryRoot.c_str(),
         DWORD((settings.recoveryRoot.size()+1)*sizeof(wchar_t)))!=FALSE;
-    return mode && path;
+    DWORD labels=settings.actionLabels?1:0;
+    bool appearance=registry->SetValue(key,"ActionLabels",REG_DWORD,&labels,sizeof(labels))!=FALSE;
+    for(int theme=0;theme<2;++theme)
+        appearance=(registry->SetValue(key,theme?"DarkColorsV1":"LightColorsV1",REG_BINARY,settings.colors[theme].data(),sizeof(Palette))!=FALSE) && appearance;
+    return mode && path && appearance;
 }
 void WINAPI SettingsCallback(BOOL load,HKEY key,CSalamanderRegistryAbstract* registry,void* param)
 {
@@ -322,7 +345,7 @@ struct Preview
     dirsync::RecoveryReport recoveryReport;
     dirsync::OverwriteReport overwriteReport;
     dirsync::DeleteReport deleteReport;
-    std::wstring recoveryRoot;
+    std::wstring recoveryRoot,tipText;
     std::vector<size_t> copyRows;
     bool copying = false, hasCopyReport = false;
     bool saving = false, hasRecoveryReport = false;
@@ -389,16 +412,13 @@ Mark RowMark(const dirsync::Row& row,bool action)
 }
 COLORREF MarkColor(Mark mark)
 {
-    if(mark==Mark::Right || mark==Mark::Equal) return dark?RGB(109,220,144):RGB(0,112,52);
-    if(mark==Mark::Left) return dark?RGB(112,190,255):RGB(0,92,175);
-    if(mark==Mark::Delete || mark==Mark::Warning) return dark?RGB(255,148,133):RGB(178,42,28);
-    if(mark==Mark::Different) return dark?RGB(244,209,105):RGB(139,91,0);
-    return dark?RGB(185,185,185):RGB(96,96,96);
+    return settings.colors[dark?1:0][size_t(mark)];
 }
-void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color)
+void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color,bool centered=false)
 {
     int dpi=GetDeviceCaps(dc,LOGPIXELSX);
     int x=cell.left+MulDiv(4,dpi,96),y=(cell.top+cell.bottom)/2;
+    if(centered) x=(cell.left+cell.right-MulDiv(10,dpi,96))/2;
     HPEN pen=CreatePen(PS_SOLID,std::max(1,MulDiv(2,dpi,96)),color);
     if(!pen) return;
     HGDIOBJ old=SelectObject(dc,pen);
@@ -419,6 +439,103 @@ void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color)
     }
     RestoreDC(dc,saved);
     SelectObject(dc,old);DeleteObject(pen);
+}
+struct Appearance {
+    Settings draft=settings;
+    CGUIColorArrowButtonAbstract* button=nullptr;
+};
+void AppearanceSample(HWND window,Appearance& appearance)
+{
+    int theme=int(SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_GETCURSEL,0,0));
+    int item=int(SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_GETCURSEL,0,0));
+    if(theme<0 || theme>1 || item<0 || item>6) return;
+    if(appearance.button) appearance.button->SetColor(appearance.draft.colors[theme][item],
+        theme?RGB(32,32,32):RGB(255,255,255));
+    InvalidateRect(GetDlgItem(window,IDC_COLOR_SAMPLE),nullptr,TRUE);
+}
+INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
+{
+    auto* appearance=reinterpret_cast<Appearance*>(GetWindowLongPtrW(window,DWLP_USER));
+    if(message==WM_INITDIALOG) {
+        appearance=reinterpret_cast<Appearance*>(l);
+        SetWindowLongPtrW(window,DWLP_USER,l);
+        CheckDlgButton(window,IDC_ACTION_LABELS,appearance->draft.actionLabels?BST_CHECKED:BST_UNCHECKED);
+        for(int id:{IDS_THEME_LIGHT,IDS_THEME_DARK}) SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_ADDSTRING,0,LPARAM(Text(id).c_str()));
+        for(int i=0;i<7;++i) SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_ADDSTRING,0,LPARAM(Text(IDS_COLOR_FIRST+i).c_str()));
+        SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_SETCURSEL,dark?1:0,0);
+        SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_SETCURSEL,0,0);
+        if(gui) appearance->button=gui->AttachColorArrowButton(window,IDC_COLOR_BUTTON,TRUE);
+        ConfigureDark(window);AppearanceSample(window,*appearance);return TRUE;
+    }
+    if(!appearance) return FALSE;
+    LRESULT brush=0;if(dark && DarkModeHandleCtlColor(message,w,l,brush)) return brush;
+    if(message==WM_DRAWITEM && w==IDC_COLOR_SAMPLE) {
+        auto* draw=reinterpret_cast<DRAWITEMSTRUCT*>(l);
+        int theme=int(SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_GETCURSEL,0,0));
+        int item=int(SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_GETCURSEL,0,0));
+        if(theme<0 || theme>1 || item<0 || item>6) return TRUE;
+        HBRUSH bg=CreateSolidBrush(theme?RGB(32,32,32):RGB(255,255,255));
+        FillRect(draw->hDC,&draw->rcItem,bg);DeleteObject(bg);
+        PaintMark(draw->hDC,draw->rcItem,Mark(item),appearance->draft.colors[theme][item],true);return TRUE;
+    }
+    if(message==WM_CLOSE) {EndDialog(window,IDCANCEL);return TRUE;}
+    if(message==WM_COMMAND) {
+        switch(LOWORD(w)) {
+        case IDC_COLOR_THEME:case IDC_COLOR_ITEM: AppearanceSample(window,*appearance);return TRUE;
+        case IDC_COLOR_RESET: {
+            int theme=int(SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_GETCURSEL,0,0));
+            if(theme>=0 && theme<2) appearance->draft.colors[theme]=DefaultPalette(theme!=0);
+            AppearanceSample(window,*appearance);return TRUE;
+        }
+        case IDC_COLOR_BUTTON: {
+            int theme=int(SendDlgItemMessageW(window,IDC_COLOR_THEME,CB_GETCURSEL,0,0));
+            int item=int(SendDlgItemMessageW(window,IDC_COLOR_ITEM,CB_GETCURSEL,0,0));
+            if(theme<0 || theme>1 || item<0 || item>6) return TRUE;
+            COLORREF custom[16]{};CHOOSECOLOR choose{};choose.lStructSize=sizeof(choose);choose.hwndOwner=window;
+            choose.rgbResult=appearance->draft.colors[theme][item];choose.lpCustColors=custom;choose.Flags=CC_FULLOPEN|CC_RGBINIT;
+            DarkModePrepareChooseColor(&choose);
+            if(ChooseColor(&choose)) appearance->draft.colors[theme][item]=choose.rgbResult;
+            AppearanceSample(window,*appearance);return TRUE;
+        }
+        case IDOK:
+            appearance->draft.actionLabels=Checked(window,IDC_ACTION_LABELS);
+            settings.actionLabels=appearance->draft.actionLabels;settings.colors=appearance->draft.colors;
+            PersistSettings(window);EndDialog(window,IDOK);return TRUE;
+        case IDCANCEL: EndDialog(window,IDCANCEL);return TRUE;
+        }
+    }
+    return FALSE;
+}
+INT_PTR CALLBACK AppearanceDialog(HWND window,UINT message,WPARAM w,LPARAM l)
+{
+    try {return AppearanceBody(window,message,w,l);}
+    catch(...) {EndDialog(window,IDCANCEL);return TRUE;}
+}
+void ConfigureAppearance(HWND parent)
+{
+    Appearance appearance;
+    DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_APPEARANCE),parent,AppearanceDialog,LPARAM(&appearance));
+    ConfigureDark(parent);
+}
+void PreviewTooltips(HWND window)
+{
+    HWND tip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
+        CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,window,nullptr,instance,nullptr);
+    if(!tip) return;
+    SendMessageW(tip,TTM_SETMAXTIPWIDTH,0,420);
+    for(auto entry:{std::pair<int,int>{IDC_MASK,IDS_TIP_MASK},{IDC_KEEP_ORIGINALS,IDS_TIP_KEEP},
+        {IDC_DELETE_FILES,IDS_TIP_DELETE},{IDC_COPY_NEW,IDS_TIP_SCOPE},{IDC_OVERWRITE,IDS_TIP_SCOPE},
+        {IDC_SAVE_ORIGINALS,IDS_TIP_SCOPE},{IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},{IDC_LIST,0}}) {
+        TOOLINFOW tool{};tool.cbSize=sizeof(tool);tool.uFlags=TTF_IDISHWND|TTF_SUBCLASS;
+        tool.hwnd=window;tool.uId=UINT_PTR(GetDlgItem(window,entry.first));tool.hinst=language;
+        tool.lpszText=entry.second?MAKEINTRESOURCEW(entry.second):LPSTR_TEXTCALLBACKW;SendMessageW(tip,TTM_ADDTOOLW,0,LPARAM(&tool));
+    }
+    DarkModeApplyWindow(tip);
+}
+void ActionColumn(HWND window)
+{
+    HDC dc=GetDC(window);int dpi=GetDeviceCaps(dc,LOGPIXELSX);ReleaseDC(window,dc);
+    ListView_SetColumnWidth(GetDlgItem(window,IDC_LIST),3,MulDiv(settings.actionLabels?145:48,dpi,96));
 }
 void StatusPane(HWND window,int part,const std::wstring& text)
 {
@@ -486,11 +603,10 @@ void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
                    IDC_EMPTY, IDC_COMPARE, IDC_ACTION, IDC_APPLY, IDC_SUMMARY, IDC_EQUAL,
-                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS, IDC_OVERWRITE, IDC_DELETE_FILES})
+                   IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT, IDC_COPY_NEW, IDC_KEEP_ORIGINALS, IDC_OVERWRITE, IDC_DELETE_FILES, IDC_APPEARANCE})
         EnableWindow(GetDlgItem(p.window, id), !busy);
     for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL,IDC_SAVE_ORIGINALS})
         EnableWindow(GetDlgItem(p.window,id),!busy && settings.keepOriginals);
-    SetDlgItemTextW(p.window,IDC_RECOVERY_SPACE,Text(settings.keepOriginals?IDS_RECOVERY_SPACE_ON:IDS_RECOVERY_SPACE_OFF).c_str());
     EnableWindow(GetDlgItem(p.window, IDC_SELECTED), !busy && !p.options.selection.empty());
     bool locked = Checked(p.window, IDC_SELECTED);
     EnableWindow(GetDlgItem(p.window, IDC_LEFT), !busy && !locked);
@@ -873,7 +989,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         // Existing darkmodelib opt-in forwards only this list's custom drawing
         // to the plugin, preserving the shared theming of all other controls.
         SetPropW(list,L"Salamander.DarkModeLib.CustomListView",HANDLE(1));
-        ListView_SetExtendedListViewStyle(list, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
+        ListView_SetExtendedListViewStyle(list, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP | LVS_EX_INFOTIP);
         int widths[] = {200, 60, 120, 145, 60, 120, 120, 250, 60};
         HDC dc = GetDC(window);
         UINT dpi = GetDeviceCaps(dc, LOGPIXELSX);
@@ -893,13 +1009,20 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             RECT bounds{}; GetWindowRect(child, &bounds); MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&bounds), 2);
             p->controls.push_back({child, bounds});
         }
-        ConfigureDark(window); SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
+        ConfigureDark(window); PreviewTooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
     LRESULT brush = 0;
     if (dark && DarkModeHandleCtlColor(message, w, l, brush)) return brush;
     switch (message)
     {
+    case WM_HELP: {
+        auto* help=reinterpret_cast<HELPINFO*>(l);
+        int id=help?GetDlgCtrlID(reinterpret_cast<HWND>(help->hItemHandle)):0;
+        Message(window,id==IDC_MASK?IDS_TIP_MASK:id==IDC_KEEP_ORIGINALS?IDS_TIP_KEEP:
+            id==IDC_DELETE_FILES?IDS_TIP_DELETE:(id==IDC_COPY_NEW || id==IDC_OVERWRITE || id==IDC_SAVE_ORIGINALS)?IDS_TIP_SCOPE:IDS_HELP);
+        return TRUE;
+    }
     case WM_GETMINMAXINFO:
         if (p->minimumWindow.cx)
         { auto* limits = reinterpret_cast<MINMAXINFO*>(l); limits->ptMinTrackSize = {p->minimumWindow.cx, p->minimumWindow.cy}; }
@@ -920,8 +1043,8 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_SAVE_ORIGINALS) { r.top += dy; r.bottom += dy; r.left += dx; r.right += dx; }
                 else if (id == IDC_RECOVERY_LABEL) { r.top += dy; r.bottom += dy; }
                 else if (id == IDC_KEEP_ORIGINALS || id == IDC_RECOVERY_SPACE || id == IDC_DELETE_FILES || id == IDC_DELETE_SCOPE) { r.top += dy; r.bottom += dy; }
-                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDC_OVERWRITE || id == IDCANCEL)
-                { r.top += dy; r.bottom += dy; if (id == IDCANCEL) { r.left += dx; r.right += dx; } }
+                else if (id == IDC_PROPOSAL_LABEL || id == IDC_ACTION || id == IDC_APPLY || id == IDC_SUMMARY || id == IDC_COPY_NEW || id == IDC_OVERWRITE || id == IDCANCEL || id==IDC_APPEARANCE)
+                { r.top += dy; r.bottom += dy; if (id == IDCANCEL || id==IDC_APPEARANCE) { r.left += dx; r.right += dx; } }
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, TRUE);
             }
         }
@@ -986,6 +1109,9 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
     case WM_COMMAND:
         switch (LOWORD(w))
         {
+        case IDC_APPEARANCE:
+            if(!p->running) { ConfigureAppearance(window);ActionColumn(window);InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,TRUE); }
+            return TRUE;
         case IDC_COMPARE: Start(*p); return TRUE;
         case IDC_STOP: p->Stop(); Status(*p); return TRUE;
         case IDCANCEL: SendMessageW(window, WM_CLOSE, 0, 0); return TRUE;
@@ -1014,6 +1140,29 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         }
         break;
     case WM_NOTIFY:
+        if(reinterpret_cast<NMHDR*>(l)->code==TTN_GETDISPINFOW) {
+            auto* tip=reinterpret_cast<NMTTDISPINFOW*>(l);
+            p->tipText.clear();POINT point{};GetCursorPos(&point);ScreenToClient(GetDlgItem(window,IDC_LIST),&point);
+            LVHITTESTINFO hit{};hit.pt=point;int index=ListView_SubItemHitTest(GetDlgItem(window,IDC_LIST),&hit);
+            if(index>=0 && size_t(index)<p->visible.size() && hit.iSubItem==3)
+                p->tipText=Text(IDS_ACTION+int(p->result.rows[p->visible[size_t(index)]].action));
+            tip->lpszText=p->tipText.data();return TRUE;
+        }
+        if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_GETINFOTIPW) {
+            auto* tip=reinterpret_cast<NMLVGETINFOTIPW*>(l);
+            if(tip->iItem>=0 && size_t(tip->iItem)<p->visible.size() && tip->cchTextMax>0) {
+                auto text=Text(IDS_ACTION+int(p->result.rows[p->visible[size_t(tip->iItem)]].action));
+                size_t count=std::min(text.size(),size_t(tip->cchTextMax-1));
+                if(count && count<text.size() && IS_HIGH_SURROGATE(text[count-1])) --count;
+                memcpy(tip->pszText,text.data(),count*sizeof(wchar_t));tip->pszText[count]=0;
+            }
+            return TRUE;
+        }
+        if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_ITEMCHANGED) {
+            int index=ListView_GetNextItem(GetDlgItem(window,IDC_LIST),-1,LVNI_FOCUSED);
+            if(!p->running && index>=0 && size_t(index)<p->visible.size())
+                StatusPane(window,0,Text(IDS_ACTION+int(p->result.rows[p->visible[size_t(index)]].action)));
+        }
         if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==NM_CUSTOMDRAW) {
             auto* draw=reinterpret_cast<NMLVCUSTOMDRAW*>(l);
             LRESULT result=CDRF_DODEFAULT;
@@ -1031,8 +1180,19 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                     result=CDRF_NOTIFYPOSTPAINT;
                 } else if(draw->nmcd.dwDrawStage==(CDDS_ITEMPOSTPAINT|CDDS_SUBITEM)) {
                     RECT cell{};
-                    if(ListView_GetSubItemRect(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),draw->iSubItem,LVIR_BOUNDS,&cell))
-                        PaintMark(draw->nmcd.hdc,cell,mark,selected?GetTextColor(draw->nmcd.hdc):MarkColor(mark));
+                    if(ListView_GetSubItemRect(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),draw->iSubItem,LVIR_BOUNDS,&cell)) {
+                        bool iconOnly=draw->iSubItem==3 && !settings.actionLabels;
+                        if(iconOnly) {
+                            // Keep the native/theme-painted selection background, including
+                            // inactive selection. The leading text padding leaves this pixel empty.
+                            COLORREF bg=GetPixel(draw->nmcd.hdc,cell.left+2,(cell.top+cell.bottom)/2);
+                            if(bg==CLR_INVALID) bg=ListView_GetBkColor(draw->nmcd.hdr.hwndFrom);
+                            HBRUSH fill=CreateSolidBrush(bg);FillRect(draw->nmcd.hdc,&cell,fill);DeleteObject(fill);
+                        }
+                        COLORREF color=MarkColor(mark);
+                        if(selected) color=GetFocus()==draw->nmcd.hdr.hwndFrom?GetSysColor(COLOR_HIGHLIGHTTEXT):ListView_GetTextColor(draw->nmcd.hdr.hwndFrom);
+                        PaintMark(draw->nmcd.hdc,cell,mark,color,iconOnly);
+                    }
                 }
             }
             SetWindowLongPtrW(window,DWLP_MSGRESULT,result);return TRUE;
@@ -1135,7 +1295,7 @@ public:
     { try { LoadSettings(key,registry); } catch(...) { settings={}; } }
     void WINAPI SaveConfiguration(HWND, HKEY key, CSalamanderRegistryAbstract* registry) override
     { StoreSettings(key,registry); }
-    void WINAPI Configuration(HWND) override {}
+    void WINAPI Configuration(HWND parent) override { ConfigureDark(nullptr);ConfigureAppearance(parent); }
     void WINAPI Connect(HWND, CSalamanderConnectAbstract* connect) override
     { connect->AddMenuItem(-1, general->LoadStr(language, IDS_MENU), 0, 1, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE, MENU_SKILLLEVEL_ALL); }
     void WINAPI ReleasePluginDataInterface(CPluginDataInterfaceAbstract*) override {}
@@ -1166,7 +1326,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (!language) return nullptr;
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES}; InitCommonControlsEx(&controls);
     ConfigureDark(nullptr);
-    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION, "0.1", "Copyright (c) 2026 Open Salamander Authors",
+    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1", "Copyright (c) 2026 Open Salamander Authors",
                               general->LoadStr(language, IDS_DESCRIPTION), "DirectorySync");
     return &plugin;
 }
