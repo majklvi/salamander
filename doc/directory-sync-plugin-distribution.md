@@ -166,3 +166,34 @@ Identifikátor pilotu `pilot-20261016-r1`; nepodepsaný ruční x64 ZIP: `C:\Sam
 Všechny tři produkční moduly jsou po bytech shodné s předchozím GUI ověřeným balíčkem z revize `dfc27edbcca001380998094f2b7dd3acdd27417f`; SPL SHA-256 `6e288f5e0cd0ef8b7a5bf354d0594c321f3e3732bd569445175105b32a6f4d9a`. Nové sestavení ani další zásah do uživatelské instalace nebyly potřeba. Nové rozbalení ověřilo všech **12 hashů manifestu a inventář 13 souborů**, x64 PE vstupy i oba místní odkazy mezi návody. Jde o ověření obsahu nového ZIP, nikoli o nový úplný průchod instalací nebo datovými operacemi; ty dokládá předchozí evidence.
 
 Pilot je omezen na kopie místních NTFS dat v Samandarinu 0.16 x64. Pokyny vysvětlují rozsah viditelných návrhů, samostatné druhy operací, výchozí ON a místo pro obnovu, trvalé důsledky OFF/Stop, zahrnutí Hidden/System, omezení adresářů a ruční obnovy. Formulář hlášení žádá identifikaci ZIP/hash, prostředí/DPI, přesné volby a kroky, očekávaný/skutečný výsledek, souhrn a dostupné protokoly bez soukromého obsahu. Bez SMB testů, změn SDK a nových funkcí.
+
+## 2026-10-16 — pilotní ZIP v čisté české konfiguraci 0.16 x64
+
+Ověřen **přímo pilot-20261016-r1 ZIP**, SHA-256 `70e34a26cd9a27fbc757f762ba85176eadd4939dc86d2118df2d00feedb7acb6`, nikoli volný výstup sestavení. Nové rozbalení do `C:\Samandarin\builds\dirsync-distribution\pilot-clean-czech-20261016\host\plugins` ověřilo všech 12 hashů manifestu. SPL SHA-256 `6e288f5e0cd0ef8b7a5bf354d0594c321f3e3732bd569445175105b32a6f4d9a`, český SLG pluginu `33e5f775a9082591e657bed69bd159a40acf2ad3935855a7ca2857589e074cc2`. ZIP nebyl změněný a není potřeba jej nahrazovat.
+
+### Oddělení hostitele a příprava češtiny
+
+Soukromý hostitel 0.16 x64: EXE SHA-256 `f0b2a56885b363dc0f75926dfedd3036bb1954b775753348cbca0fc4d48574dd`, číselná verze 5.0.0.197. Převzat pouze EXE, potřebné runtime DLL a anglický jazykový modul; žádná předchozí konfigurace. Bootstrap před testem obsahoval pouze StorageType=RegFile a výslovnou vlastní cestu, `config.reg` měl **0 bajtů**; bez InstalledPlugins a plugins.ver. Žádný import uživatelského nastavení ani ruční vložení konfigurace pluginu.
+
+Český modul z nainstalovaného hostitele 0.15.1 měl verzi 5.0.0.196 a hostitel jej správně odmítl. Proto byl pro soukromý test připraven odpovídající český modul 5.0.0.197 z nezměněného aktuálního `translations/czech/salamand.slt` a anglického SLG: `prepare_translation_workspace.ps1 -Languages czech -Modules salamand -ImportArchives`, s existujícím lokálním Translator.exe. Import jednoho archivu prošel bez chyby; výsledný hostitelský český SLG má SHA-256 `942e7d85d7eb62a86bab6c2a226851be08b80f5be4cba878e80709bd2851d8bb`. Jde o běžné vytvoření jazykových prostředků pro tento build, bez změny zdrojů hostitele, pluginu nebo SDK. Po neúspěšném přípravném startu byla vlastní konfigurace znovu vynulována před platným čistým testem.
+
+První platný start použil `-language czech`; oba další starty již byly **bez přepínače jazyka**, jen s uloženou konfigurací. Hostitel používá vlastní výchozí Windows Dark Mode. Minimální kopie opět zobrazovala známé upozornění na neběžící salmon.exe; první start měl nedokreslené hlavní panely, další starty je vykreslily. Tyto vlastnosti testovací kopie se neopravovaly v pluginu. Nativní dialog Color je v jazyce Windows (zde anglicky), vlastní dialogy pluginu jsou české.
+
+### Skutečné kroky přes Computer Use
+
+| Krok | Výsledek |
+| --- | --- |
+| První start, Správce pluginů | Automaticky nalezen **Synchronizace adresářů**, verze 0.1, `dirsync\dirsync.spl`, celkem 1 / načtených 1, český popis. Ruční Přidat nebylo použito. |
+| Konfigurovat | České Nastavení, všech sedm barev a další volby; výchozí Uchovat originály ON, cesta prázdná, popisky operací OFF. |
+| Změna přes GUI | Popisky ON, vlastní barva Shoda v tmavém režimu RGB(128,255,255), cesta `obnova-žluťoučký-漢字` mimo oba stromy; poté Uchovat originály OFF. Pole cesty i tlačítko výběru jsou zakázané. OK a běžné ukončení hostitele. |
+| První skutečný restart | Český hostitel bez jazykového přepínače. Správce: **celkem 1 / načtených 0**, český název a příkaz zachované z registrace. Po Konfigurovat se plugin načetl, OFF, přesná Unicode cesta, popisky ON a vlastní barva zůstaly. |
+| Přepnutí zpět ON | Pole cesty i jeho výběr se aktivovaly; OK a běžné ukončení. |
+| Druhý skutečný restart | Český příkaz z uložené nabídky načetl české hlavní okno. Nastavení z hlavního okna potvrdilo ON, stejnou cestu, popisky a vlastní barvu. |
+| České Porovnat | Malá vlastní NTFS sada: `left/žluťoučký.txt` má 5 B, right je prázdný. Přesně 1 řádek, 1 viditelný, 0 blokovaných; „Kopírovat doprava“, „Pouze vlevo“, „Protějšek chybí“, stav „Porovnání dokončeno“. Žádná zápisová operace se nespouštěla. |
+| Storno nastavení a F1 | Výsledek porovnání zachován, F1 otevřelo českou nápovědu. Plugin i hostitel normálně zavřeny. |
+
+Nezávislá kontrola tří uložených konfigurací (OFF, ON před druhým restartem, finální) potvrdila KeepOriginals=0/1/1, ActionLabels=1, Language=czech.slg, přesnou cestu dekódovanou z UTF-16 REG_BINARY i první DWORD DarkColorsV1 = `0x00ffff80`. Testovací soubor stále obsahuje přesně PILOT, pravý i obnovovací adresář jsou prázdné. Původní uživatelské procesy 3820 a 17148 zůstaly spuštěné; žádný testovací hostitel nezůstal běžet.
+
+Lokální důkazy mimo Git: `initial.json` (přípravný stav), `gui-evidence.json`, `config-off.reg.evidence`, `config-on.reg.evidence`, `verification.json`, finální vlastní konfigurace a překladový workspace pod kořenem této sady. Výsledný jazykový modul hostitele identifikuje verification.json; initial.json ještě eviduje původní nekompatibilní přípravný modul.
+
+**Výsledek:** aktuální pilotní balíček prošel čistou instalací rozbalením, českým načtením, dvěma řádnými restarty a zapamatováním testovaných voleb. Chyba pluginu vyžadující změnu binárek nebyla nalezena. Jde o vlastní RegFile backend a runtime x64 při aktuálním systémovém DPI; test neověřuje registry backend, kompletní Inno instalátor, podpis, změnu DPI mezi monitory ani další datové operace. Bez SMB testů a změn SDK.
