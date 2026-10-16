@@ -96,8 +96,11 @@ void Test(int dialog)
             Check(control(id).y==control(IDC_RECURSIVE).y,"scan choices in one row");
         Check(control(IDC_MASK).y+2==control(IDC_RECURSIVE).y && control(IDC_MASK).width<=60,"compact mask shares scan row");
         Check(control(IDC_COMPARE).y+control(IDC_COMPARE).height<control(IDC_MASK).y,"scan choices immediately below Compare");
-        Check(control(IDC_STOP).y==control(IDC_COMPARE).y && control(IDC_STOP).x==control(IDC_COMPARE).x+control(IDC_COMPARE).width+4,"comparison Stop adjacent to Compare");
-        Check(control(IDC_STOP_SYNC).y==control(IDC_SYNCHRONIZE).y && control(IDC_STOP_SYNC).x==control(IDC_SYNCHRONIZE).x+control(IDC_SYNCHRONIZE).width+4,"operation Stop adjacent to Synchronize");
+        for(auto pair:{std::pair<DWORD,DWORD>{IDC_COMPARE,IDC_STOP},{IDC_SYNCHRONIZE,IDC_STOP_SYNC}}) {
+            const auto& start=control(pair.first);const auto& stop=control(pair.second);
+            Check(stop.y==start.y && stop.x==start.x+start.width && stop.height==start.height,"joined native start/Stop parts without a gap");
+            Check(stop.width==14 && stop.width<start.width/2 && (stop.style&BS_ICON)!=0 && !stop.text.empty(),"small icon-only Stop part retains accessible name");
+        }
         Check(control(IDCANCEL).y==control(IDC_SYNCHRONIZE).y && control(IDCANCEL).x+control(IDCANCEL).width==width-8,"Close in top-right operation group");
         for(DWORD id:{IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT}) {
             const auto& filter=control(id);

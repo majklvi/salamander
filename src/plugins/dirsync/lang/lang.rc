@@ -20,9 +20,9 @@ BEGIN
     EDITTEXT IDC_RIGHT, 366, 6, 218, 14, ES_AUTOHSCROLL
     PUSHBUTTON "...", IDC_BROWSE_RIGHT, 588, 6, 14, 14
     DEFPUSHBUTTON "&Compare", IDC_COMPARE, 8, 26, 62, 14, WS_GROUP
-    PUSHBUTTON "S&top", IDC_STOP, 74, 26, 50, 14
-    PUSHBUTTON "S&ynchronize...", IDC_SYNCHRONIZE, 414, 26, 80, 14, WS_GROUP
-    PUSHBUTTON "Sto&p", IDC_STOP_SYNC, 498, 26, 50, 14
+    CONTROL "S&top comparison", IDC_STOP, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 70, 26, 14, 14
+    PUSHBUTTON "S&ynchronize...", IDC_SYNCHRONIZE, 454, 26, 80, 14, WS_GROUP
+    CONTROL "Sto&p synchronization", IDC_STOP_SYNC, "Button", BS_PUSHBUTTON | BS_ICON | WS_TABSTOP, 534, 26, 14, 14
     PUSHBUTTON "Close", IDCANCEL, 552, 26, 50, 14
     LTEXT "&Masks:", -1, 78, 51, 28, 10
     EDITTEXT IDC_MASK, 108, 48, 45, 14, ES_AUTOHSCROLL
@@ -112,8 +112,8 @@ BEGIN
     IDS_MENU_COPY_NEW "&Copy visible new files..."
     IDS_MENU_OVERWRITE "&Overwrite visible files..."
     IDS_MENU_DELETE_FILES "&Delete visible files..."
-    IDS_TIP_STOP_COMPARE "Stop scanning, content comparison or read-only validation."
-    IDS_TIP_STOP_SYNC "Stop the current file operation, including its validation. Completed changes remain in place."
+    IDS_TIP_STOP_COMPARE "Stop scanning, content comparison or read-only validation (Alt+T)."
+    IDS_TIP_STOP_SYNC "Stop the current file operation, including its validation (Alt+P). Completed changes remain in place."
     IDS_FILTER_EQUAL "Show equal files (Alt+Q)"
     IDS_FILTER_DIFFERENT "Show different files (Alt+D)"
     IDS_FILTER_SINGLE "Show single-sided files (Alt+N)"

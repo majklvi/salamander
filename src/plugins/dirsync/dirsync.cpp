@@ -394,7 +394,7 @@ struct Preview
     int requestedAction = 0;
     std::vector<size_t> visible;
     std::vector<dirsync::Action> defaults;
-    std::array<HICON,5> filterIcons{};
+    std::array<HICON,7> buttonIcons{};
     std::array<bool,5> filterChecks{};
     std::atomic<bool> cancel{false};
     dirsync::Progress progress;
@@ -414,7 +414,7 @@ struct Preview
     SIZE initialClient{}, minimumWindow{};
     std::vector<std::pair<HWND, RECT>> controls;
     bool running = false, closing = false, failed = false, validating = false;
-    ~Preview() { Stop(); Join(); for(auto icon:filterIcons) if(icon) DestroyIcon(icon); }
+    ~Preview() { Stop(); Join(); for(auto icon:buttonIcons) if(icon) DestroyIcon(icon); }
     void Stop()
     {
         cancel = true;
@@ -511,12 +511,12 @@ LRESULT CALLBACK FilterButton(HWND window,UINT message,WPARAM w,LPARAM l,UINT_PT
     if(message==WM_NCDESTROY) RemoveWindowSubclass(window,FilterButton,id);
     return DefSubclassProc(window,message,w,l);
 }
-void FilterIcons(Preview& p)
+void ButtonIcons(Preview& p)
 {
     HWND window=p.window;HDC dc=GetDC(window);int size=MulDiv(16,GetDeviceCaps(dc,LOGPIXELSX),96);
-    const int ids[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
-    const Mark marks[]={Mark::Equal,Mark::Different,Mark::Single,Mark::Right,Mark::Left};
-    for(size_t i=0;i<p.filterIcons.size();++i) {
+    const int ids[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT,IDC_STOP,IDC_STOP_SYNC};
+    const Mark marks[]={Mark::Equal,Mark::Different,Mark::Single,Mark::Right,Mark::Left,Mark::Delete,Mark::Delete};
+    for(size_t i=0;i<p.buttonIcons.size();++i) {
         BITMAPINFO info{};info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=size;
         info.bmiHeader.biHeight=-size;info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
         void* data=nullptr;HBITMAP bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&data,nullptr,0);
@@ -526,7 +526,10 @@ void FilterIcons(Preview& p)
             memset(data,0,size_t(size)*size*4);auto old=SelectObject(memory,bitmap);
             RECT cell{0,0,size,size};PaintMark(memory,cell,marks[i],RGB(255,255,255),true);
             SelectObject(memory,old);
-            COLORREF color=MarkColor(marks[i]==Mark::Single?Mark::Different:marks[i]);
+            // Cancellation crosses follow the host's neutral button text color,
+            // independent of the configurable file-deletion color.
+            COLORREF color=i<5?MarkColor(marks[i]==Mark::Single?Mark::Different:marks[i]):
+                (dark?DarkModeGetColors().text:GetSysColor(COLOR_BTNTEXT));
             DWORD pixel=0xff000000|(DWORD(GetRValue(color))<<16)|(DWORD(GetGValue(color))<<8)|GetBValue(color);
             auto* pixels=static_cast<DWORD*>(data);
             for(int n=0;n<size*size;++n) if(pixels[n]&0xffffff) pixels[n]=pixel;
@@ -535,7 +538,7 @@ void FilterIcons(Preview& p)
         if(memory) DeleteDC(memory);if(bitmap) DeleteObject(bitmap);if(mask) DeleteObject(mask);
         if(icon) {
             SendDlgItemMessageW(window,ids[i],BM_SETIMAGE,IMAGE_ICON,LPARAM(icon));
-            if(p.filterIcons[i]) DestroyIcon(p.filterIcons[i]);p.filterIcons[i]=icon;
+            if(p.buttonIcons[i]) DestroyIcon(p.buttonIcons[i]);p.buttonIcons[i]=icon;
         }
     }
     ReleaseDC(window,dc);
@@ -1383,7 +1386,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             RECT bounds{}; GetWindowRect(child, &bounds); MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&bounds), 2);
             p->controls.push_back({child, bounds});
         }
-        ConfigureDark(window);FilterIcons(*p); Tooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
+        ConfigureDark(window);ButtonIcons(*p); Tooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
     LRESULT brush = 0;
@@ -1481,7 +1484,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if (p->running) { p->closing = true; p->Stop(); }
         else { PersistSettings(window); EndDialog(window, 0); }
         return TRUE;
-    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ConfigureDark(window);FilterIcons(*p); return TRUE;
+    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ConfigureDark(window);ButtonIcons(*p); return TRUE;
     case WM_CONTEXTMENU:
         if(reinterpret_cast<HWND>(w)==GetDlgItem(window,IDC_LIST)) {PreviewMenu(*p,l);return TRUE;}
         break;
