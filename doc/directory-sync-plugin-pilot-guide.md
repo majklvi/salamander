@@ -1,6 +1,6 @@
 # Synchronizace adresářů — pilotní testování
 
-Vývojová verze 0.1.2 pro **Samandarin 0.16 x64**, čeština i angličtina. Balíček je nepodepsaný a obsahuje pouze plugin. Pilot je určen pro **kopie místních NTFS dat**; SMB, síťové disky a změny SDK jsou mimo tento pilot.
+Vývojová verze 0.1.3 pro **Samandarin 0.16 x64**, čeština i angličtina. Balíček je nepodepsaný a obsahuje pouze plugin. Pilot je určen pro **kopie místních NTFS dat**; SMB, síťové disky a změny SDK jsou mimo tento pilot.
 
 Klikáním do záhlaví sloupce přepínáte vzestupné/sestupné řazení souborů uvnitř adresářů. Pravé tlačítko na záhlaví nebo sekce **Sloupce / Columns** v nastavení pluginu skryje či zobrazí volitelné sloupce. Názvy vlevo i vpravo, cesta adresáře a operace zůstávají. Volby sloupců a řazení se pamatují; skrytí sloupce nevynechává soubory ze synchronizace.
 
@@ -45,3 +45,5 @@ Pošlete hlášení autorovi pluginu; souhrn výsledku lze zkopírovat přes **C
 - Při ON příslušné `manifest.jsonl` a `delete.jsonl` či `overwrite.jsonl`, pokud existují. Při OFF jejich nepřítomnost není chyba. Před odesláním odstraňte citlivé cesty/názvy z kopie hlášení; původní protokoly si ponechte pro obnovu. Neposílejte skutečná soukromá data; nejlepší je malá syntetická sada reprodukující problém.
 
 Při neočekávané změně dat další zápisy zastavte, uchovejte souhrn i obnovovací běh a nejprve zkontrolujte kopie v odděleném adresáři.
+
+Od 0.1.3 lze v Nastavení → Sloupce nezávisle zapnout relativní velikost a relativní čas. Obě volby jsou standardně vypnuté. U rozdílných hodnot dvojic souborů zobrazují rozdíl vůči protější straně; shodné hodnoty a chybějící protějšek ponechávají absolutní údaje. Řazení se nadále řídí skutečnou velikostí a časem. Podrobnosti uvádí README.cs.md.

@@ -90,7 +90,7 @@ void Run(const std::wstring& dll,Fixture& f,bool content)
 {
     Module module(dll);
     auto settingsTest=reinterpret_cast<Module::Status>(GetProcAddress(module.handle,"ProbeSettingsTest"));
-    Check(settingsTest && settingsTest()==18,"persistent recovery, appearance, columns and sorting: round trips, long Unicode paths and malformed values");
+    Check(settingsTest && settingsTest()==22,"persistent recovery, appearance, columns and sorting: round trips, long Unicode paths and malformed values");
     Check(module.release(FALSE)==1,"idle normal release succeeds");
     Check(module.start(f.left.c_str(),f.right.c_str(),content)!=FALSE,"start module worker");
     ULONGLONG deadline=GetTickCount64()+5000; unsigned status=0;
@@ -264,7 +264,7 @@ int main()
             Module module(dll);
             using DisplayTest=unsigned (WINAPI*)();
             auto display=reinterpret_cast<DisplayTest>(GetProcAddress(module.handle,"ProbeDisplayFormatting"));
-            Check(display && display()==22,"host name styles, long Unicode display paths and unchanged clipboard spelling");
+            Check(display && display()==31,"host name styles, long Unicode display paths and unchanged clipboard spelling");
             using FolderTest=unsigned (WINAPI*)(const wchar_t*);
             auto folderTest=reinterpret_cast<FolderTest>(GetProcAddress(module.handle,"ProbeFolderPath"));
             Check(chosen.size()>260 && folderTest && folderTest(chosen.c_str())==3,"folder picker preserves long Unicode names and expands shell aliases; missing folder is refused");

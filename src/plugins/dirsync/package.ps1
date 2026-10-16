@@ -40,7 +40,7 @@ Get-ChildItem -LiteralPath (Join-Path $repo 'src\third_party\darkmodelib\docs') 
     Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $payload ('licenses\'+$_.Name))
 }
 $notice=@'
-Directory Synchronization 0.1.2 preview, x64, for Samandarin 0.16.
+Directory Synchronization 0.1.3 preview, x64, for Samandarin 0.16.
 Copyright (c) 2026 Open Salamander Authors. GPL-2.0-or-later.
 Source: https://github.com/majklvi/salamander/tree/feature/directory-sync-plugin/src/plugins/dirsync
 Includes darkmodelib by ozone10; licenses are in licenses/.
@@ -57,7 +57,7 @@ $manifest=@(Get-ChildItem -LiteralPath $payload -File -Recurse | Sort-Object Ful
     [ordered]@{path=$_.FullName.Substring($payload.Length+1).Replace('\','/');sha256=(Get-FileHash -LiteralPath $_.FullName).Hash.ToLowerInvariant()}
 })
 [IO.File]::WriteAllText((Join-Path $payload 'files.json'),($manifest|ConvertTo-Json),[Text.UTF8Encoding]::new($false))
-$archive=Join-Path $output 'plugin_5.0_dirsync_0.1.2_x64.zip'
+$archive=Join-Path $output 'plugin_5.0_dirsync_0.1.3_x64.zip'
 Compress-Archive -LiteralPath $payload -DestinationPath $archive
 $hash=(Get-FileHash -LiteralPath $archive).Hash.ToLowerInvariant()
 [IO.File]::WriteAllText((Join-Path $output 'package-sha256.txt'),"$hash  $([IO.Path]::GetFileName($archive))`r`n",[Text.UTF8Encoding]::new($false))

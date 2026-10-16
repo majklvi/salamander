@@ -1,6 +1,6 @@
 # Directory Synchronization — aktuální návod
 
-Stav 17. října 2026, vývojová verze 0.1.2 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
+Stav 17. října 2026, vývojová verze 0.1.3 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
 
 Pro pilotní používání začněte [krátkými pokyny včetně hlášení chyb](directory-sync-plugin-pilot-guide.md), přiloženými v balíčku jako `PILOT.cs.md`.
 
@@ -19,6 +19,8 @@ Zavřete instance používající starou verzi pluginu, zkopírujte celý adres�
 Při sestavení ze zdrojů použijte projekt `src/plugins/dirsync/vcxproj/dirsync.vcxproj`; jazykový modul je jeho závislost. Podrobný build postup je v [implementačním záznamu](directory-sync-plugin-implementation.md#sestavení-a-testy). [Distribuční ověření](directory-sync-plugin-distribution.md) dokončilo rozbalení ZIP do čisté konfigurace 0.16 x64, automatickou registraci a dva skutečné restarty s ON/OFF a Unicode cestou obnovy. Jde o ruční portable instalaci pluginu, nikoli sestavení celého Inno instalátoru.
 
 ## Vzhled a nápověda
+
+Od **0.1.3** jsou v **Nastavení… → Sloupce** dvě nezávislé volby **Zobrazovat velikost relativně** a **Zobrazovat čas relativně**. Obě jsou ve výchozím stavu vypnuté a pamatují se přes restart. U dvojice souborů na stejné relativní cestě nahradí rozdílnou velikost například textem `o 1 024 B větší` a rozdílný čas textem `o 2 d 3 h novější`; opačná strana ukáže `menší` / `starší`. Velikost je přesný rozdíl v bajtech, s oddělováním číslic podle hostitele. Čas je uplynulá doba z UTC metadat (dny po 24 hodinách), s nenulovými dny, hodinami, minutami a sekundami. Zlomky sekundy se nezobrazují; rozdíl pod sekundou má popis `méně než 1 s`. Shodné hodnoty, jednostranné položky a adresáře si ponechávají absolutní formát hostitele. Jde pouze o zobrazení: nemění toleranci času, stav, návrhy ani řazení podle skutečných hodnot. Proto se může relativní čas objevit i u položky označené Shoda v rámci tolerance. Potvrzení voleb překreslí existující výsledky bez nového skenu; Storno je zachová. Sloupce se při zapnutí podle potřeby rozšíří pro běžné popisky, šířku lze dále měnit ručně. [Ověření relativního zobrazení](directory-sync-plugin-relative.md).
 
 Od **0.1.2** kliknutí na záhlaví sloupce seřadí položky uvnitř každého adresáře vzestupně; další kliknutí obrátí směr. Skupiny adresářů zůstávají ve stejném pořadí. Velikosti, časy a kódy chyb se řadí podle skutečných hodnot; texty podle zobrazených názvů bez rozlišení velikosti písmen. Prázdná velikost/čas je vzestupně před vyplněnou hodnotou, sestupně za ní. Při shodě rozhoduje název. Ukazatel v záhlaví označuje aktivní sloupec a směr.
 

@@ -213,3 +213,16 @@ BEGIN
     293 "Protějšek vyloučen maskami; chráněno"
     294 "Obě cesty odkazují na stejný soubor"
 END
+
+STRINGTABLE
+BEGIN
+    IDS_REL_LARGER "o {0} B větší"
+    IDS_REL_SMALLER "o {0} B menší"
+    IDS_REL_NEWER "o {0} novější"
+    IDS_REL_OLDER "o {0} starší"
+    IDS_DURATION_DAY "d"
+    IDS_DURATION_HOUR "h"
+    IDS_DURATION_MINUTE "min"
+    IDS_DURATION_SECOND "s"
+    IDS_DURATION_SUBSECOND "méně než 1 s"
+END

@@ -13,6 +13,7 @@
 #include <cstring>
 #include "../resource.h"
 #include "../previewlayout.h"
+#include "../displayformat.h"
 namespace
 {
 int checks = 0;
@@ -126,6 +127,11 @@ void Test(int dialog)
     }
     if(dialog==IDD_APPEARANCE) {
         auto control=[&](DWORD id)->const Control& {for(const auto& c:controls) if(c.id==id) return c;throw std::runtime_error("missing preference control");};
+        const auto& relativeSize=control(IDC_RELATIVE_SIZES);
+        const auto& relativeTime=control(IDC_RELATIVE_TIMES);
+        Check(relativeSize.y==relativeTime.y && relativeSize.x==7 && relativeTime.x==159 &&
+            relativeSize.y>control(IDC_COLUMN_FIRST+3).y && relativeTime.y+relativeTime.height<control(IDC_KEEP_ORIGINALS).y,
+            "relative display options share a compact row below optional columns");
         for(int i=0;i<7;++i) {
             const auto& column=control(IDC_COLUMN_FIRST+i);
             Check(column.y>control(IDC_COLOR_RESET).y && column.y+column.height<control(IDC_KEEP_ORIGINALS).y &&
@@ -220,6 +226,17 @@ int main()
             IDS_FILTER_SINGLE,IDS_FILTER_RIGHT,IDS_FILTER_LEFT,IDS_OPTIONS_PENDING,IDS_TIP_SCAN_OPTIONS}) {
             const wchar_t* text=nullptr;
             Check(LoadStringW(GetModuleHandleW(nullptr),id,reinterpret_cast<LPWSTR>(&text),0)>0,"menu captions and filter/Stop tooltips shipped in language resource");
+        }
+        auto text=[](int id) {
+            const wchar_t* value=nullptr;int n=LoadStringW(GetModuleHandleW(nullptr),id,reinterpret_cast<LPWSTR>(&value),0);
+            Check(n>0,"localized relative metadata string present");return std::wstring(value,size_t(n));
+        };
+        const auto duration=dirsync::RelativeDuration(937840000000,
+            {text(IDS_DURATION_DAY),text(IDS_DURATION_HOUR),text(IDS_DURATION_MINUTE),text(IDS_DURATION_SECOND)},text(IDS_DURATION_SUBSECOND));
+        Check(duration==L"1 d 2 h 3 min 4 s","localized duration units");
+        for(int id:{IDS_REL_LARGER,IDS_REL_SMALLER,IDS_REL_NEWER,IDS_REL_OLDER}) {
+            const auto pattern=text(id);Check(pattern.find(L"{0}")!=std::wstring::npos,"localized difference template has substitution");
+            Check(dirsync::RelativeValue(pattern,L"123").find(L"123")!=std::wstring::npos,"localized difference substitution");
         }
         Test(IDD_PREVIEW); Test(IDD_INFORMATION);Test(IDD_APPEARANCE); std::cout << checks << " resource/layout checks passed\n"; return 0;
     }

@@ -49,6 +49,8 @@ struct Settings {
     bool sortDescending=false;
     bool keepOriginals=true;
     bool actionLabels=false;
+    bool relativeSizes=false;
+    bool relativeTimes=false;
     std::array<Palette,2> colors{DefaultPalette(false),DefaultPalette(true)};
     std::wstring recoveryRoot;
 } settings;
@@ -62,6 +64,12 @@ void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     enabled=0;
     if(registry->GetValue(key,"ActionLabels",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
         settings.actionLabels=enabled!=0;
+    enabled=0;
+    if(registry->GetValue(key,"RelativeSizesV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
+        settings.relativeSizes=enabled!=0;
+    enabled=0;
+    if(registry->GetValue(key,"RelativeTimesV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
+        settings.relativeTimes=enabled!=0;
     enabled=0x3ff;
     if(registry->GetValue(key,"VisibleColumnsV1",REG_DWORD,&enabled,sizeof(enabled)))
         settings.visibleColumns=(enabled&0x3ff)|0x209; // Both names and Action are mandatory.
@@ -97,6 +105,9 @@ bool StoreSettings(HKEY key,CSalamanderRegistryAbstract* registry)
         DWORD((settings.recoveryRoot.size()+1)*sizeof(wchar_t)))!=FALSE;
     DWORD labels=settings.actionLabels?1:0;
     bool appearance=registry->SetValue(key,"ActionLabels",REG_DWORD,&labels,sizeof(labels))!=FALSE;
+    DWORD relativeSize=settings.relativeSizes?1:0,relativeTime=settings.relativeTimes?1:0;
+    appearance=(registry->SetValue(key,"RelativeSizesV1",REG_DWORD,&relativeSize,sizeof(relativeSize))!=FALSE) && appearance;
+    appearance=(registry->SetValue(key,"RelativeTimesV1",REG_DWORD,&relativeTime,sizeof(relativeTime))!=FALSE) && appearance;
     DWORD columns=(settings.visibleColumns&0x3ff)|0x209,column=DWORD(settings.sortColumn),descending=settings.sortDescending?1:0;
     appearance=(registry->SetValue(key,"VisibleColumnsV1",REG_DWORD,&columns,sizeof(columns))!=FALSE) && appearance;
     appearance=(registry->SetValue(key,"SortColumnV1",REG_DWORD,&column,sizeof(column))!=FALSE) && appearance;
@@ -507,6 +518,21 @@ std::wstring Modified(uint64_t ticks)
 }
 std::wstring Cell(const dirsync::Row& row, int column,const Preview& p)
 {
+    // Only regular-file pairs have a meaningful counterpart for relative metadata.
+    if(row.hasLeft && row.hasRight && !row.left.directory && !row.right.directory) {
+        const bool left=column==1 || column==2;
+        if(settings.relativeSizes && (column==1 || column==4) && row.left.size!=row.right.size) {
+            const auto own=left?row.left.size:row.right.size,other=left?row.right.size:row.left.size;
+            return dirsync::RelativeValue(Text(own>other?IDS_REL_LARGER:IDS_REL_SMALLER),
+                PanelSize(dirsync::MetadataDifference(own,other),0));
+        }
+        if(settings.relativeTimes && (column==2 || column==5) && row.left.time!=row.right.time) {
+            const auto own=left?row.left.time:row.right.time,other=left?row.right.time:row.left.time;
+            const auto duration=dirsync::RelativeDuration(dirsync::MetadataDifference(own,other),
+                {Text(IDS_DURATION_DAY),Text(IDS_DURATION_HOUR),Text(IDS_DURATION_MINUTE),Text(IDS_DURATION_SECOND)},Text(IDS_DURATION_SUBSECOND));
+            return dirsync::RelativeValue(Text(own>other?IDS_REL_NEWER:IDS_REL_OLDER),duration);
+        }
+    }
     switch (column)
     {
     case 0: case 9: {
@@ -677,6 +703,8 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             SetDlgItemTextW(window,IDC_COLUMN_FIRST+int(i),Text(IDS_COLUMNS+OptionalColumns[i]).c_str());
             CheckDlgButton(window,IDC_COLUMN_FIRST+int(i),(appearance->draft.visibleColumns&(1u<<OptionalColumns[i]))?BST_CHECKED:BST_UNCHECKED);
         }
+        CheckDlgButton(window,IDC_RELATIVE_SIZES,appearance->draft.relativeSizes?BST_CHECKED:BST_UNCHECKED);
+        CheckDlgButton(window,IDC_RELATIVE_TIMES,appearance->draft.relativeTimes?BST_CHECKED:BST_UNCHECKED);
         SendDlgItemMessageW(window,IDC_RECOVERY_ROOT,EM_SETLIMITTEXT,32759,0);
         SetDlgItemTextW(window,IDC_RECOVERY_ROOT,appearance->draft.recoveryRoot.c_str());
         RecoveryControls(window);Tooltips(window);
@@ -729,6 +757,8 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             settings.keepOriginals=Checked(window,IDC_KEEP_ORIGINALS);
             settings.recoveryRoot=std::move(appearance->draft.recoveryRoot);
             settings.actionLabels=Checked(window,IDC_ACTION_LABELS);
+            settings.relativeSizes=Checked(window,IDC_RELATIVE_SIZES);
+            settings.relativeTimes=Checked(window,IDC_RELATIVE_TIMES);
             settings.colors[appearance->theme]=appearance->draft.colors[appearance->theme];
             PersistSettings(window);EndDialog(window,IDOK);return TRUE;
         case IDCANCEL: EndDialog(window,IDCANCEL);return TRUE;
@@ -894,6 +924,28 @@ bool PreviewLess(const Preview& p,size_t a,size_t b)
     if(order) return settings.sortDescending?order>0:order<0;
     order=CompareRows(x,y,p,0);
     return order?order<0:a<b;
+}
+// Give relative phrases room when first enabled; retain subsequent manual widths.
+void GrowRelativeColumns(Preview& p,bool sizes,bool times)
+{
+    HWND list=GetDlgItem(p.window,IDC_LIST);HDC dc=GetDC(list);
+    if(!dc) return;
+    auto font=reinterpret_cast<HFONT>(SendMessageW(list,WM_GETFONT,0,0));
+    auto previous=font?SelectObject(dc,font):nullptr;
+    for(int column:{1,2,4,5}) {
+        const bool size=column==1 || column==4;
+        if(!(size?sizes:times)) continue;
+        int width=p.columnWidths[size_t(column)];
+        for(int id:size?std::array<int,2>{IDS_REL_LARGER,IDS_REL_SMALLER}:std::array<int,2>{IDS_REL_NEWER,IDS_REL_OLDER}) {
+            const auto text=dirsync::RelativeValue(Text(id),size?PanelSize(1234567,0):dirsync::RelativeDuration(1838450000000,
+                {Text(IDS_DURATION_DAY),Text(IDS_DURATION_HOUR),Text(IDS_DURATION_MINUTE),Text(IDS_DURATION_SECOND)},Text(IDS_DURATION_SUBSECOND)));
+            SIZE extent{};
+            if(GetTextExtentPoint32W(dc,text.c_str(),int(text.size()),&extent))
+                width=std::max(width,int(extent.cx)+MulDiv(24,GetDeviceCaps(dc,LOGPIXELSX),96));
+        }
+        p.columnWidths[size_t(column)]=width;
+    }
+    if(previous) SelectObject(dc,previous);ReleaseDC(list,dc);
 }
 void ColumnStyle(Preview& p)
 {
@@ -1686,6 +1738,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         LayoutFilters(*p,0);
         ConfigureDark(window);ButtonIcons(*p); Tooltips(window);ActionColumn(window);
         for(int i=0;i<10;++i) p->columnWidths[size_t(i)]=ListView_GetColumnWidth(list,i);
+        GrowRelativeColumns(*p,settings.relativeSizes,settings.relativeTimes);
         ColumnStyle(*p);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
@@ -1811,8 +1864,10 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             if(!p->running) {
                 RememberColumns(*p);
                 const int previousSort=settings.sortColumn;const bool previousDescending=settings.sortDescending;
+                const bool previousSizes=settings.relativeSizes,previousTimes=settings.relativeTimes;
                 ConfigureAppearance(window);ConfigureDark(window);ButtonIcons(*p);ActionColumn(window);
                 p->columnWidths[3]=ListView_GetColumnWidth(GetDlgItem(window,IDC_LIST),3);
+                GrowRelativeColumns(*p,settings.relativeSizes && !previousSizes,settings.relativeTimes && !previousTimes);
                 ColumnStyle(*p);
                 if(previousSort!=settings.sortColumn || previousDescending!=settings.sortDescending) Filter(*p);
                 InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,TRUE);Status(*p);
@@ -2100,7 +2155,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (!language) return nullptr;
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES}; InitCommonControlsEx(&controls);
     ConfigureDark(nullptr);
-    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1.2", "Copyright (c) 2026 Open Salamander Authors",
+    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1.3", "Copyright (c) 2026 Open Salamander Authors",
                               general->LoadStr(language, IDS_DESCRIPTION), "DirectorySync");
     return &plugin;
 }

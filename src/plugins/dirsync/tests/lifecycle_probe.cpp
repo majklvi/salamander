@@ -65,6 +65,16 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeDisplayFormatting()
         check(kinds==std::vector<bool>({true,false}));
         check(displayed==L"PARENT\\"+std::wstring(300,L'ž')+L" žluťoučký-漢字-😀.txt");
         check(path==L"Parent\\"+original);
+        check(dirsync::MetadataDifference(0,UINT64_MAX)==UINT64_MAX);
+        check(dirsync::MetadataDifference(UINT64_MAX,0)==UINT64_MAX);
+        check(dirsync::MetadataDifference(42,42)==0);
+        const std::array<std::wstring,4> units{L"d",L"h",L"min",L"s"};
+        check(dirsync::RelativeDuration(10000000,units,L"sub")==L"1 s");
+        check(dirsync::RelativeDuration(9999999,units,L"sub")==L"sub");
+        check(dirsync::RelativeDuration(937840000000,units,L"sub")==L"1 d 2 h 3 min 4 s");
+        check(dirsync::RelativeDuration(36000000000,units,L"sub")==L"1 h");
+        check(dirsync::RelativeDuration(UINT64_MAX,units,L"sub")==L"21350398 d 5 h 36 min 10 s");
+        check(dirsync::RelativeValue(L"o {0} B větší",L"1 024")==L"o 1 024 B větší");
         dirsync::Row row;row.path=path;row.hasLeft=true;
         Preview p;p.left=L"C:\\left";p.result.rows.push_back(row);
         check(RowPaths(p,{0},0)==path); // Clipboard retains the real spelling.
@@ -342,6 +352,20 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     x.hasRight=y.hasRight=true;x.right.size=10;y.right.size=2;
     x.right.time=1;y.right.time=UINT64_MAX;
     ok &= CompareRows(x,y,p,4)>0 && CompareRows(x,y,p,5)<0;
+    settings.relativeSizes=settings.relativeTimes=true;
+    x.left.directory=false;x.hasLeft=y.hasLeft=true;
+    // Sorting always uses absolute metadata, even when displayed differences
+    // would sort in the opposite order (or are below the date tolerance).
+    x.left.size=10;x.right.size=1000;y.left.size=20;y.right.size=21;
+    x.left.time=100;x.right.time=200;y.left.time=101;y.right.time=102;
+    ok &= CompareRows(x,y,p,1)<0 && CompareRows(x,y,p,2)<0;
+    x.hasRight=false;
+    ok &= Cell(x,1,p)==PanelSize(x.left.size,p.sizeFormat) && Cell(x,2,p)==Modified(x.left.time) && Cell(x,4,p).empty();
+    x.hasRight=true;x.right.size=x.left.size;x.right.time=x.left.time;
+    ok &= Cell(x,1,p)==PanelSize(x.left.size,p.sizeFormat) && Cell(x,4,p)==Cell(x,1,p) && Cell(x,2,p)==Cell(x,5,p);
+    x.right.directory=true;
+    ok &= Cell(x,1,p)==PanelSize(x.left.size,p.sizeFormat) && Cell(x,4,p).empty();
+    settings.relativeSizes=settings.relativeTimes=false;
     settings.sortColumn=0;settings.sortDescending=false;
     p.result.rows.clear();
     for(size_t i=0;i<6000;++i) {
@@ -442,6 +466,13 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
         HKEY key=reinterpret_cast<HKEY>(UINT_PTR(1)); // opaque key used only by the fake SDK registry
         plugin.LoadConfiguration(nullptr,nullptr,&registry);
         check(settings.keepOriginals && settings.recoveryRoot.empty());
+        check(!settings.relativeSizes && !settings.relativeTimes);
+        settings.relativeSizes=true;plugin.SaveConfiguration(nullptr,key,&registry);settings={};plugin.LoadConfiguration(nullptr,key,&registry);
+        check(settings.relativeSizes && !settings.relativeTimes);
+        settings.relativeSizes=false;settings.relativeTimes=true;plugin.SaveConfiguration(nullptr,key,&registry);settings={};plugin.LoadConfiguration(nullptr,key,&registry);
+        check(!settings.relativeSizes && settings.relativeTimes);
+        registry.values["RelativeSizesV1"].bytes={2,0,0,0};registry.values["RelativeTimesV1"].bytes={255,0,0,0};
+        plugin.LoadConfiguration(nullptr,key,&registry);check(!settings.relativeSizes && !settings.relativeTimes);
         std::wstring root=L"C:\\obnova-漢字\\"+std::wstring(200,L'階')+L"\\😀";
         settings.keepOriginals=false; settings.recoveryRoot=root;
         settings.actionLabels=true;settings.colors[0][2]=RGB(12,34,56);settings.colors[1][6]=RGB(98,76,54);

@@ -3,10 +3,34 @@
 #pragma once
 #include <windows.h>
 #include <string>
+#include <array>
+#include <cstdint>
 #include "../../filenamecase.h"
 
 namespace dirsync
 {
+// Unsigned subtraction avoids overflow even at the ends of the metadata range.
+inline uint64_t MetadataDifference(uint64_t a,uint64_t b) { return a>b?a-b:b-a; }
+inline std::wstring RelativeValue(std::wstring pattern,const std::wstring& value)
+{
+    const auto at=pattern.find(L"{0}");
+    if(at!=std::wstring::npos) pattern.replace(at,3,value);
+    return pattern;
+}
+// FILETIME durations are elapsed time, independent of local timezone/DST.
+inline std::wstring RelativeDuration(uint64_t ticks,const std::array<std::wstring,4>& units,
+                                     const std::wstring& subsecond)
+{
+    uint64_t seconds=ticks/10000000;
+    if(!seconds) return subsecond;
+    constexpr std::array<uint64_t,4> divisors{86400,3600,60,1};
+    std::wstring text;
+    for(size_t i=0;i<divisors.size();++i) {
+        const auto count=seconds/divisors[i];seconds%=divisors[i];
+        if(count) {if(!text.empty()) text+=L" ";text+=std::to_wstring(count)+L" "+units[i];}
+    }
+    return text;
+}
 // Same selection as InternalGetSize in salamdr4.cpp. -1 means NumberToStr.
 inline int PanelSizeMode(int format) { return format==1?3:format==2?0:-1; }
 
