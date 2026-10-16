@@ -90,7 +90,7 @@ void Run(const std::wstring& dll,Fixture& f,bool content)
 {
     Module module(dll);
     auto settingsTest=reinterpret_cast<Module::Status>(GetProcAddress(module.handle,"ProbeSettingsTest"));
-    Check(settingsTest && settingsTest()==15,"persistent recovery and appearance settings: round trips, long Unicode paths and malformed values");
+    Check(settingsTest && settingsTest()==18,"persistent recovery, appearance, columns and sorting: round trips, long Unicode paths and malformed values");
     Check(module.release(FALSE)==1,"idle normal release succeeds");
     Check(module.start(f.left.c_str(),f.right.c_str(),content)!=FALSE,"start module worker");
     ULONGLONG deadline=GetTickCount64()+5000; unsigned status=0;

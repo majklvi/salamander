@@ -190,6 +190,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     HWND list=CreateWindowExW(0,WC_LISTVIEWW,L"",WS_CHILD|LVS_REPORT,8,100,500,300,window,HMENU(INT_PTR(IDC_LIST)),instance,nullptr);
     HWND bar=CreateWindowExW(0,STATUSCLASSNAMEW,L"",WS_CHILD,0,440,610,30,window,HMENU(INT_PTR(IDC_STATUS)),instance,nullptr);
     ok &= list!=nullptr && bar!=nullptr;
+    SetWindowSubclass(list,PreviewList,1,0);SetWindowSubclass(ListView_GetHeader(list),PreviewHeader,1,0);
     for(int i=0;i<9;++i) {LVCOLUMNW column{};column.mask=LVCF_WIDTH;column.cx=100;SendMessageW(list,LVM_INSERTCOLUMNW,i,LPARAM(&column));}
     p.result=dirsync::Compare(left,right,p.options,p.cancel,p.progress);auto snapshot=p.result.snapshot;
     dirsync::Row row;row.path=L"skipped-漢字.txt";row.state=dirsync::State::Different;row.action=dirsync::Action::None;
@@ -294,6 +295,53 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
     const auto longDirectory=std::wstring(140,L'漢')+L"\\"+std::wstring(140,L'Ž');
     p.result.rows[0].path=longDirectory+L"\\same.txt";Filter(p);
     ok &= std::find(p.groups.begin(),p.groups.end(),longDirectory)!=p.groups.end();
+    // Sorting stays inside each directory and retains model selection. Numeric
+    // values must not be ordered as their formatted strings (2, 10, 1000).
+    p.result.rows.clear();
+    for(size_t i=0;i<6;++i) {
+        dirsync::Row entry;entry.path=(i<3?L"alpha\\":L"beta-漢字\\")+std::wstring(i%3==0?L"z.txt":i%3==1?L"a.txt":L"m.txt");
+        entry.hasLeft=true;entry.state=dirsync::State::LeftOnly;entry.action=dirsync::Action::CopyRight;
+        entry.left.size=i%3==0?2:i%3==1?1000:10;entry.left.time=i%3==0?300:i%3==1?100:200;
+        p.result.rows.push_back(entry);
+    }
+    Filter(p);for(int i=0;i<9;++i) p.columnWidths[size_t(i)]=100;
+    ListView_SetItemState(list,-1,0,LVIS_SELECTED|LVIS_FOCUSED);
+    auto picked=std::find(p.visible.begin(),p.visible.end(),size_t(2))-p.visible.begin();
+    ListView_SetItemState(list,int(picked),LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+    SortPreview(p,1);ok &= p.visible==std::vector<size_t>({0,2,1,3,5,4}) && SelectedRows(p)==std::vector<size_t>{2};
+    SortPreview(p,1);ok &= p.visible==std::vector<size_t>({1,2,0,4,5,3}) && SelectedRows(p)==std::vector<size_t>{2};
+    SortPreview(p,2);ok &= p.visible==std::vector<size_t>({1,2,0,4,5,3});
+    SortPreview(p,2);ok &= p.visible==std::vector<size_t>({0,2,1,3,5,4});
+    for(int column=0;column<9;++column) for(bool descending:{false,true}) {
+        settings.sortColumn=column;settings.sortDescending=descending;Filter(p);ColumnStyle(p);
+        for(size_t i=1;i<p.visible.size();++i) if(RowDirectory(p.result.rows[p.visible[i-1]])==RowDirectory(p.result.rows[p.visible[i]])) {
+            int comparison=CompareRows(p.result.rows[p.visible[i-1]],p.result.rows[p.visible[i]],p,column);
+            ok &= descending?comparison>=0:comparison<=0;
+        }
+        HDITEMW arrow{};arrow.mask=HDI_FORMAT;SendMessageW(ListView_GetHeader(list),HDM_GETITEMW,column,LPARAM(&arrow));
+        ok &= (arrow.fmt&(HDF_SORTUP|HDF_SORTDOWN))==(descending?HDF_SORTDOWN:HDF_SORTUP);
+    }
+    const auto beforeHide=p.visible;const auto beforeSelection=SelectedRows(p);
+    for(int column:{1,2,4,5,6,7,8}) {ToggleColumn(p,column);ok &= ListView_GetColumnWidth(list,column)==0;}
+    ok &= settings.visibleColumns==0x9 && settings.sortColumn==0 && !settings.sortDescending;
+    ListView_SetColumnWidth(list,0,0);ListView_SetColumnWidth(list,3,0);ListView_SetColumnWidth(list,6,100);
+    ok &= ListView_GetColumnWidth(list,0)>=24 && ListView_GetColumnWidth(list,3)>=24 && ListView_GetColumnWidth(list,6)==0;
+    ok &= p.visible.size()==beforeHide.size() && SelectedRows(p)==beforeSelection;
+    ToggleColumn(p,0);ToggleColumn(p,3);ok &= settings.visibleColumns==0x9;
+    for(int column:{1,2,4,5,6,7,8}) {ToggleColumn(p,column);ok &= ListView_GetColumnWidth(list,column)>0;}
+    ok &= settings.visibleColumns==0x1ff;
+    p.running=true;SortPreview(p,4);ToggleColumn(p,4);p.running=false;
+    ok &= settings.sortColumn==0 && settings.visibleColumns==0x1ff;
+    auto x=p.result.rows[0],y=x;x.left.size=2;y.left.size=1000000000000ULL;
+    ok &= CompareRows(x,y,p,1)<0 && CompareRows(y,x,p,1)>0;
+    x.left.time=UINT64_MAX;y.left.time=1;ok &= CompareRows(x,y,p,2)>0;
+    x.hasLeft=false;y.left.size=0;ok &= CompareRows(x,y,p,1)<0;
+    x.hasLeft=true;x.left.directory=true;ok &= CompareRows(x,y,p,1)<0;
+    x.error=2;y.error=10;ok &= CompareRows(x,y,p,8)<0;
+    x.hasRight=y.hasRight=true;x.right.size=10;y.right.size=2;
+    x.right.time=1;y.right.time=UINT64_MAX;
+    ok &= CompareRows(x,y,p,4)>0 && CompareRows(x,y,p,5)<0;
+    settings.sortColumn=0;settings.sortDescending=false;
     p.result.rows.clear();
     for(size_t i=0;i<6000;++i) {
         dirsync::Row entry;entry.path=L"group-"+std::to_wstring(i/100)+L"\\file-"+std::to_wstring(i)+L".txt";
@@ -375,6 +423,15 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
         settings={}; plugin.LoadConfiguration(nullptr,key,&registry);
         check(!settings.keepOriginals && settings.recoveryRoot==root);
         check(settings.actionLabels && settings.colors[0][2]==RGB(12,34,56) && settings.colors[1][6]==RGB(98,76,54));
+        settings.visibleColumns=0x39;settings.sortColumn=5;settings.sortDescending=true;
+        plugin.SaveConfiguration(nullptr,key,&registry);settings={};plugin.LoadConfiguration(nullptr,key,&registry);
+        check(settings.visibleColumns==0x39 && settings.sortColumn==5 && settings.sortDescending);
+        registry.values["VisibleColumnsV1"].bytes={0,0,0,0};
+        plugin.LoadConfiguration(nullptr,key,&registry);
+        check(settings.visibleColumns==0x9 && settings.sortColumn==0 && !settings.sortDescending);
+        registry.values["SortColumnV1"].bytes={99,0,0,0};
+        registry.values["SortDescendingV1"].bytes={2,0,0,0};
+        plugin.LoadConfiguration(nullptr,key,&registry);check(settings.sortColumn==0 && !settings.sortDescending);
         registry.values["ActionLabels"].bytes={2,0,0,0};
         registry.values["DarkColorsV1"].bytes={0,0,0,0};
         registry.values["LightColorsV1"].bytes.back()=255;

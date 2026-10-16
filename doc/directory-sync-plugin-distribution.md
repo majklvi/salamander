@@ -1,5 +1,11 @@
 # Directory Synchronization: balíček a čistá konfigurace 0.16
 
+## 2026-10-17 — balíček 0.1.2 s řazením a volitelnými sloupci
+
+Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\sorting-0.1.2-20261017\plugin_5.0_dirsync_0.1.2_x64.zip`, SHA-256 `9b08623334c9094831391eb6eb53c60f1626069406735366fea572e282ff3028`. SPL i oba SLG mají verzi **0.1.2 (x64)**; přiložený aktuální návod a pilotní pokyny popisují řazení a nabídku sloupců. ZIP byl rozbalen do nového kontrolního adresáře, ověřeno všech 12 hashů a shoda binárních modulů s izolovanou GUI instancí.
+
+[Ověření 0.1.2](directory-sync-plugin-columns.md) zahrnuje světlé/tmavé rozhraní, oba směry řazení velikostí, menu záhlaví, klávesnicové obnovení sloupce a skutečné restarty se zapamatováním nových voleb. Registrační mechanismus se neměnil; nejde o opakování čisté instalace ani kompletního instalátoru. Bez SMB testů a změn SDK.
+
 ## 2026-10-16 — balíček 0.1.1 se skupinami adresářů
 
 Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\grouping-0.1.1-20261016\plugin_5.0_dirsync_0.1.1_x64.zip`, SHA-256 `57fa3a1177c8815cc3d24e96d5ad89024bc60dfe1a3b56f77c874855fa935f36`. Obsahuje aktualizovaný návod a pilotní pokyny; SPL i oba SLG mají verzi **0.1.1 (x64)**. ZIP byl rozbalen do nového kontrolního adresáře, ověřeno všech 12 hashů manifestu a shoda tří binárních modulů s instancí použitou pro GUI test.

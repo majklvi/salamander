@@ -303,4 +303,5 @@ BEGIN
     292 "Invalid masks (regex and saved searches are not supported)"
     293 "Counterpart excluded by masks; protected"
     294 "Both paths refer to the same file"
+    517 "&Columns..."
 END

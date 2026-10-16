@@ -1,6 +1,8 @@
 # Synchronizace adresářů — pilotní testování
 
-Vývojová verze 0.1.1 pro **Samandarin 0.16 x64**, čeština i angličtina. Balíček je nepodepsaný a obsahuje pouze plugin. Pilot je určen pro **kopie místních NTFS dat**; SMB, síťové disky a změny SDK jsou mimo tento pilot.
+Vývojová verze 0.1.2 pro **Samandarin 0.16 x64**, čeština i angličtina. Balíček je nepodepsaný a obsahuje pouze plugin. Pilot je určen pro **kopie místních NTFS dat**; SMB, síťové disky a změny SDK jsou mimo tento pilot.
+
+Klikáním do záhlaví sloupce přepínáte vzestupné/sestupné řazení souborů uvnitř adresářů. Pravé tlačítko na záhlaví nebo **Sloupce… / Columns…** v kontextovém menu seznamu skryje či zobrazí volitelné sloupce. Název, cesta adresáře a operace zůstávají. Volby sloupců a řazení se pamatují; skrytí sloupce nevynechává soubory ze synchronizace.
 
 Výsledky jsou seskupené podle relativních adresářů (`\` je kořen). Pod záhlavím jsou názvy souborů; záhlaví samo není položka operace a nevybírá své potomky. Prázdné skupiny po filtrování zmizí. Adresář určený k odstranění má vlastní řádek v nadřazené skupině.
 

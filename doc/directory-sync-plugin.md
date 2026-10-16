@@ -1,6 +1,6 @@
 # Directory Synchronization — aktuální návod
 
-Stav 16. října 2026, vývojová verze 0.1.1 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
+Stav 17. října 2026, vývojová verze 0.1.2 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
 
 Pro pilotní používání začněte [krátkými pokyny včetně hlášení chyb](directory-sync-plugin-pilot-guide.md), přiloženými v balíčku jako `PILOT.cs.md`.
 
@@ -19,6 +19,10 @@ Zavřete instance používající starou verzi pluginu, zkopírujte celý adres�
 Při sestavení ze zdrojů použijte projekt `src/plugins/dirsync/vcxproj/dirsync.vcxproj`; jazykový modul je jeho závislost. Podrobný build postup je v [implementačním záznamu](directory-sync-plugin-implementation.md#sestavení-a-testy). [Distribuční ověření](directory-sync-plugin-distribution.md) dokončilo rozbalení ZIP do čisté konfigurace 0.16 x64, automatickou registraci a dva skutečné restarty s ON/OFF a Unicode cestou obnovy. Jde o ruční portable instalaci pluginu, nikoli sestavení celého Inno instalátoru.
 
 ## Vzhled a nápověda
+
+Od **0.1.2** kliknutí na záhlaví sloupce seřadí položky uvnitř každého adresáře vzestupně; další kliknutí obrátí směr. Skupiny adresářů zůstávají ve stejném pořadí. Velikosti, časy a kódy chyb se řadí podle skutečných hodnot; texty podle zobrazených názvů bez rozlišení velikosti písmen. Prázdná velikost/čas je vzestupně před vyplněnou hodnotou, sestupně za ní. Při shodě rozhoduje název. Ukazatel v záhlaví označuje aktivní sloupec a směr.
+
+Pravé tlačítko na záhlaví otevře nabídku sloupců; stejná volba **Columns… / Sloupce…** je na konci kontextového menu seznamu (také Shift+F10). Obě velikosti, oba časy, State / Stav, Reason / Důvod a Error / Chyba lze nezávisle schovat a znovu zobrazit. **Název a Operace jsou povinné, cesta v záhlaví adresáře zůstává viditelná.** Skrytí sloupce nemění viditelnost souborů ani rozsah operací. Pokud schováte právě řazený sloupec, vrátí se řazení podle názvu vzestupně. Viditelnost sloupců i řazení se pamatují společně pro plugin přes restart hostitele; šířky se při zobrazení obnoví v rámci otevřeného okna, nepamatují se přes restart. Během běžící práce se řazení ani sloupce nemění. [Ověření verze 0.1.2](directory-sync-plugin-columns.md).
 
 Od verze **0.1.1** je seznam seskupený podle relativních adresářů. Záhlaví `\` označuje kořen, například `\alpha\nested\` podadresář; sloupec **Name / Název** obsahuje samotné názvy položek. Záhlaví nejsou návrhy operací a jejich kliknutí nevybírá obsah. Adresář navržený k odstranění zůstává samostatným řádkem v nadřazené skupině. Filtry odstraní skupinu, pokud nemá žádné viditelné položky. Kopírování cest nadále používá celé skutečné cesty. Podrobnosti a ověření jsou v [záznamu seskupování](directory-sync-plugin-grouping.md).
 

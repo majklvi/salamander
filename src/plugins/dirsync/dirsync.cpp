@@ -43,6 +43,9 @@ Palette DefaultPalette(bool night)
         Palette{RGB(0,112,52),RGB(139,91,0),RGB(0,112,52),RGB(0,92,175),RGB(96,96,96),RGB(178,42,28),RGB(178,42,28)};
 }
 struct Settings {
+    DWORD visibleColumns=0x1ff;
+    int sortColumn=0;
+    bool sortDescending=false;
     bool keepOriginals=true;
     bool actionLabels=false;
     std::array<Palette,2> colors{DefaultPalette(false),DefaultPalette(true)};
@@ -58,6 +61,16 @@ void LoadSettings(HKEY key,CSalamanderRegistryAbstract* registry)
     enabled=0;
     if(registry->GetValue(key,"ActionLabels",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
         settings.actionLabels=enabled!=0;
+    enabled=0x1ff;
+    if(registry->GetValue(key,"VisibleColumnsV1",REG_DWORD,&enabled,sizeof(enabled)))
+        settings.visibleColumns=(enabled&0x1ff)|0x9; // Name and Action are mandatory.
+    enabled=0;
+    if(registry->GetValue(key,"SortColumnV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<9)
+        settings.sortColumn=int(enabled);
+    enabled=0;
+    if(registry->GetValue(key,"SortDescendingV1",REG_DWORD,&enabled,sizeof(enabled)) && enabled<=1)
+        settings.sortDescending=enabled!=0;
+    if(!(settings.visibleColumns&(1u<<settings.sortColumn))) {settings.sortColumn=0;settings.sortDescending=false;}
     for(int theme=0;theme<2;++theme) {
         Palette palette{};DWORD size=0;const char* name=theme?"DarkColorsV1":"LightColorsV1";
         if(registry->GetSize(key,name,REG_BINARY,size) && size==sizeof(palette) &&
@@ -83,6 +96,10 @@ bool StoreSettings(HKEY key,CSalamanderRegistryAbstract* registry)
         DWORD((settings.recoveryRoot.size()+1)*sizeof(wchar_t)))!=FALSE;
     DWORD labels=settings.actionLabels?1:0;
     bool appearance=registry->SetValue(key,"ActionLabels",REG_DWORD,&labels,sizeof(labels))!=FALSE;
+    DWORD columns=(settings.visibleColumns&0x1ff)|0x9,column=DWORD(settings.sortColumn),descending=settings.sortDescending?1:0;
+    appearance=(registry->SetValue(key,"VisibleColumnsV1",REG_DWORD,&columns,sizeof(columns))!=FALSE) && appearance;
+    appearance=(registry->SetValue(key,"SortColumnV1",REG_DWORD,&column,sizeof(column))!=FALSE) && appearance;
+    appearance=(registry->SetValue(key,"SortDescendingV1",REG_DWORD,&descending,sizeof(descending))!=FALSE) && appearance;
     for(int theme=0;theme<2;++theme)
         appearance=(registry->SetValue(key,theme?"DarkColorsV1":"LightColorsV1",REG_BINARY,settings.colors[theme].data(),sizeof(Palette))!=FALSE) && appearance;
     return mode && path && appearance;
@@ -394,6 +411,7 @@ struct Preview
     int requestedAction = 0;
     std::vector<size_t> visible;
     std::vector<std::wstring> groups;
+    std::array<int,9> columnWidths{};
     std::vector<dirsync::Action> defaults;
     std::array<HICON,7> buttonIcons{};
     std::array<bool,5> filterChecks{};
@@ -837,6 +855,52 @@ struct DirectoryLess {
         return CompareStringOrdinal(a.c_str(),int(a.size()),b.c_str(),int(b.size()),TRUE)==CSTR_LESS_THAN;
     }
 };
+int CompareRows(const dirsync::Row& a,const dirsync::Row& b,const Preview& p,int column)
+{
+    auto numeric=[](uint64_t x,uint64_t y){return x<y?-1:x>y?1:0;};
+    if(column==1 || column==2 || column==4 || column==5) {
+        const bool left=column<3,size=column==1 || column==4;
+        const auto& x=left?a.left:a.right;const auto& y=left?b.left:b.right;
+        bool presentX=(left?a.hasLeft:a.hasRight) && (!size || !x.directory);
+        bool presentY=(left?b.hasLeft:b.hasRight) && (!size || !y.directory);
+        if(presentX!=presentY) return presentX?1:-1;
+        if(!presentX) return 0;
+        return numeric(size?x.size:x.time,size?y.size:y.time);
+    }
+    if(column==8) return numeric(a.error,b.error);
+    const auto x=Cell(a,column,p),y=Cell(b,column,p);
+    if(x.empty() || y.empty()) return x.empty()?(y.empty()?0:-1):1;
+    return CompareStringOrdinal(x.c_str(),int(x.size()),y.c_str(),int(y.size()),TRUE)-CSTR_EQUAL;
+}
+bool PreviewLess(const Preview& p,size_t a,size_t b)
+{
+    const auto& x=p.result.rows[a];const auto& y=p.result.rows[b];
+    const auto dx=RowDirectory(x),dy=RowDirectory(y);
+    if(DirectoryLess{}(dx,dy)) return true;
+    if(DirectoryLess{}(dy,dx)) return false;
+    int order=CompareRows(x,y,p,settings.sortColumn);
+    if(order) return settings.sortDescending?order>0:order<0;
+    order=CompareRows(x,y,p,0);
+    return order?order<0:a<b;
+}
+void ColumnStyle(Preview& p)
+{
+    HWND list=GetDlgItem(p.window,IDC_LIST),header=ListView_GetHeader(list);
+    for(int i=0;i<9;++i) {
+        ListView_SetColumnWidth(list,i,(settings.visibleColumns&(1u<<i))?p.columnWidths[size_t(i)]:0);
+        // The host's dark header theme does not consistently render HDF sort
+        // arrows. Retain their semantic flags and show a compact text marker.
+        auto caption=(dark && i==settings.sortColumn?std::wstring(settings.sortDescending?L"\u2193 ":L"\u2191 "):L"")+Text(IDS_COLUMNS+i);
+        HDITEMW title{};title.mask=HDI_TEXT;title.pszText=caption.data();
+        SendMessageW(header,HDM_SETITEMW,i,LPARAM(&title));
+        HDITEMW item{};item.mask=HDI_FORMAT;
+        if(SendMessageW(header,HDM_GETITEMW,i,LPARAM(&item))) {
+            item.fmt&=~(HDF_SORTUP|HDF_SORTDOWN);
+            if(i==settings.sortColumn) item.fmt|=settings.sortDescending?HDF_SORTDOWN:HDF_SORTUP;
+            SendMessageW(header,HDM_SETITEMW,i,LPARAM(&item));
+        }
+    }
+}
 std::wstring GroupLabel(const std::wstring& directory,int format)
 {
     return directory.empty()?L"\\":L"\\"+dirsync::PanelRelativePath(directory,true,format,PanelName);
@@ -858,10 +922,7 @@ void RebuildGroups(Preview& p)
     std::map<std::wstring,int,DirectoryLess> directories;
     for(size_t index:p.visible) directories.emplace(RowDirectory(p.result.rows[index]),0);
     for(auto& entry:directories) {entry.second=int(p.groups.size());p.groups.push_back(entry.first);}
-    // Keep physical item indices in visual order for keyboard range selection.
-    std::stable_sort(p.visible.begin(),p.visible.end(),[&](size_t a,size_t b) {
-        return directories.at(RowDirectory(p.result.rows[a]))<directories.at(RowDirectory(p.result.rows[b]));
-    });
+    // Filter already keeps physical item indices in visual order.
     for(size_t i=0;i<p.groups.size();++i) {
         LVGROUP group{sizeof(group)};group.mask=LVGF_GROUPID|LVGF_STATE;
         group.iGroupId=int(i);group.stateMask=LVGS_COLLAPSIBLE|LVGS_COLLAPSED;group.state=LVGS_NORMAL;
@@ -902,9 +963,7 @@ void Filter(Preview& p)
     {
         if (RowVisible(p.result.rows[i],p.filterChecks)) p.visible.push_back(i);
     }
-    std::stable_sort(p.visible.begin(),p.visible.end(),[&](size_t a,size_t b) {
-        return DirectoryLess{}(RowDirectory(p.result.rows[a]),RowDirectory(p.result.rows[b]));
-    });
+    std::stable_sort(p.visible.begin(),p.visible.end(),[&](size_t a,size_t b) {return PreviewLess(p,a,b);});
     if(p.visible!=previous || (p.groups.empty() && !p.visible.empty())) RebuildGroups(p);
     for(size_t i=0;i<p.visible.size();++i) {
         // Selection is sorted by model index; display order is grouped by directory.
@@ -1154,6 +1213,42 @@ int PreviewHit(HWND list,POINT point)
     LVHITTESTINFO hit{};hit.pt=point;
     return ListView_SubItemHitTest(list,&hit);
 }
+void RememberColumns(Preview& p)
+{
+    HWND list=GetDlgItem(p.window,IDC_LIST);
+    for(int i=0;i<9;++i) if(settings.visibleColumns&(1u<<i))
+        p.columnWidths[size_t(i)]=std::max(24,ListView_GetColumnWidth(list,i));
+}
+void SortPreview(Preview& p,int column)
+{
+    if(p.running || column<0 || column>=9 || !(settings.visibleColumns&(1u<<column))) return;
+    RememberColumns(p);
+    settings.sortDescending=column==settings.sortColumn?!settings.sortDescending:false;
+    settings.sortColumn=column;Filter(p);ColumnStyle(p);
+}
+void ToggleColumn(Preview& p,int column)
+{
+    if(p.running || column<0 || column>=9 || column==0 || column==3) return;
+    RememberColumns(p);settings.visibleColumns^=1u<<column;
+    if(!(settings.visibleColumns&(1u<<settings.sortColumn))) {
+        settings.sortColumn=0;settings.sortDescending=false;Filter(p);
+    }
+    ColumnStyle(p);
+}
+void ColumnsMenu(Preview& p,POINT point)
+{
+    if(!gui || p.running) return;
+    MENU_TEMPLATE_ITEM items[11]{};
+    items[0]={MNTT_PB,0,0,0,-1,0,nullptr};
+    for(int i=0;i<9;++i) items[i+1]={MNTT_IT,IDS_COLUMNS+i,MNTS_B|MNTS_I|MNTS_A,DWORD(i+1),-1,0,nullptr};
+    items[10]={MNTT_PE,0,0,0,-1,0,nullptr};
+    auto* menu=gui->CreateMenuPopup();if(!menu) return;DWORD command=0;
+    if(menu->LoadFromTemplate(language,items,nullptr,nullptr,nullptr)) {
+        for(int i=0;i<9;++i) {menu->CheckItem(i+1,FALSE,(settings.visibleColumns&(1u<<i))!=0);menu->EnableItem(i+1,FALSE,i!=0 && i!=3);}
+        command=menu->Track(MENU_TRACK_RETURNCMD|MENU_TRACK_RIGHTBUTTON|MENU_TRACK_NONOTIFY,point.x,point.y,p.window,nullptr);
+    }
+    gui->DestroyMenuPopup(menu);if(command) ToggleColumn(p,int(command)-1);
+}
 void PreviewMenu(Preview& p,LPARAM position)
 {
     if(!gui || p.running) return;HWND list=GetDlgItem(p.window,IDC_LIST);
@@ -1193,7 +1288,10 @@ void PreviewMenu(Preview& p,LPARAM position)
         {MNTT_IT,IDS_MENU_DELETE_FILES,MNTS_B|MNTS_I|MNTS_A,PlanDelete+1,-1,0,nullptr},
         {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
         {MNTT_IT,IDS_MENU_SAVE,MNTS_B|MNTS_I|MNTS_A,PlanSave+1,-1,0,nullptr},
-        {MNTT_PE,0,0,0,-1,0,nullptr},{MNTT_PE,0,0,0,-1,0,nullptr}};
+        {MNTT_PE,0,0,0,-1,0,nullptr},
+        {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
+        {MNTT_IT,IDS_MENU_COLUMNS,MNTS_B|MNTS_I|MNTS_A,1001,-1,0,nullptr},
+        {MNTT_PE,0,0,0,-1,0,nullptr}};
     auto* menu=gui->CreateMenuPopup();if(!menu) return;DWORD command=0;
     if(menu->LoadFromTemplate(language,items,nullptr,nullptr,nullptr)) {
         if(auto* plan=menu->GetSubMenu(21,FALSE)) EnablePlanMenu(plan,p);
@@ -1210,10 +1308,41 @@ void PreviewMenu(Preview& p,LPARAM position)
         command=menu->Track(MENU_TRACK_RETURNCMD|MENU_TRACK_RIGHTBUTTON|MENU_TRACK_NONOTIFY,point.x,point.y,p.window,nullptr);
     }
     gui->DestroyMenuPopup(menu);
-    if(command) PreviewCommand(p,rows,int(command)-1);
+    if(command==1001) ColumnsMenu(p,point);
+    else if(command) PreviewCommand(p,rows,int(command)-1);
+}
+LRESULT CALLBACK PreviewHeader(HWND header,UINT message,WPARAM w,LPARAM l,UINT_PTR id,DWORD_PTR data)
+{
+    if(message==WM_RBUTTONUP || message==WM_CONTEXTMENU) {
+        auto* p=reinterpret_cast<Preview*>(GetWindowLongPtrW(GetParent(GetParent(header)),DWLP_USER));
+        if(p) {
+            POINT point{static_cast<short>(LOWORD(l)),static_cast<short>(HIWORD(l))};
+            if(message==WM_RBUTTONUP) ClientToScreen(header,&point);
+            else if(l==LPARAM(-1)) {RECT r{};GetWindowRect(header,&r);point={r.left,r.bottom};}
+            ColumnsMenu(*p,point);
+        }
+        // Consume the header gesture, including its default context forwarding.
+        // Otherwise a second, file-row menu opens after the columns menu closes.
+        return 0;
+    }
+    if(message==WM_NCDESTROY) RemoveWindowSubclass(header,PreviewHeader,id);
+    (void)data;return DefSubclassProc(header,message,w,l);
 }
 LRESULT CALLBACK PreviewList(HWND list,UINT message,WPARAM w,LPARAM l,UINT_PTR id,DWORD_PTR data)
 {
+    if(message==WM_NOTIFY && l) {
+        auto* notification=reinterpret_cast<NMHDR*>(l);
+        auto* p=reinterpret_cast<Preview*>(GetWindowLongPtrW(GetParent(list),DWLP_USER));
+        if(p && notification->hwndFrom==ListView_GetHeader(list)) {
+            if(notification->code==HDN_ITEMCHANGINGW || notification->code==HDN_ITEMCHANGINGA) {
+                auto* header=reinterpret_cast<NMHEADERW*>(l);
+                if(header->iItem>=0 && header->iItem<9 && header->pitem && (header->pitem->mask&HDI_WIDTH)) {
+                    const bool visible=(settings.visibleColumns&(1u<<header->iItem))!=0;
+                    if((!visible && header->pitem->cxy!=0) || (visible && (header->iItem==0 || header->iItem==3) && header->pitem->cxy<24)) return TRUE;
+                }
+            }
+        }
+    }
     if(message==WM_LBUTTONDOWN || message==WM_LBUTTONDBLCLK) {
         LVHITTESTINFO hit{};hit.pt={static_cast<short>(LOWORD(l)),static_cast<short>(HIWORD(l))};
         SendMessageW(list,LVM_HITTEST,WPARAM(-1),LPARAM(&hit));
@@ -1522,6 +1651,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         }
         HWND list = GetDlgItem(window, IDC_LIST);
         SetWindowSubclass(list,PreviewList,1,0);
+        SetWindowSubclass(ListView_GetHeader(list),PreviewHeader,1,0);
         // Existing darkmodelib opt-in forwards only this list's custom drawing
         // to the plugin, preserving the shared theming of all other controls.
         SetPropW(list,L"Salamander.DarkModeLib.CustomListView",HANDLE(1));
@@ -1544,7 +1674,9 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             p->controls.push_back({child, bounds});
         }
         LayoutFilters(*p,0);
-        ConfigureDark(window);ButtonIcons(*p); Tooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
+        ConfigureDark(window);ButtonIcons(*p); Tooltips(window);ActionColumn(window);
+        for(int i=0;i<9;++i) p->columnWidths[size_t(i)]=ListView_GetColumnWidth(list,i);
+        ColumnStyle(*p);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
     if(message==WM_CTLCOLORBTN && (GetWindowLongPtrW(reinterpret_cast<HWND>(l),GWL_STYLE)&BS_PUSHLIKE)) {
@@ -1651,7 +1783,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if (p->running) { p->closing = true; p->Stop(); }
         else { PersistSettings(window); EndDialog(window, 0); }
         return TRUE;
-    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ReadPanelFormat(*p);UpdateGroupHeaders(*p);ConfigureDark(window);ButtonIcons(*p);InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,FALSE); return TRUE;
+    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ReadPanelFormat(*p);UpdateGroupHeaders(*p);RememberColumns(*p);ConfigureDark(window);ColumnStyle(*p);ButtonIcons(*p);InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,FALSE); return TRUE;
     case WM_CONTEXTMENU:
         if(reinterpret_cast<HWND>(w)==GetDlgItem(window,IDC_LIST)) {PreviewMenu(*p,l);return TRUE;}
         break;
@@ -1695,6 +1827,9 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         }
         break;
     case WM_NOTIFY:
+        if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_COLUMNCLICK) {
+            SortPreview(*p,reinterpret_cast<NMLISTVIEW*>(l)->iSubItem);return TRUE;
+        }
         if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_KEYDOWN) {
             auto* key=reinterpret_cast<NMLVKEYDOWN*>(l);
             if((GetKeyState(VK_CONTROL)&0x8000) && !(GetKeyState(VK_MENU)&0x8000) && !(GetKeyState(VK_SHIFT)&0x8000)) {
@@ -1765,7 +1900,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                     ListView_GetBkColor(draw->nmcd.hdr.hwndFrom),ListView_GetTextColor(draw->nmcd.hdr.hwndFrom));
             if(draw->nmcd.dwDrawStage==CDDS_PREPAINT) result=CDRF_NOTIFYITEMDRAW|CDRF_NOTIFYPOSTPAINT;
             else if(draw->nmcd.dwDrawStage==CDDS_ITEMPREPAINT) result=CDRF_NOTIFYSUBITEMDRAW;
-            else if((draw->iSubItem==3 || draw->iSubItem==6) && draw->nmcd.dwItemSpec<p->visible.size()) {
+            else if((draw->iSubItem==3 || draw->iSubItem==6) && (settings.visibleColumns&(1u<<draw->iSubItem)) && draw->nmcd.dwItemSpec<p->visible.size()) {
                 const auto& row=p->result.rows[p->visible[size_t(draw->nmcd.dwItemSpec)]];
                 Mark mark=RowMark(row,draw->iSubItem==3);
                 bool selected=(ListView_GetItemState(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),LVIS_SELECTED)&LVIS_SELECTED)!=0;
@@ -1943,7 +2078,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (!language) return nullptr;
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES}; InitCommonControlsEx(&controls);
     ConfigureDark(nullptr);
-    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1.1", "Copyright (c) 2026 Open Salamander Authors",
+    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1.2", "Copyright (c) 2026 Open Salamander Authors",
                               general->LoadStr(language, IDS_DESCRIPTION), "DirectorySync");
     return &plugin;
 }

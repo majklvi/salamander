@@ -211,4 +211,5 @@ BEGIN
     292 "Neplatné masky (regulární výrazy a uložená hledání nejsou podporována)"
     293 "Protějšek vyloučen maskami; chráněno"
     294 "Obě cesty odkazují na stejný soubor"
+    517 "Sloup&ce..."
 END
