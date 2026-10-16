@@ -251,6 +251,14 @@ int main()
         Check(n>0 && n<exe.size(),"executable path"); std::wstring dll(exe.data(),n);
         dll.resize(dll.find_last_of(L'\\')+1); dll+=L"dirsync_lifecycle_probe.dll";
         Fixture scan; for(int i=0;i<256;++i) scan.Dir(scan.left+L"\\d"+std::to_wstring(i));
+        {
+            std::wstring chosen=scan.root;
+            for(wchar_t part:{L'階',L'長',L'文'}) {chosen+=L"\\"+std::wstring(90,part);scan.Dir(L"\\\\?\\"+chosen);}
+            Module module(dll);
+            using FolderTest=unsigned (WINAPI*)(const wchar_t*);
+            auto folderTest=reinterpret_cast<FolderTest>(GetProcAddress(module.handle,"ProbeFolderPath"));
+            Check(chosen.size()>260 && folderTest && folderTest(chosen.c_str())==3,"folder picker preserves long Unicode names and expands shell aliases; missing folder is refused");
+        }
         Fixture content; content.Sparse(content.left+L"\\same.bin"); content.Sparse(content.right+L"\\same.bin");
         for(int pass=0;pass<3;++pass) { Run(dll,scan,false); Run(dll,content,true); }
         for(bool verify:{false,true}) for(bool close:{false,true}) CopyControls(dll,verify,close);

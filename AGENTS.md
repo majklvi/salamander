@@ -125,3 +125,11 @@ When changing any plug-in-facing SDK interface, preserve binary compatibility wi
 
 - Don't use SegoeUI.
 - Use: FONT 8, "MS Shell Dlg"
+
+## Native Salamander GUI layout
+
+- Follow existing Salamander dialog resources and controls, rather than inventing a separate visual style. Inspect a comparable dialog in `src/lang/lang.rc` before changing a plugin dialog.
+- Keep dialogs compact: size to their contents, use the existing small margins and gaps (typically 5–7 dialog units), and ordinary 50 × 14 DU command buttons where the captions fit. Do not reserve large empty areas around short messages or checkboxes.
+- Confirmation dialogs use **OK** and **Cancel**. Explain the action in the dialog text, not by inventing confirmation button labels. Preserve a safe default of Cancel where dismissing the dialog must retain the current state.
+- Directory-path edits have an adjacent small native `...` browse button, matching existing Salamander dialogs. Canceling the folder picker must preserve the edit and current results; disable the browse button whenever its edit is disabled.
+- Retain `MS Shell Dlg` 8, localization, keyboard access, host-controlled dark mode, and checks for clipped captions and overlaps at supported DPI. Resizing must keep browse buttons beside their corresponding edits and give extra space to useful content.

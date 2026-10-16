@@ -16,7 +16,10 @@
 #include <exception>
 #include <utility>
 #include <array>
+#include <shlobj.h>
 #pragma comment(lib,"comdlg32.lib")
+#pragma comment(lib,"shell32.lib")
+#pragma comment(lib,"ole32.lib")
 
 CSalamanderDebugAbstract* SalamanderDebug = nullptr;
 namespace
@@ -137,6 +140,56 @@ void ConfigureDark(HWND dialog)
     if (dialog) { DarkModeApplyWindow(dialog); DarkModeRefreshTitleBar(dialog); DarkModeApplyTree(dialog); }
 }
 using InfoRows = std::vector<std::pair<std::wstring, std::wstring>>;
+struct FolderChoice {HWND parent;std::wstring initial,title;};
+bool FolderSelectionPath(const std::wstring& selected,std::wstring& result)
+{
+    result.clear();
+    auto api=dirsync::ApiPath(selected);
+    DWORD size=GetLongPathNameW(api.c_str(),nullptr,0);
+    if(!size || size>32768) return false;
+    std::vector<wchar_t> buffer(size);
+    DWORD count=GetLongPathNameW(api.c_str(),buffer.data(),size);
+    if(!count || count>=size) return false;
+    result.assign(buffer.data(),count);
+    if(result.rfind(L"\\\\?\\UNC\\",0)==0) result=L"\\\\"+result.substr(8);
+    else if(result.rfind(L"\\\\?\\",0)==0) result.erase(0,4);
+    return !result.empty() && result.size()<32760;
+}
+int CALLBACK FolderCallback(HWND window,UINT message,LPARAM,LPARAM data)
+{
+    if(message==BFFM_INITIALIZED) {
+        auto& choice=*reinterpret_cast<FolderChoice*>(data);
+        general->MultiMonCenterWindow(window,choice.parent,FALSE);
+        SetWindowTextW(window,choice.title.c_str());ConfigureDark(window);
+        if(!choice.initial.empty()) SendMessageW(window,BFFM_SETSELECTIONW,TRUE,LPARAM(choice.initial.c_str()));
+    }
+    return 0;
+}
+void BrowseFolder(HWND parent,int edit,int title)
+{
+    if(!IsWindowEnabled(GetDlgItem(parent,edit))) return;
+    struct Apartment {
+        HRESULT result=CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);
+        ~Apartment() {if(SUCCEEDED(result)) CoUninitialize();}
+    } apartment;
+    if(FAILED(apartment.result)) {Message(parent,IDS_BROWSE_FAILED);return;}
+    // Use the same native tree picker as the host, through wide APIs so that
+    // the legacy SDK's narrow/MAX_PATH browse boundary cannot truncate paths.
+    FolderChoice choice{parent,ControlText(parent,edit),Text(title)};
+    BROWSEINFOW browse{};browse.hwndOwner=parent; browse.lpszTitle=choice.title.c_str();
+    browse.ulFlags=BIF_RETURNONLYFSDIRS; browse.lpfn=FolderCallback; browse.lParam=LPARAM(&choice);
+    struct FreePidl {using pointer=PIDLIST_ABSOLUTE;void operator()(pointer p) const {ILFree(p);}};
+    std::unique_ptr<ITEMIDLIST_ABSOLUTE,FreePidl> item(SHBrowseForFolderW(&browse));
+    ConfigureDark(parent);
+    if(!item) return;
+    PWSTR value=nullptr;
+    HRESULT resolved=SHGetNameFromIDList(item.get(),SIGDN_FILESYSPATH,&value);
+    std::unique_ptr<wchar_t,decltype(&CoTaskMemFree)> path(value,CoTaskMemFree);
+    std::wstring full;
+    // The shell can return an 8.3 alias for a long path, even through wide APIs.
+    if(FAILED(resolved) || !path || !FolderSelectionPath(path.get(),full)) {Message(parent,IDS_BROWSE_FAILED);return;}
+    if(choice.initial!=full) SetDlgItemTextW(parent,edit,full.c_str());
+}
 void Field(InfoRows& rows, int label, const std::wstring& value)
 { rows.push_back({Text(label), value}); }
 void Field(InfoRows& rows, int label, uint64_t value)
@@ -267,11 +320,6 @@ INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
                 ShowWindow(GetDlgItem(window,IDCANCEL),SW_HIDE);
                 SetDlgItemTextW(window,IDOK,Text(IDS_UI_SUMMARY).c_str());
                 SendMessageW(window,DM_SETDEFID,IDOK,0);
-            } else {
-                int label=info->title==IDS_UI_DELETE_CONFIRM?IDS_UI_START_DELETE:
-                    info->title==IDS_UI_OVERWRITE_CONFIRM?IDS_UI_START_OVERWRITE:
-                    info->title==IDS_UI_SAVE_CONFIRM?IDS_UI_START_SAVE:IDS_UI_START_COPY;
-                SetDlgItemTextW(window,IDOK,Text(label).c_str());
             }
             if(!info->rows.empty()) ListView_SetItemState(list,0,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
             CompactInformation(window,*info);
@@ -455,7 +503,7 @@ void Tooltips(HWND window);
 void RecoveryControls(HWND window)
 {
     bool keep=Checked(window,IDC_KEEP_ORIGINALS);
-    for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL}) EnableWindow(GetDlgItem(window,id),keep);
+    for(int id:{IDC_RECOVERY_ROOT,IDC_RECOVERY_LABEL,IDC_BROWSE_RECOVERY}) EnableWindow(GetDlgItem(window,id),keep);
 }
 void AppearanceSample(HWND window,Appearance& appearance)
 {
@@ -511,6 +559,7 @@ INT_PTR AppearanceBody(HWND window,UINT message,WPARAM w,LPARAM l)
             AppearanceSample(window,*appearance);return TRUE;
         }
         switch(id) {
+        case IDC_BROWSE_RECOVERY: BrowseFolder(window,IDC_RECOVERY_ROOT,IDS_BROWSE_RECOVERY);return TRUE;
         case IDC_KEEP_ORIGINALS: RecoveryControls(window);return TRUE;
         case IDC_COLOR_RESET:
             appearance->draft.colors[appearance->theme]=DefaultPalette(appearance->theme!=0);
@@ -552,14 +601,15 @@ void Tooltips(HWND window)
     HWND tip=CreateWindowExW(WS_EX_TOPMOST,TOOLTIPS_CLASSW,nullptr,WS_POPUP|TTS_ALWAYSTIP|TTS_NOPREFIX,
         CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,window,nullptr,instance,nullptr);
     if(!tip) return;
-    auto texts=std::make_unique<std::vector<std::wstring>>();texts->reserve(11);
+    auto texts=std::make_unique<std::vector<std::wstring>>();texts->reserve(14);
     if(!SetWindowSubclass(tip,TooltipLifetime,1,reinterpret_cast<DWORD_PTR>(texts.get()))) {DestroyWindow(tip);return;}
     auto* storage=texts.release();
     HDC dc=GetDC(window);int dpi=GetDeviceCaps(dc,LOGPIXELSX);ReleaseDC(window,dc);
     SendMessageW(tip,TTM_SETMAXTIPWIDTH,0,MulDiv(420,dpi,96));
     for(auto entry:{std::pair<int,int>{IDC_MASK,IDS_TIP_MASK},{IDC_KEEP_ORIGINALS,IDS_TIP_KEEP},{IDC_RECOVERY_ROOT,IDS_SAVE_ROOT},
         {IDC_DELETE_FILES,IDS_TIP_DELETE},{IDC_COPY_NEW,IDS_TIP_SCOPE},{IDC_OVERWRITE,IDS_TIP_SCOPE},
-        {IDC_SAVE_ORIGINALS,IDS_TIP_SCOPE},{IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},{IDC_LIST,0}}) {
+        {IDC_SAVE_ORIGINALS,IDS_TIP_SCOPE},{IDC_SELECTED,IDS_TIP_SELECTION},{IDC_EMPTY,IDS_TIP_EMPTY},
+        {IDC_BROWSE_LEFT,IDS_BROWSE_LEFT},{IDC_BROWSE_RIGHT,IDS_BROWSE_RIGHT},{IDC_BROWSE_RECOVERY,IDS_BROWSE_RECOVERY},{IDC_LIST,0}}) {
         TOOLINFOW tool{};tool.cbSize=sizeof(tool);tool.uFlags=TTF_IDISHWND|TTF_SUBCLASS;
         tool.hwnd=window;tool.uId=UINT_PTR(GetDlgItem(window,entry.first));tool.hinst=language;
         if(!tool.uId) continue;
@@ -650,6 +700,7 @@ void Busy(Preview& p, bool busy)
     bool locked = Checked(p.window, IDC_SELECTED);
     EnableWindow(GetDlgItem(p.window, IDC_LEFT), !busy && !locked);
     EnableWindow(GetDlgItem(p.window, IDC_RIGHT), !busy && !locked);
+    for(int id:{IDC_BROWSE_LEFT,IDC_BROWSE_RIGHT}) EnableWindow(GetDlgItem(p.window,id),!busy && !locked);
     EnableWindow(GetDlgItem(p.window, IDC_STOP), busy);
 }
 void InvalidatePlan(Preview& p)
@@ -666,7 +717,11 @@ void InvalidatePlan(Preview& p)
 struct DiscardChoice {bool suppress=false;};
 INT_PTR CALLBACK DiscardDialog(HWND window,UINT message,WPARAM w,LPARAM l)
 {
-    if(message==WM_INITDIALOG) {SetWindowLongPtrW(window,DWLP_USER,l);ConfigureDark(window);return TRUE;}
+    if(message==WM_INITDIALOG) {
+        SetWindowLongPtrW(window,DWLP_USER,l);
+        general->MultiMonCenterWindow(window,GetParent(window),FALSE);
+        ConfigureDark(window);return TRUE;
+    }
     LRESULT brush=0;if(dark && DarkModeHandleCtlColor(message,w,l,brush)) return brush;
     if(message==WM_CLOSE) {EndDialog(window,IDCANCEL);return TRUE;}
     if(message==WM_COMMAND) {
@@ -1105,6 +1160,8 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 int id = GetDlgCtrlID(control.first);
                 if (id == IDC_LIST) { r.right += dx; r.bottom += dy; }
                 else if (id == IDC_LEFT) r.right += dx/2;
+                else if (id == IDC_BROWSE_LEFT) {r.left+=dx/2;r.right+=dx/2;}
+                else if (id == IDC_BROWSE_RIGHT) {r.left+=dx;r.right+=dx;}
                 else if (id == IDC_RIGHT) { r.left += dx/2; r.right += dx; }
                 else if (id == IDC_RIGHT_LABEL) { r.left += dx/2; r.right += dx/2; }
                 else if (id == IDC_SAVE_ORIGINALS || id == IDC_DELETE_FILES) { r.top += dy; r.bottom += dy; }
@@ -1176,6 +1233,8 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         {
 
         case IDC_COMPARE: Start(*p); return TRUE;
+        case IDC_BROWSE_LEFT: BrowseFolder(window,IDC_LEFT,IDS_BROWSE_LEFT);return TRUE;
+        case IDC_BROWSE_RIGHT: BrowseFolder(window,IDC_RIGHT,IDS_BROWSE_RIGHT);return TRUE;
         case IDC_STOP: p->Stop(); Status(*p); return TRUE;
         case IDCANCEL: SendMessageW(window, WM_CLOSE, 0, 0); return TRUE;
         case IDC_APPLY: ValidatePreview(*p, Preview::Intent::Apply); return TRUE;

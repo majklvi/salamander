@@ -14,9 +14,11 @@ CAPTION "Directory Synchronization"
 FONT 8, "MS Shell Dlg"
 BEGIN
     LTEXT "&Left folder:", -1, 8, 9, 52, 10
-    EDITTEXT IDC_LEFT, 62, 6, 236, 14, ES_AUTOHSCROLL
+    EDITTEXT IDC_LEFT, 62, 6, 218, 14, ES_AUTOHSCROLL
+    PUSHBUTTON "...", IDC_BROWSE_LEFT, 284, 6, 14, 14
     LTEXT "&Right folder:", IDC_RIGHT_LABEL, 312, 9, 52, 10
-    EDITTEXT IDC_RIGHT, 366, 6, 236, 14, ES_AUTOHSCROLL
+    EDITTEXT IDC_RIGHT, 366, 6, 218, 14, ES_AUTOHSCROLL
+    PUSHBUTTON "...", IDC_BROWSE_RIGHT, 588, 6, 14, 14
     LTEXT "&Masks:", -1, 8, 29, 28, 10
     EDITTEXT IDC_MASK, 38, 26, 58, 14, ES_AUTOHSCROLL
     CONTROL "Sub&folders", IDC_RECURSIVE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 104, 28, 71, 12
@@ -52,7 +54,7 @@ BEGIN
     CONTROL "", IDC_INFO_TABLE, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_BORDER | WS_TABSTOP, 7, 7, 286, 84
     LTEXT "&Notes:", IDC_INFO_NOTES_LABEL, 7, 96, 286, 8
     EDITTEXT IDC_INFO_NOTES, 7, 107, 286, 54, ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
-    PUSHBUTTON "&Continue", IDOK, 137, 167, 76, 14
+    PUSHBUTTON "OK", IDOK, 137, 167, 76, 14
     DEFPUSHBUTTON "Cancel", IDCANCEL, 219, 167, 74, 14
 END
 IDD_APPEARANCE DIALOGEX 0, 0, 306, 219
@@ -90,25 +92,30 @@ BEGIN
     CONTROL "", -1, "Static", SS_ETCHEDHORZ, 88, 127, 211, 1
     CONTROL "&Keep originals", IDC_KEEP_ORIGINALS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 139, 140, 12
     LTEXT "Rec&overy folder:", IDC_RECOVERY_LABEL, 7, 160, 76, 10
-    EDITTEXT IDC_RECOVERY_ROOT, 86, 157, 213, 14, ES_AUTOHSCROLL
+    EDITTEXT IDC_RECOVERY_ROOT, 86, 157, 195, 14, ES_AUTOHSCROLL
+    PUSHBUTTON "...", IDC_BROWSE_RECOVERY, 285, 157, 14, 14
     CONTROL "&Warn before discarding comparison results", IDC_CONFIRM_DISCARD, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 177, 292, 12
     DEFPUSHBUTTON "OK", IDOK, 169, 199, 62, 14
     PUSHBUTTON "Cancel", IDCANCEL, 237, 199, 62, 14
 END
-IDD_DISCARD_RESULTS DIALOGEX 0, 0, 280, 99
+IDD_DISCARD_RESULTS DIALOGEX 0, 0, 220, 70
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 EXSTYLE WS_EX_APPWINDOW
 CAPTION "Discard comparison results?"
 FONT 8, "MS Shell Dlg"
 BEGIN
-    LTEXT "Changing this option will discard the current comparison", -1, 7, 7, 266, 10
-    LTEXT "results and manual proposals. Change the option?", -1, 7, 19, 266, 10
-    CONTROL "&Do not ask again", IDC_DONT_ASK, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 42, 266, 12
-    PUSHBUTTON "&Change option", IDOK, 119, 78, 78, 14
-    DEFPUSHBUTTON "Cancel", IDCANCEL, 203, 78, 70, 14
+    LTEXT "Changing this option will discard the current", -1, 7, 7, 206, 10
+    LTEXT "results and manual proposals.", -1, 7, 18, 206, 10
+    CONTROL "&Do not ask again", IDC_DONT_ASK, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 32, 206, 12
+    PUSHBUTTON "OK", IDOK, 107, 49, 50, 14
+    DEFPUSHBUTTON "Cancel", IDCANCEL, 163, 49, 50, 14
 END
 STRINGTABLE
 BEGIN
+    IDS_BROWSE_LEFT "Choose left folder"
+    IDS_BROWSE_RIGHT "Choose right folder"
+    IDS_BROWSE_RECOVERY "Choose recovery folder"
+    IDS_BROWSE_FAILED "The selected folder could not be read. Enter the full folder path in the edit field."
     IDS_APPEARANCE "Appearance"
     IDS_TIP_MASK "File masks, for example *.txt; separate masks with spaces or semicolons. Use | before exclusions."
     IDS_TIP_KEEP "Save verified originals before overwrites and deletions. Uses additional disk space. When off, no new recovery copies are created; existing backups are kept."
@@ -189,10 +196,6 @@ BEGIN
     IDS_UI_RECOVERY_FOLDER "Recovery folder"
     IDS_UI_COMPLETE "Comparison complete"
     IDS_UI_ERROR_DETAILS "Error / staging details"
-    IDS_UI_START_COPY "Copy files"
-    IDS_UI_START_SAVE "Save originals"
-    IDS_UI_START_OVERWRITE "Overwrite files"
-    IDS_UI_START_DELETE "Delete files"
     IDS_DELETE_PROGRESS "Backup/delete: item %llu of %llu; copied %llu bytes; Verify read %llu bytes; complete %llu"
     IDS_DELETE_AGAIN "Deletion run finished. Inspect the result and compare again before any further action."
     IDS_DELETE_EMPTY "No visible Delete on right proposal is a supported right-only file from an asymmetric comparison. Nothing to delete."

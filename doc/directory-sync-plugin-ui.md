@@ -139,3 +139,26 @@ Skutečný Computer Use průchod v izolovaném Samandarinu 0.16 x64: C:\Samandar
 Preferences mají 306 × 219 DU, varování 280 × 99 DU, MS Shell Dlg 8. Kompilované dialogy v Debug i Release prošly 2 506 kontrolami geometrie, úplnosti popisků, mnemonik a Tab při 96/120/144/192/240 DPI, včetně výchozího Cancel a nové volby v Preferences. Nejde o runtime přepínání mezi monitory. Release lifecycle regrese prošla 2 343 kontrolami; mock skutečných SDK callbacků zahrnuje ON/OFF/obnovení i neplatnou hodnotu ConfirmDiscardResults vedle dosavadního nastavení obnovy/vzhledu. Testovací host byl řádně ukončen; běžící uživatelské instance nebyly měněny.
 
 Kontextové menu samotných souborových výsledků bylo zařazeno do dalšího plánu v aktuálním návodu: průzkum referenčního chování, zápis pozorování a následná implementace se současným SDK. V této etapě se neimplementuje. Bez mazání složek, SMB testů a změn SDK.
+## 2026-10-16 — nativní kompaktní potvrzení a výběr všech cest
+
+Podle zdrojových dialogů Salamanderu (například IDD_USERMENUCOMPAREARGS / IDD_PLUGINKEYS v src/lang/lang.rc) bylo potvrzení zmenšeno z 280 × 99 na **220 × 70 DU**: o 44 % menší plocha, okraje 7 DU, malé mezery, tlačítka **OK/Cancel 50 × 14 DU**, standardní MS Shell Dlg 8 a centrování pomocí existujícího SDK. Výchozí Enter nadále znamená Cancel; OK přijme změnu. Také potvrzovací tabulky pro souborové operace používají OK/Cancel, nepřepisují již OK na názvy operací. Trvalé pravidlo tohoto rozložení je v AGENTS.md → Native Salamander GUI layout.
+
+Vlevo a vpravo v náhledu a u Recovery folder jsou nyní nativní **…** tlačítka 14 × 14 DU, oddělená od editace čtyřmi DU jako v hostiteli. Šířka editací ustoupila tlačítku; seznam souborů se nezmenšil. Při resize se tlačítka posouvají s koncem příslušné editace. Disabled stav sdílejí s editací: běžící operace / Panel selection a Keep originals OFF.
+
+Dialog výběru je nativní strom SHBrowseForFolderW, stejného typu jako v jádře, s výchozí složkou, centrováním přes SDK a tématem pluginu. Záměrně se nevolá úzké SDK GetTargetDirectory: jeho implementace v 0.16 prochází ANSI a pevnými krátkými buffery. Výsledek získává SHGetNameFromIDList, paměť vlastní standardní shell/COM alokátor. Případný krátký název se rozvine přes GetLongPathNameW s dynamickým bufferem a dlouhou Win32 cestou. SDK ani hostitel se nemění. Nejde o nový vlastní styl výběru složky. Pokud shell složku nezpřístupní, zůstává ruční zadání plné cesty; neúspěch původní hodnotu nepřepíše.
+
+Skutečné GUI ověření: izolovaný Samandarin 0.16 x64 v C:\Samandarin\builds\dirsync-distribution\native-ui-20261016-host, schéma Windows Dark Mode. Bez provedení kopií, přepisů nebo mazání dat.
+
+| Případ | Výsledek |
+| --- | --- |
+| Compare nad dvěma soubory, Subfolders, výchozí Enter | Kompaktní dialog OK/Cancel čitelný; původní dva výsledky zachované. Ve finálním sestavení ověřeno centrování a OK → volba změněna, Rows 0. |
+| Browse left → Cancel | Otevřela se správná výchozí levá složka; původní cesta a Rows 2 zachované. |
+| Browse right → OK bez změny výběru | Správná pravá složka; Rows 2 zachované. |
+| 305 UTF-16 jednotek / 793 UTF-8 bajtů, tři dlouhé Unicode komponenty | První průchod odhalil návrat zkráceného 8.3 názvu ze shellu. Opraveno rozvinutím názvu; ve finálním dialogu obnovy potvrzen přesný původní Unicode řetězec bez zkrácení. |
+| Keep originals OFF/ON | Editace obnovy i její browse tlačítko se společně zakázaly/povolily. |
+| Alt+O → Tab → Space v Preferences | Zaměření browse tlačítka a otevření nativního výběru klávesnicí. OK výběru zachovalo úplnou dlouhou Unicode cestu; OK Preferences ji uložilo. |
+| Maximalizace náhledu a návrat | Obě cesty se rozšířily, tlačítka zůstala bez překryvu vedle správných editací. Seznam dostal dodatečné místo. |
+
+Release x64 sestavení prošlo s warnings-as-errors. Debug i Release resource/layout testy mají **2 458 kontrol**, při 96/120/144/192/240 font DPI: rozložení, standardní potvrzovací popisky, Tab, příslušnost browse tlačítek a ostatní dosavadní kontroly. Pokles proti minulé etapě je odstranění kontrol již nepoužívaných dynamických názvů potvrzovacích tlačítek. Release lifecycle sada má **2 351 kontrol**; nová nativní regrese ověřuje úplnou dlouhou Unicode cestu, její shellový 8.3 alias a odmítnutí neexistujícího výběru. GUI nebylo přesouváno mezi různými DPI monitory. Testovací host byl normálně zavřen; uživatelské instance zůstaly beze změny.
+
+Průzkum nabídky výsledků a návrh implementace jsou v directory-sync-plugin-context-menu.md. Nabídka v pluginu zatím implementovaná není. Bez mazání složek, SMB testů a změn SDK.

@@ -23,11 +23,11 @@ Okno **Preferences** otevřete výhradně přes předvolby pluginu ve **Plugins 
 
 Dialog lze ovládat Tab/Shift+Tab. Alt+L přepíná popisky; Alt+E/D/R/F/S/T/B otevře volbu barvy příslušného řádku. Alt+U obnoví výchozí barvy vzhledu, Alt+K přepne uchování originálů a Alt+O zaměří cestu obnovy. Alt+W přepne **Warn before discarding comparison results** v Other settings. Enter uloží a Escape zruší všechny rozepsané změny.
 
-Změna některé ze šesti voleb vedle Masks při existujících výsledcích nejprve vyžádá potvrzení **Discard comparison results?**, i když jsou všechny řádky skryté. **Cancel**, Escape, křížek i výchozí Enter ponechají původní volbu, výsledky a ruční návrhy. **Change option** změnu přijme a vyprázdní výsledky; poté spusťte nové Compare. **Do not ask again** potlačí příští dotazy pouze při potvrzení změny a pamatuje se i po restartu. Dotaz obnovíte zapnutím **Warn before discarding comparison results** v Preferences → Other settings. Pouhé filtrování výsledky neruší a neptá se. Úpravy textu masky či cest nadále zneplatňují plán přímo; toto potvrzení se týká šesti voleb skenu.
+Změna některé ze šesti voleb vedle Masks při existujících výsledcích nejprve vyžádá potvrzení **Discard comparison results?**, i když jsou všechny řádky skryté. **Cancel**, Escape, křížek i výchozí Enter ponechají původní volbu, výsledky a ruční návrhy. **OK** změnu přijme a vyprázdní výsledky; poté spusťte nové Compare. **Do not ask again** potlačí příští dotazy pouze při potvrzení změny a pamatuje se i po restartu. Dotaz obnovíte zapnutím **Warn before discarding comparison results** v Preferences → Other settings. Pouhé filtrování výsledky neruší a neptá se. Úpravy textu masky či cest nadále zneplatňují plán přímo; toto potvrzení se týká šesti voleb skenu.
 
 ## Běžný postup
 
-1. Otevřete požadované kořeny v levém a pravém panelu a spusťte plugin. Zkontrolujte obě cesty vedle sebe. **Panel selection** používá sjednocený původní výběr z panelů a uzamkne kořeny; nejde o zvýraznění v náhledu.
+1. Otevřete požadované kořeny v levém a pravém panelu a spusťte plugin. Zkontrolujte obě cesty vedle sebe. Malé tlačítko **…** vedle každé cesty otevře nativní výběr složky; stejné tlačítko je u Recovery folder v Preferences. Začíná na vyplněné cestě. Cancel ani potvrzení stejné složky výsledky neruší. Volba jiné složky změní příslušné pole a v náhledu zneplatní porovnání stejně jako ruční úprava cesty. Výběr složky obnovy se uloží až přes OK celých Preferences. Je-li pole zakázané při práci, Panel selection nebo Keep originals OFF, je zakázané i jeho tlačítko. Tlačítko je dostupné přes Tab a Space/Enter. **Panel selection** používá sjednocený původní výběr z panelů a uzamkne kořeny; nejde o zvýraznění v náhledu.
 2. Nastavte masku a volby skenu. Výchozí `*.*` zahrnuje všechny názvy. Více masek oddělujte mezerou nebo středníkem, názvy s mezerou uvozovkami; za `|` patří výluky (např. `*.txt | *.tmp`). Subfolders zahrnuje podstromy. **Compare** jen čte a sestaví návrhy. Tolerance časů je 3 sekundy včetně; By content porovnává hlavní datový proud, nikoli ADS, a nenahrazuje pravidlo přednosti novějšího času. Při Ignore date nebo stejně starých odlišných datech zvolte směr ručně.
 3. Prohlédněte sloupce Action, State a Reason. Ve sloupci Action jsou výchozí pouze vycentrované symboly; textové popisy lze zapnout v Preferences. Text významu zůstává dostupný přes přístupnost, tooltip akce a stavový řádek při zaměření položky klávesnicí. Sloupec State má symbol i popis. Ve výchozí paletě zelená šipka znamená kopii doprava, modrá doleva; zelené `=` shodu, okrové `≠` neshodu/jednostrannost, šedé pozastavení Skip, červené `×` mazání a `!` nutnost rozhodnutí či blokování. Zvýrazněné řádky používají barvu výběru. Barva sama neurčuje operaci.
 4. Chcete-li změnit návrh, zvýrazněte řádky, vyberte **Proposal** a použijte **Apply to highlighted rows**. Pro vynechání nastavte Skip. Filtry Equal/Different/Single-sided a směrové filtry určují viditelnost. Blokované a konfliktní řádky zůstávají viditelné.
@@ -62,14 +62,9 @@ Obnovovací kopie jsou nezávislá data, nikoli hardlinky. Dědí oprávnění o
 
 ## Další plán: kontextové menu výsledků
 
-Náhled souborů zatím vlastní kontextové menu nemá. Existující nabídka pro kopírování v tabulkových souhrnech je jiná funkce. Další samostatný krok:
+Náhled souborů zatím vlastní kontextové menu nemá. Skutečný průzkum referenční nabídky přes Computer Use je hotový a [samostatný návrh](directory-sync-plugin-context-menu.md) odděluje pozorované chování, neprovedené operace a doporučené menu pro současné SDK. Existující nabídka schránky v tabulkových souhrnech je jiná funkce.
 
-1. Na izolované sadě prozkoumat nabídku synchronizace referenčního správce souborů: dostupné příkazy a jejich aktivaci podle stavu řádku, chování pravého kliknutí oproti více zvýrazněným řádkům, prázdnému místu a klávesnici.
-2. Zdokumentovat skutečně pozorované chování, rozsah příkazů a nejmenší vhodné mapování na současné SDK 0.16. Předem neodvozovat neověřené funkce ani rozšiřovat schválený rozsah operací.
-3. Implementovat nativní nabídku včetně Shift+F10 / klávesy Menu. Ověřit zřetelné rozlišení práce s označenými řádky od operačních tlačítek pro viditelné návrhy, dále skryté/Skip/blokované položky, Unicode cesty a běžné ovládání klávesnicí.
-
-V této úpravě je menu pouze naplánované; průzkum a implementace ještě neproběhly. Mazání složek, SMB testy a změny SDK zůstávají mimo rozsah.
-
+Doporučený první krok menu: změny návrhů jen pro zvýrazněné viditelné soubory (výchozí návrh, Skip, směr, případně označení k pravostrannému mazání) a Unicode kopírování cest. Samotné souborové operace nadále patří do existujících samostatných tlačítek. Prohlížení/porovnání, editace, přejmenování a shellové nabídky vyžadují navazující mapování; nejsou automatickou součástí první nabídky. Podoba menu čeká na posouzení před implementací. Bez mazání složek, SMB testů a změn SDK.
 ## Mapa dokumentace
 
 | Potřeba | Dokument |

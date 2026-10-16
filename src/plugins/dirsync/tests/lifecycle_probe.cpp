@@ -20,6 +20,19 @@ bool RecoveryLogged()
 }
 }
 // Exercise the real SDK configuration callbacks without touching user registry data.
+extern "C" __declspec(dllexport) unsigned WINAPI ProbeFolderPath(const wchar_t* expected)
+{
+    std::wstring full;
+    if(!FolderSelectionPath(expected,full) || full!=expected) return 0;
+    auto api=dirsync::ApiPath(expected);
+    DWORD size=GetShortPathNameW(api.c_str(),nullptr,0);
+    if(!size) return 0;
+    std::vector<wchar_t> alias(size);
+    DWORD count=GetShortPathNameW(api.c_str(),alias.data(),size);
+    if(!count || count>=size || !FolderSelectionPath(alias.data(),full) || full!=expected) return 0;
+    if(FolderSelectionPath(std::wstring(expected)+L"\\missing-picker-folder",full) || !full.empty()) return 0;
+    return 3;
+}
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
 {
     struct Registry : CSalamanderRegistryAbstract {

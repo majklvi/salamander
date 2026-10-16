@@ -71,10 +71,13 @@ void Test(int dialog)
         }
         if (c.id == IDC_LIST || c.id == IDC_ACTION || c.id == IDC_COMPARE || c.id == IDC_COPY_NEW ||
             c.id == IDC_RECOVERY_ROOT || c.id == IDC_SAVE_ORIGINALS || c.id == IDC_KEEP_ORIGINALS || c.id == IDC_OVERWRITE || c.id == IDC_DELETE_FILES || c.id == IDCANCEL ||
-            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_NOTES || c.id == IDC_CONFIRM_DISCARD || c.id == IDC_DONT_ASK || c.id == IDOK)
+            c.id == IDC_INFO_TABLE || c.id == IDC_INFO_NOTES || c.id == IDC_CONFIRM_DISCARD || c.id == IDC_DONT_ASK ||
+            c.id == IDC_BROWSE_LEFT || c.id == IDC_BROWSE_RIGHT || c.id == IDC_BROWSE_RECOVERY || c.id == IDOK)
             Check((c.style & WS_TABSTOP) != 0, "primary controls reachable by Tab");
         if(dialog==IDD_DISCARD_RESULTS && c.id==IDCANCEL)
             Check((c.style&BS_TYPEMASK)==BS_DEFPUSHBUTTON,"discard warning defaults to Cancel");
+        if((dialog==IDD_DISCARD_RESULTS || dialog==IDD_INFORMATION) && c.id==IDOK)
+            Check(c.text==L"OK","standard confirmation caption");
         if(c.id==IDC_STATUS) Check(c.className==L"msctls_statusbar32", "real native status bar");
         if(c.id==IDC_INFO_NOTES)
             Check((c.style&ES_READONLY)!=0 && (c.style&ES_MULTILINE)!=0 && (c.style&WS_VSCROLL)!=0,"selectable scrolling read-only details");
@@ -85,6 +88,10 @@ void Test(int dialog)
         const auto& left=control(IDC_LEFT);const auto& right=control(IDC_RIGHT);
         Check(left.y==right.y && left.x+left.width<right.x,"roots side by side without overlap");
         Check(left.width==right.width,"equally sized root inputs");
+        for(auto pair:{std::pair<DWORD,DWORD>{IDC_LEFT,IDC_BROWSE_LEFT},{IDC_RIGHT,IDC_BROWSE_RIGHT}}) {
+            const auto& edit=control(pair.first);const auto& browse=control(pair.second);
+            Check(browse.y==edit.y && browse.x==edit.x+edit.width+4 && browse.width==14,"native adjacent folder browse button");
+        }
         for(DWORD id:{IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_SELECTED,IDC_EMPTY})
             Check(control(id).y==control(IDC_RECURSIVE).y,"scan choices in one row");
         Check(control(IDC_MASK).y+2==control(IDC_RECURSIVE).y && control(IDC_MASK).width<=60,"compact mask shares scan row");
@@ -96,7 +103,9 @@ void Test(int dialog)
         Check(control(IDC_COLOR_BUTTON_FIRST).y==control(IDC_COLOR_BUTTON_FIRST+4).y &&
             control(IDC_COLOR_BUTTON_FIRST+4).x>control(IDC_COLOR_BUTTON_FIRST).x,"two columns of color choices");
         Check(control(IDC_KEEP_ORIGINALS).y>control(IDC_COLOR_BUTTON_FIRST+3).y,"recovery settings below colors");
-        Check(control(IDC_RECOVERY_ROOT).width>=200,"usable Unicode recovery path editor");
+        const auto& root=control(IDC_RECOVERY_ROOT);const auto& browse=control(IDC_BROWSE_RECOVERY);
+        Check(root.width>=190,"usable Unicode recovery path editor");
+        Check(browse.y==root.y && browse.x==root.x+root.width+4 && browse.width==14,"native adjacent recovery browse button");
     }
     for (int dpi : {96, 120, 144, 192, 240})
     {
@@ -125,14 +134,6 @@ void Test(int dialog)
             int padding = c.type == 0x80 ? MulDiv((c.style & 0xf) == BS_AUTOCHECKBOX ? 20 : 12, dpi, 96) : 0;
             if (size.cx + padding > MulDiv(c.width, baseX, 4) || size.cy > MulDiv(h, baseY, 8))
             { std::wcerr << L"DPI " << dpi << L": clipped caption " << c.text << L"\n"; fits = false; }
-            if(dialog==IDD_INFORMATION && c.id==IDOK) {
-                for(int id:{IDS_UI_SUMMARY,IDS_UI_START_COPY,IDS_UI_START_SAVE,IDS_UI_START_OVERWRITE,IDS_UI_START_DELETE}) {
-                    wchar_t label[128]{};int n=LoadStringW(GetModuleHandleW(nullptr),id,label,128);
-                    Check(n>0,"localized action caption present"); SIZE action{};
-                    Check(GetTextExtentPoint32W(dc,label,n,&action)!=FALSE,"action caption metrics");
-                    Check(action.cx+MulDiv(12,dpi,96)<=MulDiv(c.width,baseX,4),"dynamic action captions fit");
-                }
-            }
         }
         SelectObject(dc, old); DeleteObject(font); DeleteDC(dc);
         Check(fits, "dialog bounds and captions fit at requested font DPI");
