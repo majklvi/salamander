@@ -1,4 +1,4 @@
-﻿Microsoft Visual Studio Solution File, Format Version 12.00
+Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.9.12112.369
 MinimumVisualStudioVersion = 10.0.40219.1
@@ -255,6 +255,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "dirsync", "..\plugins\dirsync\vcxproj\dirsync.vcxproj", "{6D724817-144F-4DC0-BB33-64329D33A5B4}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_dirsync", "..\plugins\dirsync\vcxproj\lang_dirsync.vcxproj", "{78287B63-D450-4488-893D-068E8302F1B6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_dirsync_czech", "..\plugins\dirsync\vcxproj\lang_dirsync_czech.vcxproj", "{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -3873,6 +3875,35 @@ Global
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Utils (Release)|x64.ActiveCfg = Release|x64
 		{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}.Utils (Release)|x64.Build.0 = Release|x64
 
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Debug|Any CPU.Build.0 = Debug|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Debug|ARM64.Build.0 = Debug|ARM64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Debug|Win32.ActiveCfg = Debug|Win32
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Debug|Win32.Build.0 = Debug|Win32
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Debug|x64.ActiveCfg = Debug|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Debug|x64.Build.0 = Debug|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release clean|Any CPU.ActiveCfg = Release clean|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release clean|Any CPU.Build.0 = Release clean|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release clean|ARM64.ActiveCfg = Release clean|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release clean|ARM64.Build.0 = Release clean|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release clean|Win32.ActiveCfg = Release clean|Win32
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release clean|Win32.Build.0 = Release clean|Win32
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release clean|x64.ActiveCfg = Release clean|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release clean|x64.Build.0 = Release clean|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release|Any CPU.ActiveCfg = Release|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release|Any CPU.Build.0 = Release|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release|ARM64.ActiveCfg = Release|ARM64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release|ARM64.Build.0 = Release|ARM64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release|Win32.ActiveCfg = Release|Win32
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release|Win32.Build.0 = Release|Win32
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release|x64.ActiveCfg = Release|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Release|x64.Build.0 = Release|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Utils (Release)|Any CPU.ActiveCfg = Release|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Utils (Release)|Any CPU.Build.0 = Release|x64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Utils (Release)|ARM64.ActiveCfg = Release|ARM64
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Utils (Release)|Win32.ActiveCfg = Release|Win32
+		{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}.Utils (Release)|x64.ActiveCfg = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -130,3 +130,15 @@ Rozbalením ověřeno všech 10 hashů manifestu a přesný inventář 11 soubor
 ## 2026-10-16 — balíček po větším NTFS pilotu
 
 Aktualizovaný nepodepsaný ruční x64 ZIP: `C:\Samandarin\builds\dirsync-distribution\large-pilot-20261016\plugin_5.0_dirsync_0.1_x64.zip`, SHA-256 `8457898bc5752f21784d7d05c5335fc4d20343c88b942d7871e5e28d35ab5f3f`. Obsahuje opravu schování infotipu seznamu během práce a aktuální návod včetně odkazu na evidenci většího pilotu. Rozbalení ověřilo všech 10 hashů manifestu a přesný počet 11 souborů. Produkční SPL bylo načteno v soukromém hostiteli 0.16 x64; potvrzení přepisu a Cancel na malé sadě prošly bez překrývajícího infotipu. Nejde o nové kompletní ověření čisté instalace/restartů této revize ZIP; předchozí evidence zůstává datovaná. [Větší pilot](directory-sync-plugin-pilot.md) rozlišuje původní datový běh, následnou opravu a známé omezení velkých UI Automation seznamů.
+
+## 2026-10-16 — česká lokalizace
+
+Přidán samostatný `lang/czech.slg` (**Synchronizace adresářů**). Přeloženo všech 205 položek tabulky řetězců, tři dialogy, nabídky, tooltipy, stavové zprávy a nápověda F1. ID a pořadí formátovacích značek souhlasí s anglickou verzí. Formáty manifestů a protokolů se nemění; zprávy Windows závisejí na jazyku systému.
+
+Český modul je závislostí projektu pluginu a je zaregistrován i v hlavním řešení. Produkční Release x64 sestavení prošlo; samostatný český modul prošel také Debug Win32/ARM64 sestavením bez varování. Nativní načtení zdrojů českého SLG ověřilo diakritiku názvu, LCID `0x0405`, pevné klíče metadat vyžadované hostitelem a shodu verze SPL/SLG. Blok StringFileInfo záměrně zachovává `040904b0`, protože jej současný hostitel vyhledává pevnou cestou; skutečný jazyk určuje VarFileInfo/Translation.
+
+České kompilované dialogy prošly 1 990 kontrolami rozložení, popisků, nekolidujících klávesových zkratek a Tab přístupu pro fontové metriky 96/120/144/192/240 DPI. Anglická regrese prošla 1 974 kontrolami. Český test má vlastní projekt `tests/dirsync_ui_czech_tests.vcxproj`, který objeví běžný nativní test runner. Jde o kontroly kompilovaných zdrojů a fontových metrik; nový GUI běh, skutečná změna systémového DPI a čistá instalace/restarty české verze nebyly v této etapě provedeny.
+
+Nový nepodepsaný ruční x64 ZIP: `C:\Samandarin\builds\dirsync-distribution\czech-directories-20261016\plugin_5.0_dirsync_0.1_x64.zip`, SHA-256 `a2c0551fc6f2feea63798f5340fdf8c5f5be5554b23e4f511059540ac72ebb21`. Obsahuje aktuální plugin s ikonou, anglický i český SLG a aktualizovaný český návod. Rozbalení ověřilo všech 11 hashů manifestu a přesný počet 12 souborů. Jazyk vybírá nezměněné `LoadLanguageModule` hostitele podle načteného jazyka Salamanderu; po změně jazyka hostitele restartujte program. Bez změn SDK, SMB testů a mazání adresářů.
+
+Česká terminologie sjednocena podle přání uživatele: directory/folder = adresář, subdirectory/subfolder = podadresář. Název pluginu je **Synchronizace adresářů**. Aktualizován návod i balíček; delší popisky prošly kontrolami rozložení.

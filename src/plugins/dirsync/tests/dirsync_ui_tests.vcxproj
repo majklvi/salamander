@@ -23,8 +23,11 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <PropertyGroup>
+    <DirSyncLanguage Condition="'$(DirSyncLanguage)'==''">english</DirSyncLanguage>
     <OutDir>$(OPENSAL_BUILD_DIR)tests\$(Configuration)_$(Platform)\</OutDir>
     <IntDir>$(OPENSAL_BUILD_DIR)tests\$(Configuration)_$(Platform)\DirSyncUiIntermediate\</IntDir>
+    <IntDir Condition="'$(DirSyncLanguage)'=='czech'">$(OPENSAL_BUILD_DIR)tests\$(Configuration)_$(Platform)\$(MSBuildProjectName)CzechIntermediate\</IntDir>
+    <TargetName Condition="'$(DirSyncLanguage)'=='czech'">dirsync_ui_czech_tests</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -43,7 +46,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ui_tests.cpp" />
-    <ResourceCompile Include="..\lang\lang.rc" />
+    <ResourceCompile Include="..\lang\lang.rc" Condition="'$(DirSyncLanguage)'=='english'" />
+    <ResourceCompile Include="..\lang\czech.rc" Condition="'$(DirSyncLanguage)'=='czech'" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

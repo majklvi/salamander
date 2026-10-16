@@ -11,7 +11,7 @@ $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..'))
 $binary=(Resolve-Path -LiteralPath $BinaryDirectory).Path
 $output=[IO.Path]::GetFullPath($OutputDirectory)
 if(Test-Path -LiteralPath $output) { throw 'Output directory must be new; existing artifacts are never replaced.' }
-$inputs=@('dirsync.spl','lang\english.slg')
+$inputs=@('dirsync.spl','lang\english.slg','lang\czech.slg')
 foreach($relative in $inputs) {
     $path=Join-Path $binary $relative
     if(!(Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing input: $path" }
@@ -43,6 +43,7 @@ Includes darkmodelib by ozone10; licenses are in licenses/.
 Manual installation: extract dirsync/ into the host plugins/ directory, then
 Plugins > Plugins Manager > Add > dirsync.spl if not already auto-registered.
 README.cs.md is the current guide;
+English and Czech language modules are included in lang/.
 its technical documentation links refer to doc/ in the source repository.
 This local development package is unsigned and is not a catalog release.
 '@

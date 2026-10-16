@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Open Salamander Authors; SPDX-License-Identifier: GPL-2.0-or-later -->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <DirSyncLanguage>czech</DirSyncLanguage>
+  </PropertyGroup>
+  <Import Project="dirsync_ui_tests.vcxproj" />
+  <PropertyGroup>
+    <ProjectGuid>{EBEA134E-A993-4F18-B5FC-2345631BDA38}</ProjectGuid>
+  </PropertyGroup>
+</Project>

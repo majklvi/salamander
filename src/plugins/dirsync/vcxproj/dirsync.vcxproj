@@ -199,5 +199,9 @@
       <Project>{78287B63-D450-4488-893D-068E8302F1B6}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="lang_dirsync_czech.vcxproj">
+      <Project>{07CA2C44-3E4B-4F17-94F7-3D7096016BF5}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
 </Project>

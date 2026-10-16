@@ -133,7 +133,7 @@ void Test(int dialog)
         Check(root.width>=190,"usable Unicode recovery path editor");
         Check(browse.y==root.y && browse.x==root.x+root.width+4 && browse.width==14,"native adjacent recovery browse button");
         const auto& reset=control(IDC_COLOR_RESET);
-        Check(reset.text==L"Restore defa&ult colors" && reset.x+reset.width==width-7 && reset.y>control(IDC_COLOR_BUTTON_FIRST+3).y,"color-only reset caption, right aligned below color grid");
+        Check((reset.text==L"Restore defa&ult colors" || reset.text==L"Obnovit výchozí &barvy") && reset.x+reset.width==width-7 && reset.y>control(IDC_COLOR_BUTTON_FIRST+3).y,"color-only reset caption, right aligned below color grid");
     }
     for (int dpi : {96, 120, 144, 192, 240})
     {
