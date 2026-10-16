@@ -258,3 +258,43 @@ Sloupce velikostí používají `SALCFG_SIZEFORMAT` a stejné volání jako `Int
 Release x64 sestavení s kontrolou varování prošlo. Nativní lifecycle regrese prošla 2 357 kontrolami, včetně nového testu skutečných pomocných funkcí pro 22 případů názvů: všech sedm režimů, DOS hranice, dlouhá cesta nad 260 znaky, česká diakritika, CJK, emoji, odlišení rodičovského adresáře od souboru a původní zápis cest ve schránce. Porovnání číselného formátování je ověřeno trasováním stejných rutin jádra; nový interaktivní GUI průchod přepínáním všech voleb Show sizes / Show names a skutečná změna systémového locale se v této etapě neprováděly.
 
 Aktualizovaný nepodepsaný x64 ZIP: `C:\Samandarin\builds\dirsync-distribution\panel-format-20261016\plugin_5.0_dirsync_0.1_x64.zip`, SHA-256 `cb03169285d969dd188e0a5d28ba06440d8b581257d4e10ca892d14ab0ef936b`. Rozbalením ověřeno všech 11 hashů manifestu a přesný inventář 12 souborů včetně obou SLG. Bez SMB testů, mazání adresářů a změn SDK.
+
+## 2026-10-16 — GUI porovnání Show sizes a Show names
+
+Computer Use ověřil produkční plugin z commitu `836a1311` v soukromém hostiteli Samandarin 0.16 x64 proti jeho hlavním souborovým panelům. SPL SHA-256: `985191e7da55d3887c48c24be773fd22214d10180bca5d7e5f8a21f7ed3e6061`. Nastavení se měnilo skutečně přes **Options → Configuration → Panels** a po OK následovalo znovuotevření pluginu a Compare. Nebyl spuštěn žádný příkaz Synchronize ani souborová operace pluginu. Test byl ve světlém režimu; regionální nastavení en-US zůstalo beze změny.
+
+Izolovaná sada `C:\Samandarin\builds\dirsync-panel-format-gui-20261016` má shodné levé/pravé stromy, každý se sedmi syntetickými soubory a dvěma podadresáři. Názvy zahrnují `FOO.TXT`, `hello WORLD.TxT`, `LONGERTHAN8.TXT`, `MiXeD.Name.TxT`, `ŽLUŤOUČKÝ-漢字-😀.TXT`, `Large.BIN`, `MiXeD.Dir\NeStEd.TxT` a prázdný `EMPTY.DIR`. Soubory jsou řídké; velikost největšího je 5 368 709 243 bajtů a při porovnání nebyl čten jeho obsah. Ostatní hlavní testované velikosti jsou 0, 1, 1 023, 1 025 a 1 234 567 bajtů; vnořený soubor má 123 456 bajtů.
+
+### Velikosti
+
+| Bajty na disku | In Bytes: panel i plugin | In Kilo Bytes: panel i plugin | In short format: panel i plugin |
+| --- | --- | --- | --- |
+| 0 | `0` | `0 KB` | `0 B` |
+| 1 | `1` | `1 KB` | `1 B` |
+| 1 023 | `1,023` | `1 KB` | `1023 B` |
+| 1 025 | `1,025` | `2 KB` | `1 KB` |
+| 1 234 567 | `1,234,567` | `1,206 KB` | `1.18 MB` |
+| 5 368 709 243 | `5,368,709,243` | `5,242,881 KB` | `5 GB` |
+
+Všechny tři režimy se shodují v obou velikostních sloupcích pluginu. Ověřeno zaokrouhlování nahoru v celých KB, smíšené B/KB/MB/GB, čárky mezi tisíci a desetinná tečka. Hlavní panely byly odečteny ze screenshotů; plugin také ze skutečné přístupnosti ListView, která poskytuje celý text buněk i při úzkém sloupci. Výchozí úzký sloupec v pluginu velký bajtový údaj zkrátí výpustkou; je resizovatelný. Nejde o ztrátu či změnu číselné hodnoty. Nebyla provedena změna systémového regionu ani ověření všech kombinací locale.
+
+### Názvy
+
+Aktuální GUI nabízí šest voleb, nikoli všech sedm historických hodnot SDK. Zdrojově to potvrzuje šestipoložková nabídka v `CCfgPagePanels::Transfer` / `src/dialogs5.cpp`; z GUI byly všechny níže uvedené volby skutečně vybrány.
+
+| Volba Show names | SDK formát | Příklad souboru (panel = plugin) | Příklad adresáře (panel = plugin) |
+| --- | --- | --- | --- |
+| As they are stored on the disk | 4 | `hello WORLD.TxT` | `EMPTY.DIR` |
+| In partially mixed case if they are in DOS format | 5 | `FOO.TXT` → `Foo.txt`; `LONGERTHAN8.TXT` zůstává | `Empty.dir` |
+| In lower case; directories in upper case | 6 | `hello world.txt` | `MIXED.DIR` |
+| In partially mixed case | 7 | `Hello World.txt`; `Mixed.name.txt` | `Mixed.dir` |
+| In lower case | 2 | `hello world.txt` | `empty.dir` |
+| In upper case | 3 | `HELLO WORLD.TXT` | `EMPTY.DIR` |
+
+Česká diakritika se podle režimu mění (`ŽLUŤOUČKÝ` / `Žluťoučký` / `žluťoučký`), CJK a emoji jsou zachované. V pluginu se správně formátuje i adresářová část vnořené cesty, např. `MIXED.DIR\nested.txt` ve formátu 6. Po opětovném otevření plugin načte novou volbu hostitele bez jeho restartu. V každém běhu zůstaly výsledky shodné a bez blokování. Nejde o úplný kartézský součin 3 × 6: sedm průchodů pokrylo tři velikostní režimy a šest názvových režimů samostatně. Starší formát 1 není v nynějším GUI volitelný; jeho předchozí nativní ověření zůstává oddělené od tohoto GUI testu.
+
+Textová evidence sedmi dokončených porovnání je v `observations.json` vedle sady; `baseline.json` zachycuje původní soubory. Po ukončení bylo všech 14 souborů beze změny přesného názvu, velikosti, mtime a atributů; nevznikl žádný další soubor ve stromech. Obsah velkých řídkých souborů se nehashoval. Prázdné adresáře zůstaly zachované. Příkazy pro kopírování do schránky se v tomto průchodu neopakovaly; jejich nativní a dřívější GUI evidence tím není rozšiřována.
+
+Výsledek: nebyla nalezena odchylka formátování vyžadující opravu produkčního kódu. Doplněn aktuální návod a upřesněn počet skutečně dostupných názvových režimů. Bez změn SDK, mazání adresářů a SMB testů.
+
+Provozní poznámka k testovací sadě: konfigurace RegFile musí zachovat podporované textové kódování; UTF-16 kopie byla parserem odmítnuta a nahrazena UTF-8 bez BOM. Při skrytém startu byly panely prázdně vykreslené; po běžném interaktivním restartu bylo hlavní okno funkční. Příčina v hostiteli se zde neměnila ani nedovozuje jako závada pluginu. Launcher navíc otevřel další instalovanou instanci; ta byla po výslovném schválení uživatele ukončena. Dvě původní uživatelské instance zůstaly otevřené, soukromý hostitel byl ukončen běžně.
