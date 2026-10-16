@@ -360,14 +360,65 @@ std::wstring Cell(const dirsync::Row& row, int column)
     case 0: return row.path + (((row.hasLeft && row.left.directory) || (row.hasRight && row.right.directory)) ? L"\\" : L"");
     case 1: return row.hasLeft && !row.left.directory ? Number(row.left.size) : L"";
     case 2: return row.hasLeft ? Modified(row.left.time) : L"";
-    case 3: return Text(IDS_ACTION + int(row.action));
+    case 3: return L"     " + Text(IDS_ACTION + int(row.action));
     case 4: return row.hasRight && !row.right.directory ? Number(row.right.size) : L"";
     case 5: return row.hasRight ? Modified(row.right.time) : L"";
-    case 6: return Text(IDS_STATE + int(row.state));
+    case 6: return L"     " + Text(IDS_STATE + int(row.state));
     case 7: return Text(IDS_REASON + int(row.reason));
     case 8: return row.error ? Number(row.error) : L"";
     }
     return L"";
+}
+// Draw simple geometric marks so their shape does not depend on font coverage.
+// Text remains available to accessibility clients, and selection keeps native colors.
+enum class Mark { Equal, Different, Right, Left, Skip, Delete, Warning };
+Mark RowMark(const dirsync::Row& row,bool action)
+{
+    if(!action) {
+        if(row.state==dirsync::State::Equal) return Mark::Equal;
+        if(row.state==dirsync::State::Blocked || row.state==dirsync::State::Conflict) return Mark::Warning;
+        return Mark::Different;
+    }
+    switch(row.action) {
+    case dirsync::Action::CopyRight: return Mark::Right;
+    case dirsync::Action::CopyLeft: return Mark::Left;
+    case dirsync::Action::DeleteRight: return Mark::Delete;
+    case dirsync::Action::None: return Mark::Skip;
+    default: return Mark::Warning;
+    }
+}
+COLORREF MarkColor(Mark mark)
+{
+    if(mark==Mark::Right || mark==Mark::Equal) return dark?RGB(109,220,144):RGB(0,112,52);
+    if(mark==Mark::Left) return dark?RGB(112,190,255):RGB(0,92,175);
+    if(mark==Mark::Delete || mark==Mark::Warning) return dark?RGB(255,148,133):RGB(178,42,28);
+    if(mark==Mark::Different) return dark?RGB(244,209,105):RGB(139,91,0);
+    return dark?RGB(185,185,185):RGB(96,96,96);
+}
+void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color)
+{
+    int dpi=GetDeviceCaps(dc,LOGPIXELSX);
+    int x=cell.left+MulDiv(4,dpi,96),y=(cell.top+cell.bottom)/2;
+    HPEN pen=CreatePen(PS_SOLID,std::max(1,MulDiv(2,dpi,96)),color);
+    if(!pen) return;
+    HGDIOBJ old=SelectObject(dc,pen);
+    auto line=[&](int a,int b,int c,int d) { MoveToEx(dc,x+MulDiv(a,dpi,96),y+MulDiv(b,dpi,96),nullptr); LineTo(dc,x+MulDiv(c,dpi,96),y+MulDiv(d,dpi,96)); };
+    int saved=SaveDC(dc);
+    if(!saved) { SelectObject(dc,old);DeleteObject(pen);return; }
+    IntersectClipRect(dc,cell.left,cell.top,cell.right,cell.bottom);
+    switch(mark) {
+    case Mark::Right: line(0,0,10,0);line(6,-4,10,0);line(10,0,6,4);break;
+    case Mark::Left: line(0,0,10,0);line(0,0,4,-4);line(0,0,4,4);break;
+    case Mark::Equal: case Mark::Different:
+        line(0,-2,10,-2);line(0,2,10,2);
+        if(mark==Mark::Different) line(2,5,8,-5);
+        break;
+    case Mark::Delete: line(1,-4,9,4);line(1,4,9,-4);break;
+    case Mark::Skip: line(3,-4,3,4);line(7,-4,7,4);break;
+    case Mark::Warning: line(5,-5,5,1);line(5,3,5,5);break;
+    }
+    RestoreDC(dc,saved);
+    SelectObject(dc,old);DeleteObject(pen);
 }
 void StatusPane(HWND window,int part,const std::wstring& text)
 {
@@ -819,8 +870,11 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         CheckDlgButton(window, IDC_SELECTED, p->options.selection.empty() ? BST_UNCHECKED : BST_CHECKED);
         for (int id : {IDC_EQUAL, IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT}) CheckDlgButton(window, id, BST_CHECKED);
         HWND list = GetDlgItem(window, IDC_LIST);
+        // Existing darkmodelib opt-in forwards only this list's custom drawing
+        // to the plugin, preserving the shared theming of all other controls.
+        SetPropW(list,L"Salamander.DarkModeLib.CustomListView",HANDLE(1));
         ListView_SetExtendedListViewStyle(list, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER | LVS_EX_LABELTIP);
-        int widths[] = {240, 95, 150, 120, 95, 150, 95, 270, 70};
+        int widths[] = {200, 60, 120, 145, 60, 120, 120, 250, 60};
         HDC dc = GetDC(window);
         UINT dpi = GetDeviceCaps(dc, LOGPIXELSX);
         ReleaseDC(window, dc);
@@ -859,7 +913,9 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 RECT r = control.second;
                 int id = GetDlgCtrlID(control.first);
                 if (id == IDC_LIST) { r.right += dx; r.bottom += dy; }
-                else if (id == IDC_LEFT || id == IDC_RIGHT) r.right += dx;
+                else if (id == IDC_LEFT) r.right += dx/2;
+                else if (id == IDC_RIGHT) { r.left += dx/2; r.right += dx; }
+                else if (id == IDC_RIGHT_LABEL) { r.left += dx/2; r.right += dx/2; }
                 else if (id == IDC_RECOVERY_ROOT) { r.top += dy; r.bottom += dy; r.right += dx; }
                 else if (id == IDC_SAVE_ORIGINALS) { r.top += dy; r.bottom += dy; r.left += dx; r.right += dx; }
                 else if (id == IDC_RECOVERY_LABEL) { r.top += dy; r.bottom += dy; }
@@ -958,6 +1014,29 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         }
         break;
     case WM_NOTIFY:
+        if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==NM_CUSTOMDRAW) {
+            auto* draw=reinterpret_cast<NMLVCUSTOMDRAW*>(l);
+            LRESULT result=CDRF_DODEFAULT;
+            if(draw->nmcd.dwDrawStage==(CDDS_ITEMPREPAINT|CDDS_SUBITEM) &&
+               !(ListView_GetItemState(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),LVIS_SELECTED)&LVIS_SELECTED))
+                draw->clrText=ListView_GetTextColor(draw->nmcd.hdr.hwndFrom);
+            if(draw->nmcd.dwDrawStage==CDDS_PREPAINT) result=CDRF_NOTIFYITEMDRAW;
+            else if(draw->nmcd.dwDrawStage==CDDS_ITEMPREPAINT) result=CDRF_NOTIFYSUBITEMDRAW;
+            else if((draw->iSubItem==3 || draw->iSubItem==6) && draw->nmcd.dwItemSpec<p->visible.size()) {
+                const auto& row=p->result.rows[p->visible[size_t(draw->nmcd.dwItemSpec)]];
+                Mark mark=RowMark(row,draw->iSubItem==3);
+                bool selected=(ListView_GetItemState(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),LVIS_SELECTED)&LVIS_SELECTED)!=0;
+                if(draw->nmcd.dwDrawStage==(CDDS_ITEMPREPAINT|CDDS_SUBITEM)) {
+                    if(!selected) draw->clrText=MarkColor(mark);
+                    result=CDRF_NOTIFYPOSTPAINT;
+                } else if(draw->nmcd.dwDrawStage==(CDDS_ITEMPOSTPAINT|CDDS_SUBITEM)) {
+                    RECT cell{};
+                    if(ListView_GetSubItemRect(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),draw->iSubItem,LVIR_BOUNDS,&cell))
+                        PaintMark(draw->nmcd.hdc,cell,mark,selected?GetTextColor(draw->nmcd.hdc):MarkColor(mark));
+                }
+            }
+            SetWindowLongPtrW(window,DWLP_MSGRESULT,result);return TRUE;
+        }
         if (reinterpret_cast<NMHDR*>(l)->idFrom == IDC_LIST && reinterpret_cast<NMHDR*>(l)->code == LVN_GETDISPINFOW)
         {
             auto* info = reinterpret_cast<NMLVDISPINFOW*>(l);

@@ -1,5 +1,8 @@
 # Directory Synchronization: provedení a obnova na úrovni jádra
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 **Nová etapa:** implementovány [přepisy podle D4/D5](directory-sync-plugin-overwrite.md), včetně samostatného `overwrite.jsonl` při zapnuté obnově. Při vypnutí se obnova nevytváří a výsledek je v UI/paměti. Přesné provedené testy a dosud neověřené přepisové případy uvádí nový dokument; starší návrhové pasáže níže nejsou dalším rozšířením záruk. Mazání/SMB/SDK změny zůstávají mimo rozsah.
 
 **Aktuální navazující etapa:** implementováno [samostatné uchování originálů a JSONL protokol](directory-sync-plugin-recovery.md), bez následného přepisu či mazání. Nový dokument vymezuje skutečný formát a provedené testy; transakční journal, replay ani automatický rollback se nezavádějí.

@@ -1,5 +1,8 @@
 # Kopie do nových cílů: Stop/Close a chyby po publikaci
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 Další [ověření nuceného uvolnění a ukončení hostitele](directory-sync-plugin-copy-unload.md) rozšiřuje lifecycle sadu na 547 kontrol Debug/Release x64; níže uvedených 429 je výsledek předchozí etapy.
 
 Navazující [došetření UI Automation a dokončené GUI Stop/Close](directory-sync-plugin-ui-automation.md) uzavírá běžný GUI případ na aktuální binárce; velké UIA průchody zůstávají odděleným známým omezením.

@@ -22,6 +22,7 @@ It evolves the [original project](https://github.com/OpenSalamander/salamander) 
 - Sortable Find, Registry Search, and Batch Renamer result lists.
 
 ### Viewers and extensions
+- Directory Synchronization preview for Samandarin 0.16: compare folders, review proposals and separately copy, overwrite or delete asymmetric right-only files with optional recovery. See the [current usage and recovery guide](doc/directory-sync-plugin.md).
 - Internal Viewer with Unicode, status and selection information, zoom, line numbers, and live Log View Mode.
 - Prism Text Viewer with syntax highlighting, plus WebView2 rendering for HTML, Markdown, SVG, modern images, and PDF.
 - PictView combines WIC with native decoders, embedded previews, interactive STL preview, and expanded STL/CDR/folder/image thumbnails.

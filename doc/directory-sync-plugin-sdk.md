@@ -1,5 +1,8 @@
 # Synchronizační plugin a technický průzkum SDK 0.16
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 
 **Navazující stav (15. října 2026):** na samostatný pokyn uživatele implementována [kopie pouze do nových cílů](directory-sync-plugin-copy-new.md), včetně stagingu, Verify, metadat, průběhu a Stop. Původní návrhové pasáže níže nejsou tvrzením o přepisech či mazání; ty zůstávají neimplementované. SDK/hostitel beze změn, bez SMB testů. Přesné runtime výsledky a odchylku vlastní CREATE_NEW rezervace stagingu uvádí nový protokol.
 

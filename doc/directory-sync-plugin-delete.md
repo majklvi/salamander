@@ -1,5 +1,8 @@
 # Directory Synchronization: asymetrické mazání souborů
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 15. října 2026, navazuje na [přepisy D4/D5](directory-sync-plugin-overwrite.md). Cílem je běžná použitelnost současného jádra nad existujícím SDK 0.16. Bez mazání složek, SMB testů a změn SDK/hostitele.
 
 ## Krok 1: adaptér a obnova

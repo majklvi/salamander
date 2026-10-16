@@ -1,5 +1,8 @@
 # Skutečný nedostatek místa: postup pro izolovaný NTFS VHD
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 Připraveno 15. října 2026. Jde o postup přípravy; výsledky následně provedeného běhu jsou v [samostatném záznamu skutečných NTFS VHD testů](directory-sync-plugin-vhd-results.md). [Řízené testy chyb 112/39](directory-sync-plugin-copy-space.md) zůstávají odděleným druhem důkazu. Vytvoření tohoto postupu samo neprovedlo připojení ani formátování a neměnilo plugin, SDK nebo hostitele.
 
 ## Oprávnění a rozdělení práce

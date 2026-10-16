@@ -78,6 +78,15 @@ void Test(int dialog)
             Check((c.style&ES_READONLY)!=0 && (c.style&ES_MULTILINE)!=0 && (c.style&WS_VSCROLL)!=0,"selectable scrolling read-only details");
         controls.push_back(c);
     }
+    if(dialog==IDD_PREVIEW) {
+        auto control=[&](DWORD id)->const Control& { for(const auto& c:controls) if(c.id==id) return c; throw std::runtime_error("missing preview control"); };
+        const auto& left=control(IDC_LEFT);const auto& right=control(IDC_RIGHT);
+        Check(left.y==right.y && left.x+left.width<right.x,"roots side by side without overlap");
+        Check(left.width==right.width,"equally sized root inputs");
+        for(DWORD id:{IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_SELECTED,IDC_EMPTY})
+            Check(control(id).y==control(IDC_RECURSIVE).y,"scan choices in one row");
+        Check(control(IDC_LIST).height>height/2,"file list gets majority of initial height");
+    }
     for (int dpi : {96, 120, 144, 192, 240})
     {
         HDC dc = CreateCompatibleDC(nullptr); Check(dc != nullptr, "measurement DC");

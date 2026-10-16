@@ -1,5 +1,8 @@
 # Directory Synchronization: celý pracovní postup v GUI
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 16. října 2026. Souvislý akceptační průchod nad malou izolovanou sadou na místním NTFS; navazuje na [kopírování](directory-sync-plugin-copy-new.md), [přepisy](directory-sync-plugin-overwrite.md) a [mazání souborů](directory-sync-plugin-delete.md). Bez mazání složek, SMB testů a změn SDK/hostitele.
 
 ## Prostředí a vstupy

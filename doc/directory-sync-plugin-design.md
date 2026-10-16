@@ -1,5 +1,8 @@
 # Synchronizační plugin pro Samandarin
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 Stav k 15. říjnu 2026: D1–D5 a doplňující pravidla schválená. Na pokyn uživatele implementována [první etapa: kostra, sken, porovnání a náhled bez zápisů](directory-sync-plugin-implementation.md) nad nezměněným SDK Samandarin-0.16. V1–V4 dokládá [protokol TC](directory-sync-plugin-tc-observations.md); V5/V6 mají [technický audit](directory-sync-plugin-sdk.md). Navazujícím pokynem byla implementována [kopie do nových cílů](directory-sync-plugin-copy-new.md), [samostatné uchování původních cílových souborů s jednoduchým protokolem](directory-sync-plugin-recovery.md) a nyní [přepisy podle D4/D5](directory-sync-plugin-overwrite.md) se zapamatovanou volbou obnovy, zachováním cílové DACL a ověřením dat/ADS/metadat. Navazuje [asymetrické mazání souborů s volitelnou obnovou](directory-sync-plugin-delete.md). Mazání složek, SMB testy a změny SDK/hostitele zůstávají mimo rozsah. Nižší počty testů a starší omezení ve starších etapách jsou historická.
 
 Cílem je plugin pro porovnání a synchronizaci dvou adresářových stromů s pracovním postupem známým z Total Commanderu: **Porovnat → prohlédnout a upravit navržené operace → Synchronizovat**. Uživatel musí před zápisem vidět, co se zkopíruje, přepíše nebo odstraní. Tento dokument vymezuje chování předlohy, navržený rozsah pluginu, bezpečnost operací a rozhodnutí potřebná před zahájením vývoje.

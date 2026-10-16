@@ -1,5 +1,8 @@
 # Skutečný NTFS VHD: nedostatek místa a oprava pro Modify
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 15. října 2026. Dokončen skutečný místní test podle [VHD postupu](directory-sync-plugin-vhd-runbook.md), včetně GUI souhrnů a nového pokusu po uvolnění místa. Nejde o [dřívější vstřikování chyb](directory-sync-plugin-copy-space.md). Bez přepisů či mazání uživatelských položek, SMB testů a změn SDK nebo hostitele.
 
 ## Prostředí a ověření identity

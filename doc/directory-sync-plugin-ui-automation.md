@@ -1,5 +1,8 @@
 # UI Automation a dokončení GUI Stop/Close
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 15. října 2026. Navazuje na [předchozí ověření přerušení](directory-sync-plugin-copy-cancellation.md). Tento záznam uzavírá tehdy otevřený průchod GUI Stop/Close během skutečného kopírování. Pouze izolovaná místní NTFS data; bez přepisů, mazání uživatelských položek, SMB a změn SDK/hostitele.
 
 ## Došetření prodlev

@@ -1,5 +1,8 @@
 # Kopie do nových cílů: nedostatek místa
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 Navazující [skutečný NTFS VHD test](directory-sync-plugin-vhd-results.md) již ověřil chybu 112 v GUI i nový pokus a odhalil opravený nadbytečný zápis DACL při právech Modify. Aktuální copy regrese má 766 assertions Debug/Release x64. Níže uvedený chybějící skutečný test a 743 assertions popisují předchozí etapu.
 
 Pro další skutečný běh je připraven [postup izolovaného NTFS VHD a potřebných oprávnění](directory-sync-plugin-vhd-runbook.md). Postup zatím nebyl proveden a nemění níže uvedené výsledky.

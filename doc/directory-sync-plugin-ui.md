@@ -1,5 +1,8 @@
 # Directory Synchronization: status bar a strukturované dialogy
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 16. října 2026. Zpřehlednění stávajícího rozhraní; žádná změna pravidel skenu, kopírování, přepisů, mazání ani obnovy. Bez mazání složek, SMB testů a změn SDK/hostitele.
 
 ## Rozhraní
@@ -67,3 +70,17 @@ Následující evidence popisuje předchozí variantu; zmínky o Selected value 
 Deset následných kontrol fixture prošlo: správná nová data/ADS, obě finální kopie, nezměněný pravý overwrite.txt i delete.txt, ponechaná prázdná složka, prázdná obnova, přesně obnovená soukromá konfigurace a zachované tři původní uživatelské instance. Evidence mimo Git: `results.json` a `config-before.reg` ve fixture. Finální SPL SHA-256 `BF0E663EE9CD89F3B126B1E487264B48A7515B43A78C1B274C5BF5DC2072B660`, SLG `DE79568410C49846F6BA3F244AA48999633539448A742F66D50057776591050A`.
 
 GUI běhy přímo ověřují úspěšné výsledky nových kopií a potvrzení přepisu/mazání; nové výsledkové dialogy ostatních operací využívají stejný presenter, ale jejich dokončené GUI běhy se zde netvrdí. Chyby/přerušení adaptéru a dřívější GUI operace dokládají navazující dokumenty. Žádná nová kampaň souběhových či pádových scénářů, žádné změny SDK.
+
+## Cesty vedle sebe a značky v seznamu (16. října 2026)
+
+Oba kořeny jsou na jednom řádku ve stejně širokých editorech; při zvětšování se přírůstek šířky dělí mezi ně a pravý popisek se posouvá spolu s pravou polovinou. Pod nimi je maska a jeden řádek šesti voleb skenu. Zobrazovací filtry mají společný řádek s Compare/Stop. Seznam dostal 246 místo 165 dialogových jednotek na výšku (+49 %), přes polovinu výchozí výšky dialogu 470 DU. Při zvětšení okna dostává celý přírůstek výšky. Zůstává native status bar a kompaktní samostatná tlačítka operací.
+
+Action a State doplňují geometrické značky vykreslené přes GDI: šipka doprava/doleva, rovnost/nerovnost, Skip, křížek mazání a vykřičník pro rozhodnutí/blokování. Text zůstává lokalizovaný a dostupný UI Automation. Zelená/modrá/okrová/šedá/červená paleta má samostatné hodnoty pro světlý a tmavý režim; zvýrazněné řádky zachovávají nativní kontrast. Značky nejsou závislé na dostupnosti Unicode symbolu ve fontu. Použit stávající opt-in `Salamander.DarkModeLib.CustomListView`, aby společná knihovna předala custom draw tohoto seznamu pluginu; knihovna, hostitel ani SDK se nemění. Barva se výslovně vrací na běžný text u ostatních sloupců, aby se nepřenášela na velikost/čas/důvod.
+
+Computer Use: soukromý Release x64 hostitel 0.16, produkční SPL/SLG bez testovací úpravy stylu, experimentální Windows Dark Mode. Fixture `C:\Samandarin\builds\dirsync-ui\layout-20261016`, pět porovnávaných cest / sedm souborů: shoda, stejně starý rozdílný pár, levostranné soubory včetně Unicode jména a pravostranný soubor. Ověřeny obě barevné šipky, =, ≠, Skip, výzva k rozhodnutí, čitelnost zvýraznění a po Asymmetric také červený návrh Delete on right. Žádná zápisová operace nebyla spuštěna. Maximalizace/obnovení zachovaly rozložení obou cest, seznamu, spodních prvků a status baru. Finální binárka po běžném Unload a novém načtení potvrdila opravu barev sousedních sloupců i kontrast zvýraznění.
+
+Devět nezávislých kontrol disku prošlo: sedm původních hashů, přesný inventář a prázdná obnova. Hostitel běžně ukončen; soukromá konfigurace následně obnovena byte-for-byte, tři uživatelské instance zachovány. Evidence mimo Git: before.json, results.json, config-before.reg a config-after.reg ve fixture. Finální SPL SHA-256 `2AA8F78913848D95E7F3946E641E8F251B48FB48A69BDBBFC9A94FC2E2C38B01`.
+
+Produkční Debug/Release x64 build s warnings-as-errors prošel. **1 678 resource/layout kontrol** prošlo v Debug i Release při 96/120/144/192/240 DPI, navíc hlídají stejně široké kořeny vedle sebe, jeden řádek voleb skenu a převahu seznamu. Lifecycle regrese **2 343 kontrol** prošla v obou konfiguracích. Nové barevné značky jsou runtime ověřené v tmavém režimu x64; světlý režim a runtime změny DPI monitoru nejsou tímto průchodem ověřené. Bez SMB, mazání složek a změn zápisových adaptérů.
+
+Otevřený distribuční bod: po jednom běžném restartu této starší soukromé RegFile konfigurace správce ukázal 0 pluginů, ačkoli config.reg stále obsahoval registraci dirsync. Po obnovení config-before.reg se stejná binárka načetla a běžný Unload/reload proběhl správně. Příčina není určena a nebyl to test čisté instalace; případ nesmí být prezentován jako úspěšné ověření registrace po restartu. Při distribučním kroku zopakovat s čistou konfigurací 0.16 a oddělit načtení registrace hostitelem od nastavení Keep originals/cesty pluginu.

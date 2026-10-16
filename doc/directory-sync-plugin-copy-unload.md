@@ -1,5 +1,8 @@
 # Kopírování: nucené uvolnění a ukončení hostitele
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 15. října 2026. Navazuje na [Stop/Close a chyby po publikaci](directory-sync-plugin-copy-cancellation.md) a [dokončené GUI ověření](directory-sync-plugin-ui-automation.md). Pouze vlastní syntetická místní NTFS data, kopie do nových cílů. Bez přepisů, mazání uživatelských položek, SMB testů a změn SDK nebo hostitele.
 
 ## Nucené Release během přenosu a Verify

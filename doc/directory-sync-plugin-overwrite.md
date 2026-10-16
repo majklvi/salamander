@@ -1,5 +1,8 @@
 # Directory Synchronization: přepisy podle D4/D5
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 **Aktuální stav:** implementováno [asymetrické mazání souborů s volitelnou obnovou](directory-sync-plugin-delete.md), 3 380 kontrol adaptéru a 2 343 lifecycle kontrol Debug/Release x64. Mazání složek, SMB testy a změny SDK/hostitele nejsou součástí. Níže zůstává historie předchozích etap.
 
 15. října 2026, `feature/directory-sync-plugin`, výchozí commit `a8c7fca0`. Na pokyn uživatele implementovány **přepisy existujících běžných souborů** nad stávajícím adaptérem. Navazuje na [uchování originálů a zapamatovanou volbu](directory-sync-plugin-recovery.md) a [mapování jádra](directory-sync-plugin-core-adapter.md). Mazání uživatelských položek, SMB testy a změny SDK/hostitele zůstávají mimo rozsah.

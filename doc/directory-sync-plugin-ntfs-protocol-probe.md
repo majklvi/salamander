@@ -1,5 +1,8 @@
 # Directory Synchronization: izolovaná NTFS sonda provedení a obnovy
 
+> **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
+
+
 15. října 2026. Navazuje na [návrh protokolu](directory-sync-plugin-execution-protocol.md). **Plugin zůstává read-only.** Sonda je samostatný EXE bez vazby na engine, SPL, hostitele nebo SDK. Není zařazena do distribuce ani běžného CI; její zápisy se týkají pouze čerstvě vytvořených syntetických dat. SMB se nepoužilo.
 
 ## Následné rozhodnutí o rozsahu (15. října 2026)
