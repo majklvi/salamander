@@ -1,5 +1,11 @@
 # Directory Synchronization: balíček a čistá konfigurace 0.16
 
+## 2026-10-16 — balíček 0.1.1 se skupinami adresářů
+
+Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\grouping-0.1.1-20261016\plugin_5.0_dirsync_0.1.1_x64.zip`, SHA-256 `57fa3a1177c8815cc3d24e96d5ad89024bc60dfe1a3b56f77c874855fa935f36`. Obsahuje aktualizovaný návod a pilotní pokyny; SPL i oba SLG mají verzi **0.1.1 (x64)**. ZIP byl rozbalen do nového kontrolního adresáře, ověřeno všech 12 hashů manifestu a shoda tří binárních modulů s instancí použitou pro GUI test.
+
+[Nové seskupení a jeho ověření](directory-sync-plugin-grouping.md) proběhlo v izolovaném hostiteli 0.16 x64 v českém tmavém a anglickém světlém režimu. Nejde o opakování níže popsané čisté instalace celé předchozí verze; registrační mechanismus ani konfigurace se v 0.1.1 nemění. Bez SMB testů a změn SDK. Následující části jsou historická evidence jednotlivých balíčků.
+
 16. října 2026. Navazuje na [aktuální návod](directory-sync-plugin.md). Dokončeno místní distribuční ověření první preview verze pro x64; bez mazání složek, SMB testů a změn SDK/hostitele.
 
 ## Opravená příčina mizení registrace

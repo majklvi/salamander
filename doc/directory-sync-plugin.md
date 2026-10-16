@@ -1,6 +1,6 @@
 # Directory Synchronization — aktuální návod
 
-Stav 16. října 2026, vývojová verze 0.1 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
+Stav 16. října 2026, vývojová verze 0.1.1 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
 
 Pro pilotní používání začněte [krátkými pokyny včetně hlášení chyb](directory-sync-plugin-pilot-guide.md), přiloženými v balíčku jako `PILOT.cs.md`.
 
@@ -19,6 +19,8 @@ Zavřete instance používající starou verzi pluginu, zkopírujte celý adres�
 Při sestavení ze zdrojů použijte projekt `src/plugins/dirsync/vcxproj/dirsync.vcxproj`; jazykový modul je jeho závislost. Podrobný build postup je v [implementačním záznamu](directory-sync-plugin-implementation.md#sestavení-a-testy). [Distribuční ověření](directory-sync-plugin-distribution.md) dokončilo rozbalení ZIP do čisté konfigurace 0.16 x64, automatickou registraci a dva skutečné restarty s ON/OFF a Unicode cestou obnovy. Jde o ruční portable instalaci pluginu, nikoli sestavení celého Inno instalátoru.
 
 ## Vzhled a nápověda
+
+Od verze **0.1.1** je seznam seskupený podle relativních adresářů. Záhlaví `\` označuje kořen, například `\alpha\nested\` podadresář; sloupec **Name / Název** obsahuje samotné názvy položek. Záhlaví nejsou návrhy operací a jejich kliknutí nevybírá obsah. Adresář navržený k odstranění zůstává samostatným řádkem v nadřazené skupině. Filtry odstraní skupinu, pokud nemá žádné viditelné položky. Kopírování cest nadále používá celé skutečné cesty. Podrobnosti a ověření jsou v [záznamu seskupování](directory-sync-plugin-grouping.md).
 
 Sloupce velikostí přebírají **Configuration → Panels → Show sizes**: bajty s oddělovači tisíců, celé KB nebo smíšené jednotky. Používají stejné formátovací rutiny jádra, včetně jeho zaokrouhlování a regionálních oddělovačů. Souhrny výslovně označené jako bajty a přenosové čítače nadále uvádějí přesné bajty. **Show names** ze stejného nastavení určuje velikost písmen každé části relativní cesty v seznamu, včetně odlišného stylu pro soubory a adresáře. Zobrazení nemění skutečné názvy, plán, manifest ani cesty kopírované do schránky. Nastavení se načítá při otevření okna a při oznámení změny konfigurace hostitelem.
 

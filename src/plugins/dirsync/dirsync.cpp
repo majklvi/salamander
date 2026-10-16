@@ -20,6 +20,8 @@
 #include <utility>
 #include <array>
 #include <climits>
+#include <map>
+#include <stdexcept>
 #include <shlobj.h>
 #pragma comment(lib,"comdlg32.lib")
 #pragma comment(lib,"shell32.lib")
@@ -391,6 +393,7 @@ struct Preview
     std::vector<size_t> requestedRows;
     int requestedAction = 0;
     std::vector<size_t> visible;
+    std::vector<std::wstring> groups;
     std::vector<dirsync::Action> defaults;
     std::array<HICON,7> buttonIcons{};
     std::array<bool,5> filterChecks{};
@@ -411,7 +414,7 @@ struct Preview
     std::thread worker;
     SIZE initialClient{}, minimumWindow{};
     std::vector<std::pair<HWND, RECT>> controls;
-    bool running = false, closing = false, failed = false, validating = false;
+    bool running = false, closing = false, failed = false, validating = false, updatingList = false;
     ~Preview() { Stop(); Join(); for(auto icon:buttonIcons) if(icon) DestroyIcon(icon); }
     void Stop()
     {
@@ -487,7 +490,11 @@ std::wstring Cell(const dirsync::Row& row, int column,const Preview& p)
 {
     switch (column)
     {
-    case 0: return PanelPath(row,p.nameFormat);
+    case 0: {
+        const auto separator=row.path.find_last_of(L'\\');
+        const bool directory=(row.hasLeft && row.left.directory) || (row.hasRight && row.right.directory);
+        return PanelName(row.path.substr(separator==std::wstring::npos?0:separator+1),p.nameFormat,directory)+(directory?L"\\":L"");
+    }
     case 1: return row.hasLeft && !row.left.directory ? PanelSize(row.left.size,p.sizeFormat) : L"";
     case 2: return row.hasLeft ? Modified(row.left.time) : L"";
     case 3: return L"     " + Text(IDS_ACTION + int(row.action));
@@ -817,6 +824,61 @@ bool RowVisible(const dirsync::Row& row,const std::array<bool,5>& filters)
     if(row.action==dirsync::Action::CopyLeft) show &= filters[4];
     return show;
 }
+// Native group headers are not model rows: selection, counts and executors
+// continue to receive only the visible model indices.
+std::wstring RowDirectory(const dirsync::Row& row)
+{
+    const auto separator=row.path.find_last_of(L'\\');
+    return separator==std::wstring::npos?L"":row.path.substr(0,separator);
+}
+struct DirectoryLess {
+    bool operator()(const std::wstring& a,const std::wstring& b) const {
+        if(a.empty() || b.empty()) return a.empty() && !b.empty();
+        return CompareStringOrdinal(a.c_str(),int(a.size()),b.c_str(),int(b.size()),TRUE)==CSTR_LESS_THAN;
+    }
+};
+std::wstring GroupLabel(const std::wstring& directory,int format)
+{
+    return directory.empty()?L"\\":L"\\"+dirsync::PanelRelativePath(directory,true,format,PanelName);
+}
+void UpdateGroupHeaders(Preview& p)
+{
+    HWND list=GetDlgItem(p.window,IDC_LIST);
+    for(size_t i=0;i<p.groups.size();++i) {
+        auto text=GroupLabel(p.groups[i],p.nameFormat);
+        LVGROUP group{sizeof(group)};group.mask=LVGF_HEADER;group.pszHeader=text.data();
+        SendMessageW(list,LVM_SETGROUPINFO,WPARAM(i),LPARAM(&group));
+    }
+}
+void RebuildGroups(Preview& p)
+{
+    HWND list=GetDlgItem(p.window,IDC_LIST);
+    ListView_EnableGroupView(list,FALSE);
+    ListView_DeleteAllItems(list);ListView_RemoveAllGroups(list);p.groups.clear();
+    std::map<std::wstring,int,DirectoryLess> directories;
+    for(size_t index:p.visible) directories.emplace(RowDirectory(p.result.rows[index]),0);
+    for(auto& entry:directories) {entry.second=int(p.groups.size());p.groups.push_back(entry.first);}
+    // Keep physical item indices in visual order for keyboard range selection.
+    std::stable_sort(p.visible.begin(),p.visible.end(),[&](size_t a,size_t b) {
+        return directories.at(RowDirectory(p.result.rows[a]))<directories.at(RowDirectory(p.result.rows[b]));
+    });
+    for(size_t i=0;i<p.groups.size();++i) {
+        LVGROUP group{sizeof(group)};group.mask=LVGF_GROUPID|LVGF_STATE;
+        group.iGroupId=int(i);group.stateMask=LVGS_COLLAPSIBLE|LVGS_COLLAPSED;group.state=LVGS_NORMAL;
+        if(ListView_InsertGroup(list,-1,&group)==-1) throw std::runtime_error("Directory group insertion failed");
+    }
+    UpdateGroupHeaders(p);
+    for(size_t i=0;i<p.visible.size();++i) {
+        LVITEMW item{};item.mask=LVIF_TEXT|LVIF_GROUPID;item.iItem=int(i);
+        item.pszText=LPSTR_TEXTCALLBACKW;item.iGroupId=directories.at(RowDirectory(p.result.rows[p.visible[i]]));
+        if(SendMessageW(list,LVM_INSERTITEMW,0,LPARAM(&item))==-1) throw std::runtime_error("Directory item insertion failed");
+        for(int column=1;column<9;++column) {
+            item.mask=LVIF_TEXT;item.iSubItem=column;
+            if(!SendMessageW(list,LVM_SETITEMW,0,LPARAM(&item))) throw std::runtime_error("Directory item text failed");
+        }
+    }
+    if(ListView_EnableGroupView(list,TRUE)==-1) throw std::runtime_error("Directory groups unavailable");
+}
 void Filter(Preview& p)
 {
     HWND list=GetDlgItem(p.window,IDC_LIST);
@@ -826,21 +888,34 @@ void Filter(Preview& p)
     size_t focus=focused>=0 && size_t(focused)<p.visible.size()?p.visible[size_t(focused)]:SIZE_MAX;
     for(int i=ListView_GetNextItem(list,-1,LVNI_SELECTED);i>=0;i=ListView_GetNextItem(list,i,LVNI_SELECTED))
         if(size_t(i)<p.visible.size()) selected.push_back(p.visible[size_t(i)]);
-    ListView_SetItemState(list,-1,0,LVIS_SELECTED|LVIS_FOCUSED);
+    std::sort(selected.begin(),selected.end());
+    const int top=ListView_GetTopIndex(list);
+    const size_t anchor=top>=0 && size_t(top)<p.visible.size()?p.visible[size_t(top)]:SIZE_MAX;
+    struct RedrawGuard {
+        HWND list;Preview& preview;
+        RedrawGuard(HWND value,Preview& p):list(value),preview(p){preview.updatingList=true;SendMessageW(list,WM_SETREDRAW,FALSE,0);}
+        ~RedrawGuard(){preview.updatingList=false;SendMessageW(list,WM_SETREDRAW,TRUE,0);RedrawWindow(list,nullptr,nullptr,RDW_INVALIDATE|RDW_ERASE);}
+    } redraw(list,p);
+    const auto previous=p.visible;
     p.visible.clear();
     for (size_t i = 0; i < p.result.rows.size(); ++i)
     {
         if (RowVisible(p.result.rows[i],p.filterChecks)) p.visible.push_back(i);
     }
-    ListView_SetItemCountEx(GetDlgItem(p.window, IDC_LIST), int(p.visible.size()), LVSICF_NOSCROLL);
+    std::stable_sort(p.visible.begin(),p.visible.end(),[&](size_t a,size_t b) {
+        return DirectoryLess{}(RowDirectory(p.result.rows[a]),RowDirectory(p.result.rows[b]));
+    });
+    if(p.visible!=previous || (p.groups.empty() && !p.visible.empty())) RebuildGroups(p);
     for(size_t i=0;i<p.visible.size();++i) {
-        // Both lists retain ascending model indices; avoid quadratic Ctrl+A filtering.
+        // Selection is sorted by model index; display order is grouped by directory.
         UINT state=(std::binary_search(selected.begin(),selected.end(),p.visible[i])?LVIS_SELECTED:0)|
             (p.visible[i]==focus?LVIS_FOCUSED:0);
-        if(state) ListView_SetItemState(list,int(i),state,LVIS_SELECTED|LVIS_FOCUSED);
+        if(ListView_GetItemState(list,int(i),LVIS_SELECTED|LVIS_FOCUSED)!=state) ListView_SetItemState(list,int(i),state,LVIS_SELECTED|LVIS_FOCUSED);
     }
+    const auto anchored=std::find(p.visible.begin(),p.visible.end(),anchor);
+    if(anchored!=p.visible.end()) ListView_EnsureVisible(list,int(anchored-p.visible.begin()),FALSE);
     InvalidateRect(GetDlgItem(p.window, IDC_LIST), nullptr, TRUE);
-    // An owner-data list caches the infotip for the item under the pointer.
+    // A callback-text list caches the infotip for the item under the pointer.
     // Repainting after Skip/filtering alone can keep the old operation text.
     POINT cursor{};
     if(GetCursorPos(&cursor) && ScreenToClient(list,&cursor)) {
@@ -881,12 +956,12 @@ void Busy(Preview& p, bool busy)
 void InvalidatePlan(Preview& p)
 {
     if (p.running) return;
-    p.result = {}; p.visible.clear(); p.defaults.clear(); p.failed = false;
+    p.result = {}; p.visible.clear(); p.groups.clear(); p.defaults.clear(); p.failed = false;
     p.hasCopyReport = false;
     p.hasRecoveryReport = false;
     p.hasOverwriteReport = false;
     p.hasDeleteReport = false;
-    ListView_SetItemCount(GetDlgItem(p.window, IDC_LIST), 0);
+    ListView_DeleteAllItems(GetDlgItem(p.window,IDC_LIST));ListView_RemoveAllGroups(GetDlgItem(p.window,IDC_LIST));
     Status(p);
 }
 void Start(Preview& p)
@@ -1076,13 +1151,8 @@ void PreviewCommand(Preview& p,const std::vector<size_t>& rows,int command)
 int PreviewHit(HWND list,POINT point)
 {
     RECT client{};GetClientRect(list,&client);if(!PtInRect(&client,point)) return -1;
-    int count=ListView_GetItemCount(list),first=ListView_GetTopIndex(list);
-    int end=std::min(count,first+ListView_GetCountPerPage(list)+2);
-    for(int i=first;i<end;++i) {
-        RECT row{};
-        if(ListView_GetItemRect(list,i,&row,LVIR_BOUNDS) && point.y>=row.top && point.y<row.bottom) return i;
-    }
-    return -1;
+    LVHITTESTINFO hit{};hit.pt=point;
+    return ListView_SubItemHitTest(list,&hit);
 }
 void PreviewMenu(Preview& p,LPARAM position)
 {
@@ -1144,6 +1214,11 @@ void PreviewMenu(Preview& p,LPARAM position)
 }
 LRESULT CALLBACK PreviewList(HWND list,UINT message,WPARAM w,LPARAM l,UINT_PTR id,DWORD_PTR data)
 {
+    if(message==WM_LBUTTONDOWN || message==WM_LBUTTONDBLCLK) {
+        LVHITTESTINFO hit{};hit.pt={static_cast<short>(LOWORD(l)),static_cast<short>(HIWORD(l))};
+        SendMessageW(list,LVM_HITTEST,WPARAM(-1),LPARAM(&hit));
+        if(hit.flags&LVHT_EX_GROUP_HEADER) {SetFocus(list);return 0;}
+    }
     if(message==WM_RBUTTONDOWN) {
         SetFocus(list);POINT point{static_cast<short>(LOWORD(l)),static_cast<short>(HIWORD(l))};
         int index=PreviewHit(list,point);
@@ -1576,7 +1651,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if (p->running) { p->closing = true; p->Stop(); }
         else { PersistSettings(window); EndDialog(window, 0); }
         return TRUE;
-    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ReadPanelFormat(*p);ConfigureDark(window);ButtonIcons(*p);InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,FALSE); return TRUE;
+    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ReadPanelFormat(*p);UpdateGroupHeaders(*p);ConfigureDark(window);ButtonIcons(*p);InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,FALSE); return TRUE;
     case WM_CONTEXTMENU:
         if(reinterpret_cast<HWND>(w)==GetDlgItem(window,IDC_LIST)) {PreviewMenu(*p,l);return TRUE;}
         break;
@@ -1627,7 +1702,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 switch(key->wVKey) {
                 case 'D':command=RestoreProposal;break;case 'M':command=0;break;case 'L':command=1;break;
                 case 'R':command=2;break;case 'W':command=ReverseProposal;break;case 'C':command=10;break;
-                case 'A':if(!p->running) ListView_SetItemState(GetDlgItem(window,IDC_LIST),-1,LVIS_SELECTED,LVIS_SELECTED);return TRUE;
+                case 'A':if(!p->running) {p->updatingList=true;ListView_SetItemState(GetDlgItem(window,IDC_LIST),-1,LVIS_SELECTED,LVIS_SELECTED);p->updatingList=false;Status(*p);}return TRUE;
                 }
                 if(command>=0) {PreviewCommand(*p,SelectedRows(*p),command);return TRUE;}
             }
@@ -1652,20 +1727,43 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         }
         if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==LVN_ITEMCHANGED) {
             int index=ListView_GetNextItem(GetDlgItem(window,IDC_LIST),-1,LVNI_FOCUSED);
-            if(!p->running && index>=0 && size_t(index)<p->visible.size()) {
+            if(!p->running && !p->updatingList && index>=0 && size_t(index)<p->visible.size()) {
                 if(PendingOptions(*p)) Status(*p);
                 else StatusPane(window,0,Text(IDS_ACTION+int(p->result.rows[p->visible[size_t(index)]].action)));
             }
         }
         if(reinterpret_cast<NMHDR*>(l)->idFrom==IDC_LIST && reinterpret_cast<NMHDR*>(l)->code==NM_CUSTOMDRAW) {
             auto* draw=reinterpret_cast<NMLVCUSTOMDRAW*>(l);
+            if(draw->nmcd.dwDrawStage==CDDS_POSTPAINT) {
+                // Group-specific notifications are not delivered by every common-
+                // controls theme. Paint the native header rectangles after the list.
+                HWND list=draw->nmcd.hdr.hwndFrom;RECT client{};GetClientRect(list,&client);
+                HBRUSH brush=backgroundBrush?backgroundBrush:GetSysColorBrush(COLOR_BTNFACE);
+                HFONT font=reinterpret_cast<HFONT>(SendMessageW(list,WM_GETFONT,0,0));
+                HGDIOBJ old=font?SelectObject(draw->nmcd.hdc,font):nullptr;
+                SetBkMode(draw->nmcd.hdc,TRANSPARENT);SetTextColor(draw->nmcd.hdc,ListView_GetTextColor(list));
+                for(size_t i=0;i<p->groups.size();++i) {
+                    RECT header{};
+                    if(!ListView_GetGroupRect(list,int(i),LVGGR_HEADER,&header) || header.bottom<client.top) continue;
+                    if(header.top>client.bottom) break;
+                    FillRect(draw->nmcd.hdc,&header,brush);
+                    header.left+=MulDiv(6,GetDeviceCaps(draw->nmcd.hdc,LOGPIXELSX),96);
+                    auto text=GroupLabel(p->groups[i],p->nameFormat);
+                    DrawTextW(draw->nmcd.hdc,text.c_str(),int(text.size()),&header,DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX|DT_END_ELLIPSIS);
+                }
+                if(old) SelectObject(draw->nmcd.hdc,old);
+                SetWindowLongPtrW(window,DWLP_MSGRESULT,CDRF_DODEFAULT);return TRUE;
+            }
+            if(draw->nmcd.dwDrawStage!=CDDS_PREPAINT && draw->dwItemType==LVCDI_GROUP) {
+                SetWindowLongPtrW(window,DWLP_MSGRESULT,CDRF_DODEFAULT);return TRUE;
+            }
             LRESULT result=CDRF_DODEFAULT;
             if(draw->nmcd.dwDrawStage==(CDDS_ITEMPREPAINT|CDDS_SUBITEM) &&
                draw->nmcd.dwItemSpec<p->visible.size() &&
                !(ListView_GetItemState(draw->nmcd.hdr.hwndFrom,int(draw->nmcd.dwItemSpec),LVIS_SELECTED)&LVIS_SELECTED))
                 draw->clrText=PreviewColor(p->result.rows[p->visible[size_t(draw->nmcd.dwItemSpec)]],draw->iSubItem,
                     ListView_GetBkColor(draw->nmcd.hdr.hwndFrom),ListView_GetTextColor(draw->nmcd.hdr.hwndFrom));
-            if(draw->nmcd.dwDrawStage==CDDS_PREPAINT) result=CDRF_NOTIFYITEMDRAW;
+            if(draw->nmcd.dwDrawStage==CDDS_PREPAINT) result=CDRF_NOTIFYITEMDRAW|CDRF_NOTIFYPOSTPAINT;
             else if(draw->nmcd.dwDrawStage==CDDS_ITEMPREPAINT) result=CDRF_NOTIFYSUBITEMDRAW;
             else if((draw->iSubItem==3 || draw->iSubItem==6) && draw->nmcd.dwItemSpec<p->visible.size()) {
                 const auto& row=p->result.rows[p->visible[size_t(draw->nmcd.dwItemSpec)]];
@@ -1821,7 +1919,7 @@ public:
     void WINAPI Event(int event, DWORD) override
     {
         if(event==PLUGINEVENT_CONFIGURATIONCHANGED && active && active->window) {
-            ReadPanelFormat(*active);InvalidateRect(GetDlgItem(active->window,IDC_LIST),nullptr,FALSE);
+            ReadPanelFormat(*active);UpdateGroupHeaders(*active);InvalidateRect(GetDlgItem(active->window,IDC_LIST),nullptr,FALSE);
         }
     }
     void WINAPI ClearHistory(HWND) override {}
@@ -1845,7 +1943,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (!language) return nullptr;
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES}; InitCommonControlsEx(&controls);
     ConfigureDark(nullptr);
-    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1", "Copyright (c) 2026 Open Salamander Authors",
+    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1.1", "Copyright (c) 2026 Open Salamander Authors",
                               general->LoadStr(language, IDS_DESCRIPTION), "DirectorySync");
     return &plugin;
 }

@@ -159,12 +159,12 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeProposalRules(const wchar_
     return checks;
 }
 // Real native toggle states, option handlers and list/status geometry; no executor.
-extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t* left,const wchar_t* right)
+extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t* left,const wchar_t* right) try
 {
     struct Template {DLGTEMPLATE dialog;WORD menu=0,cls=0,title=0;} dialog{};
     dialog.dialog.style=WS_POPUP;dialog.dialog.cx=610;dialog.dialog.cy=470;
     auto procedure=+[](HWND window,UINT message,WPARAM w,LPARAM l)->INT_PTR {
-        return message==WM_COMMAND?DialogBody(window,message,w,l):FALSE;
+        return (message==WM_COMMAND || message==WM_NOTIFY)?DialogBody(window,message,w,l):FALSE;
     };
     HWND window=CreateDialogIndirectParamW(GetModuleHandleW(nullptr),&dialog.dialog,nullptr,procedure,0);
     if(!window) return FALSE;
@@ -187,12 +187,13 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
         ok &= CreateWindowExW(0,L"BUTTON",L"",WS_CHILD|BS_AUTOCHECKBOX,0,0,20,20,window,HMENU(INT_PTR(id)),instance,nullptr)!=nullptr;
     for(int id:{IDC_LEFT,IDC_RIGHT})
         ok &= CreateWindowExW(0,L"EDIT",id==IDC_LEFT?left:right,WS_CHILD,0,0,20,20,window,HMENU(INT_PTR(id)),instance,nullptr)!=nullptr;
-    HWND list=CreateWindowExW(0,WC_LISTVIEWW,L"",WS_CHILD|LVS_REPORT|LVS_OWNERDATA,8,100,500,300,window,HMENU(INT_PTR(IDC_LIST)),instance,nullptr);
+    HWND list=CreateWindowExW(0,WC_LISTVIEWW,L"",WS_CHILD|LVS_REPORT,8,100,500,300,window,HMENU(INT_PTR(IDC_LIST)),instance,nullptr);
     HWND bar=CreateWindowExW(0,STATUSCLASSNAMEW,L"",WS_CHILD,0,440,610,30,window,HMENU(INT_PTR(IDC_STATUS)),instance,nullptr);
     ok &= list!=nullptr && bar!=nullptr;
+    for(int i=0;i<9;++i) {LVCOLUMNW column{};column.mask=LVCF_WIDTH;column.cx=100;SendMessageW(list,LVM_INSERTCOLUMNW,i,LPARAM(&column));}
     p.result=dirsync::Compare(left,right,p.options,p.cancel,p.progress);auto snapshot=p.result.snapshot;
     dirsync::Row row;row.path=L"skipped-漢字.txt";row.state=dirsync::State::Different;row.action=dirsync::Action::None;
-    p.result.rows={row};p.defaults={dirsync::Action::CopyRight};p.visible={0};ListView_SetItemCount(list,1);
+    p.result.rows={row};p.defaults={dirsync::Action::CopyRight};p.visible={0};Filter(p);
     CheckDlgButton(window,IDC_RECURSIVE,BST_CHECKED);p.options.selection={{L"item",false}};
     for(int id:{IDC_RECURSIVE,IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_EMPTY,IDC_SELECTED}) {
         CheckDlgButton(window,id,Checked(window,id)?BST_UNCHECKED:BST_CHECKED);
@@ -254,8 +255,55 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
         MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&bounds),2);MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&status),2);
         ok &= bounds.left==0 && bounds.right==client.right && bounds.bottom==status.top;
     }
+    // Headers are native groups, never synthetic file rows. Duplicate basenames
+    // remain distinct model indices through filtering and proposal changes.
+    p.filterChecks.fill(true);p.result.rows.clear();
+    for(const auto* path:{L"root.txt",L"alpha\\same.txt",L"alpha\\nested\\same.txt",L"beta-漢字\\same.txt",L"delete-dir"}) {
+        dirsync::Row entry;entry.path=path;entry.state=dirsync::State::LeftOnly;
+        entry.action=dirsync::Action::CopyRight;entry.hasLeft=true;p.result.rows.push_back(entry);
+    }
+    p.result.rows[4].hasLeft=false;p.result.rows[4].hasRight=true;p.result.rows[4].right.directory=true;
+    p.result.rows[4].state=dirsync::State::RightOnly;p.result.rows[4].action=dirsync::Action::DeleteRight;
+    Filter(p);
+    ok &= p.visible.size()==5 && ListView_GetItemCount(list)==5 && ListView_GetGroupCount(list)==4;
+    ok &= p.groups==std::vector<std::wstring>{L"",L"alpha",L"alpha\\nested",L"beta-漢字"};
+    ok &= Cell(p.result.rows[1],0,p)==L"same.txt" && Cell(p.result.rows[4],0,p)==L"delete-dir\\";
+    for(size_t i=0;i<p.visible.size();++i) {
+        LVITEMW item{};item.mask=LVIF_GROUPID;item.iItem=int(i);
+        ok &= SendMessageW(list,LVM_GETITEMW,0,LPARAM(&item))!=FALSE;
+        ok &= p.groups[size_t(item.iGroupId)]==RowDirectory(p.result.rows[p.visible[i]]);
+    }
+    RECT header{};ok &= ListView_GetGroupRect(list,0,LVGGR_HEADER,&header)!=FALSE;
+    ok &= PreviewHit(list,{10,(header.top+header.bottom)/2})==-1;
+    const auto selected=std::find(p.visible.begin(),p.visible.end(),size_t(3))-p.visible.begin();
+    ListView_SetItemState(list,int(selected),LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+    ok &= SelectedRows(p)==std::vector<size_t>{3};
+    p.result.rows[3].action=dirsync::Action::None;Filter(p);
+    ok &= SelectedRows(p)==std::vector<size_t>{3} && p.result.rows[1].action==dirsync::Action::CopyRight;
+    ok &= RowPaths(p,SelectedRows(p),0)==L"beta-漢字\\same.txt";
+    p.filterChecks[3]=false;Filter(p);
+    ok &= p.visible==std::vector<size_t>({4,3}) && ListView_GetGroupCount(list)==2;
+    p.filterChecks[2]=false;Filter(p);
+    ok &= p.visible.empty() && ListView_GetGroupCount(list)==0 && ListView_GetItemCount(list)==0;
+    p.filterChecks.fill(true);Filter(p);
+    ok &= SelectedRows(p).empty() && p.visible.size()==5 && ListView_GetGroupCount(list)==4;
+    ListView_SetItemState(list,-1,LVIS_SELECTED,LVIS_SELECTED);
+    auto all=SelectedRows(p);std::sort(all.begin(),all.end());
+    ok &= all==std::vector<size_t>({0,1,2,3,4});
+    ok &= GroupLabel(L"",4)==L"\\";
+    const auto longDirectory=std::wstring(140,L'漢')+L"\\"+std::wstring(140,L'Ž');
+    p.result.rows[0].path=longDirectory+L"\\same.txt";Filter(p);
+    ok &= std::find(p.groups.begin(),p.groups.end(),longDirectory)!=p.groups.end();
+    p.result.rows.clear();
+    for(size_t i=0;i<6000;++i) {
+        dirsync::Row entry;entry.path=L"group-"+std::to_wstring(i/100)+L"\\file-"+std::to_wstring(i)+L".txt";
+        entry.state=dirsync::State::LeftOnly;entry.action=dirsync::Action::CopyRight;p.result.rows.push_back(entry);
+    }
+    const auto started=GetTickCount64();Filter(p);
+    ok &= p.visible.size()==6000 && ListView_GetItemCount(list)==6000 && ListView_GetGroupCount(list)==60;
+    fprintf(stdout,"Grouped list: 6000 items / 60 groups rebuilt in %llu ms\n",GetTickCount64()-started);
     DestroyWindow(window);p.window=nullptr;return ok;
-}
+} catch(const std::exception& error) {fprintf(stderr,"Preview controls: %s\n",error.what());return FALSE;}
 // Exercise the real SDK configuration callbacks without touching user registry data.
 extern "C" __declspec(dllexport) BOOL WINAPI ProbeStopControls()
 {
