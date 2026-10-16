@@ -2,6 +2,8 @@
 
 Stav 16. října 2026, vývojová verze 0.1 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
 
+Pro pilotní používání začněte [krátkými pokyny včetně hlášení chyb](directory-sync-plugin-pilot-guide.md), přiloženými v balíčku jako `PILOT.cs.md`.
+
 ## Instalace a spuštění
 
 Použijte plugin ze stejného sestavení a pro stejnou architekturu jako hostitel (x64 hostitel vyžaduje x64 SPL). Vývojový výstup obsahuje:

@@ -28,7 +28,11 @@ New-Item -ItemType Directory -Path (Join-Path $payload 'lang'),(Join-Path $paylo
 foreach($relative in $inputs) { Copy-Item -LiteralPath (Join-Path $binary $relative) -Destination (Join-Path $payload $relative) }
 $guide=[IO.File]::ReadAllText((Join-Path $repo 'doc\directory-sync-plugin.md'))
 $guide=[regex]::Replace($guide,'\]\((directory-sync-plugin[^)]*)\)','](https://github.com/majklvi/salamander/blob/feature/directory-sync-plugin/doc/$1)')
+$guide=$guide.Replace('](https://github.com/majklvi/salamander/blob/feature/directory-sync-plugin/doc/directory-sync-plugin-pilot-guide.md)','](PILOT.cs.md)')
 [IO.File]::WriteAllText((Join-Path $payload 'README.cs.md'),$guide,[Text.UTF8Encoding]::new($false))
+$pilotGuide=[IO.File]::ReadAllText((Join-Path $repo 'doc\directory-sync-plugin-pilot-guide.md'))
+$pilotGuide=$pilotGuide.Replace('](directory-sync-plugin.md)','](README.cs.md)')
+[IO.File]::WriteAllText((Join-Path $payload 'PILOT.cs.md'),$pilotGuide,[Text.UTF8Encoding]::new($false))
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE') -Destination (Join-Path $payload 'LICENSE')
 Copy-Item -LiteralPath (Join-Path $repo 'src\third_party\darkmodelib\LICENSE.md') -Destination (Join-Path $payload 'licenses\darkmodelib-MPL-2.0.md')
 Copy-Item -LiteralPath (Join-Path $repo 'src\third_party\darkmodelib\LICENSE-MIT.md') -Destination (Join-Path $payload 'licenses\darkmodelib-MIT.md')
@@ -42,7 +46,8 @@ Source: https://github.com/majklvi/salamander/tree/feature/directory-sync-plugin
 Includes darkmodelib by ozone10; licenses are in licenses/.
 Manual installation: extract dirsync/ into the host plugins/ directory, then
 Plugins > Plugins Manager > Add > dirsync.spl if not already auto-registered.
-README.cs.md is the current guide;
+Start with PILOT.cs.md for pilot instructions and bug reports.
+README.cs.md is the full current guide;
 English and Czech language modules are included in lang/.
 its technical documentation links refer to doc/ in the source repository.
 This local development package is unsigned and is not a catalog release.
