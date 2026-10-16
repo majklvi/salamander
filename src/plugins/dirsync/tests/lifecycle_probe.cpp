@@ -19,7 +19,7 @@ bool RecoveryLogged()
             [](const dirsync::RecoveryItem& item) { return item.logged; }));
 }
 }
-// Exercise the real SDK configuration callbacks without touching user registry data.
+// Exercise the same Unicode path expansion used by the native folder picker.
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeFolderPath(const wchar_t* expected)
 {
     std::wstring full;
@@ -33,6 +33,7 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeFolderPath(const wchar_t* 
     if(FolderSelectionPath(std::wstring(expected)+L"\\missing-picker-folder",full) || !full.empty()) return 0;
     return 3;
 }
+// Exercise the real SDK configuration callbacks without touching user registry data.
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeSettingsTest()
 {
     struct Registry : CSalamanderRegistryAbstract {

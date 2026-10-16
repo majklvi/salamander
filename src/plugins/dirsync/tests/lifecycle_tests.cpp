@@ -252,7 +252,14 @@ int main()
         dll.resize(dll.find_last_of(L'\\')+1); dll+=L"dirsync_lifecycle_probe.dll";
         Fixture scan; for(int i=0;i<256;++i) scan.Dir(scan.left+L"\\d"+std::to_wstring(i));
         {
-            std::wstring chosen=scan.root;
+            // CI may return an 8.3 TEMP ancestor (e.g. RUNNER~1). The picker
+            // deliberately returns full names, so compare against a full root.
+            DWORD size=GetLongPathNameW(scan.root.c_str(),nullptr,0);
+            Check(size!=0,"resolve full fixture root size");
+            std::vector<wchar_t> root(size);
+            DWORD count=GetLongPathNameW(scan.root.c_str(),root.data(),size);
+            Check(count!=0 && count<size,"resolve full fixture root");
+            std::wstring chosen(root.data(),count);
             for(wchar_t part:{L'階',L'長',L'文'}) {chosen+=L"\\"+std::wstring(90,part);scan.Dir(L"\\\\?\\"+chosen);}
             Module module(dll);
             using FolderTest=unsigned (WINAPI*)(const wchar_t*);
