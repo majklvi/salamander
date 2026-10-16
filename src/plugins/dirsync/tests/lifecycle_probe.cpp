@@ -196,17 +196,17 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeStopControls()
     if(!window) return FALSE;
     bool ok=true;Preview p;p.window=window;
     SetWindowLongPtrW(window,DWLP_USER,reinterpret_cast<LONG_PTR>(&p));
-    for(int id:{IDC_STOP,IDC_STOP_SYNC,IDC_COMPARE,IDC_SYNCHRONIZE})
+    for(int id:{IDC_STOP,IDC_STOP_SYNC,IDC_COMPARE,IDC_SYNCHRONIZE,IDC_SETTINGS})
         ok &= CreateWindowExW(0,L"BUTTON",L"",WS_CHILD,0,0,30,15,window,HMENU(INT_PTR(id)),GetModuleHandleW(nullptr),nullptr)!=nullptr;
     auto enabled=[&](int id) {return IsWindowEnabled(GetDlgItem(window,id))!=FALSE;};
-    Busy(p,false);ok &= !enabled(IDC_STOP) && !enabled(IDC_STOP_SYNC) && enabled(IDC_COMPARE) && enabled(IDC_SYNCHRONIZE);
+    Busy(p,false);ok &= !enabled(IDC_STOP) && !enabled(IDC_STOP_SYNC) && enabled(IDC_COMPARE) && enabled(IDC_SYNCHRONIZE) && enabled(IDC_SETTINGS);
     for(auto intent:{Preview::Intent::None,Preview::Intent::Apply,Preview::Intent::Summary,Preview::Intent::Copy,
         Preview::Intent::Save,Preview::Intent::Overwrite,Preview::Intent::Delete}) {
         p.running=true;p.validating=intent!=Preview::Intent::None;p.intent=intent;p.cancel=false;
         Busy(p,true);int activeStop=StopControl(p),inactiveStop=activeStop==IDC_STOP?IDC_STOP_SYNC:IDC_STOP;
         const bool files=intent==Preview::Intent::Copy || intent==Preview::Intent::Save || intent==Preview::Intent::Overwrite || intent==Preview::Intent::Delete;
         ok &= activeStop==(files?IDC_STOP_SYNC:IDC_STOP) && enabled(activeStop) && !enabled(inactiveStop);
-        ok &= !enabled(IDC_COMPARE) && !enabled(IDC_SYNCHRONIZE);
+        ok &= !enabled(IDC_COMPARE) && !enabled(IDC_SYNCHRONIZE) && !enabled(IDC_SETTINGS);
         DialogBody(window,WM_COMMAND,inactiveStop,0);ok &= !p.cancel;
         DialogBody(window,WM_COMMAND,activeStop,0);ok &= p.cancel;
     }

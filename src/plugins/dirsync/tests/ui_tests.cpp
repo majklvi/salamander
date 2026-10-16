@@ -69,7 +69,7 @@ void Test(int dialog)
             if (c.text[j + 1] == L'&') { ++j; continue; }
             Check(keys.insert(wchar_t(towlower(c.text[j + 1]))).second, "unique dialog mnemonic");
         }
-        if (c.id == IDC_LIST || c.id == IDC_COMPARE || c.id == IDC_STOP || c.id == IDC_STOP_SYNC || c.id == IDC_SYNCHRONIZE ||
+        if (c.id == IDC_LIST || c.id == IDC_COMPARE || c.id == IDC_STOP || c.id == IDC_STOP_SYNC || c.id == IDC_SYNCHRONIZE || c.id == IDC_SETTINGS ||
             c.id == IDC_RECOVERY_ROOT || c.id == IDC_SAVE_ORIGINALS || c.id == IDC_KEEP_ORIGINALS || c.id == IDC_OVERWRITE || c.id == IDC_DELETE_FILES || c.id == IDCANCEL ||
             c.id == IDC_INFO_TABLE || c.id == IDC_INFO_NOTES ||
             c.id == IDC_BROWSE_LEFT || c.id == IDC_BROWSE_RIGHT || c.id == IDC_BROWSE_RECOVERY || c.id == IDOK)
@@ -100,8 +100,9 @@ void Test(int dialog)
         Check(control(IDC_COMPARE).x==control(IDC_SYNCHRONIZE).x &&
             control(IDC_COMPARE).y<control(IDC_SYNCHRONIZE).y &&
             control(IDCANCEL).x>control(IDC_STOP).x+control(IDC_STOP).width &&
-            control(IDCANCEL).y>control(IDC_COMPARE).y && control(IDCANCEL).y<control(IDC_SYNCHRONIZE).y,
-            "Close beside stacked Compare and Synchronize");
+            control(IDC_SETTINGS).x==control(IDCANCEL).x &&
+            control(IDC_SETTINGS).y==control(IDC_COMPARE).y && control(IDCANCEL).y==control(IDC_SYNCHRONIZE).y,
+            "Settings and Close aligned beside Compare and Synchronize");
         for(auto pair:{std::pair<DWORD,DWORD>{IDC_COMPARE,IDC_STOP},{IDC_SYNCHRONIZE,IDC_STOP_SYNC}}) {
             const auto& start=control(pair.first);const auto& stop=control(pair.second);
             Check(stop.y==start.y && stop.x==start.x+start.width && stop.height==start.height,"joined native start/Stop parts without a gap");

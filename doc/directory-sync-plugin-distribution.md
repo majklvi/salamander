@@ -112,3 +112,8 @@ Po rozbalení ověřeno všech 10 hashů manifestu a přesný inventář 11 soub
 Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\native-filters-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
 SHA256: `2c6725dbdf7aa361967bfa0f7d13e88b155050c405fe739a0292569077da0b44`.
 Po rozbalení ověřeno všech 10 hashů manifestu a přesný inventář 11 souborů. Balíček obsahuje aktuální návod, nativní ikonové přepínače ve dvou řádcích, opravené překreslování a Close vedle operačních tlačítek. Produkční SPL a hlavní dialog s finální geometrií byly ověřeny v soukromém 0.16 x64 hostiteli s tmavým schématem; poslední resource build pouze vrátil nezměněný styl informačního dialogu. Nová čistá instalace se neopakovala.
+## 2026-10-16 — Settings, světlé schéma a resize tahem
+
+Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\settings-light-drag-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
+SHA256: `73ed7bafaf795ae3f4e5639c89953a58d3e85d4291dbb637d2efc88a87c24706`.
+Balíček obsahuje aktuální návod, Settings/Close zarovnané s Compare/Synchronize a stejné nativní ikonové filtry. Rozbalením ověřeno 10 manifestových hashů a přesný inventář 11 souborů. Produkční SPL/SLG stejného sestavení byly přes Computer Use ověřeny v soukromém světlém 0.16 x64 hostiteli: filtry OFF/ON, skutečné zvětšování i zmenšování tahem, Settings/OK/Cancel a Close. Nová čistá instalace se neopakovala. Podrobnosti a limity jsou v datovaném UI záznamu.

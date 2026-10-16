@@ -773,7 +773,7 @@ int StopControl(const Preview& p)
 void Busy(Preview& p, bool busy)
 {
     for (int id : {IDC_MASK, IDC_RECURSIVE, IDC_CONTENT, IDC_IGNORE, IDC_ASYMMETRIC, IDC_SELECTED,
-                   IDC_EMPTY, IDC_COMPARE, IDC_SYNCHRONIZE, IDC_EQUAL,
+                   IDC_EMPTY, IDC_COMPARE, IDC_SYNCHRONIZE, IDC_SETTINGS, IDC_EQUAL,
                    IDC_DIFFERENT, IDC_SINGLE, IDC_TORIGHT, IDC_TOLEFT})
         EnableWindow(GetDlgItem(p.window, id), !busy);
     EnableWindow(GetDlgItem(p.window, IDC_SELECTED), !busy && !p.options.selection.empty());
@@ -1402,7 +1402,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_BROWSE_RIGHT) {r.left+=dx;r.right+=dx;}
                 else if (id == IDC_RIGHT) { r.left += dx/2; r.right += dx; }
                 else if (id == IDC_RIGHT_LABEL) { r.left += dx/2; r.right += dx/2; }
-                else if (id == IDC_COMPARE || id == IDC_STOP || id == IDC_SYNCHRONIZE || id == IDC_STOP_SYNC || id == IDCANCEL) {r.left+=dx;r.right+=dx;}
+                else if (id == IDC_COMPARE || id == IDC_STOP || id == IDC_SYNCHRONIZE || id == IDC_STOP_SYNC || id == IDC_SETTINGS || id == IDCANCEL) {r.left+=dx;r.right+=dx;}
                 else if (id==IDC_EQUAL || id==IDC_DIFFERENT || id==IDC_SINGLE || id==IDC_TORIGHT || id==IDC_TOLEFT)
                 {r.left+=dx/2;r.right+=dx/2;}
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, FALSE);
@@ -1484,6 +1484,12 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         case IDC_STOP: case IDC_STOP_SYNC:
             if(p->running && LOWORD(w)==StopControl(*p)) {p->Stop();Status(*p);} return TRUE;
         case IDC_SYNCHRONIZE: SynchronizeMenu(*p);return TRUE;
+        case IDC_SETTINGS:
+            if(!p->running) {
+                ConfigureAppearance(window);ConfigureDark(window);ButtonIcons(*p);ActionColumn(window);
+                InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,TRUE);Status(*p);
+            }
+            return TRUE;
         case IDCANCEL: SendMessageW(window, WM_CLOSE, 0, 0); return TRUE;
         case IDC_SUMMARY: ValidatePreview(*p, Preview::Intent::Summary); return TRUE;
         case IDC_COPY_NEW: ValidatePreview(*p, Preview::Intent::Copy); return TRUE;
