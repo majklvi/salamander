@@ -504,6 +504,36 @@ void PaintMark(HDC dc,RECT cell,Mark mark,COLORREF color,bool centered=false)
     RestoreDC(dc,saved);
     SelectObject(dc,old);DeleteObject(pen);
 }
+std::array<RECT,5> FilterBounds(RECT anchor,RECT compare,RECT synchronize,int gap,int dx)
+{
+    // Use the actual pixel height: equal DU widths/heights need not be square
+    // after the dialog font has been mapped at the current DPI.
+    const int side=compare.bottom-compare.top;
+    const int left=anchor.left+dx/2;
+    const bool single=left+5*side+4*gap<=compare.left+dx-gap;
+    std::array<RECT,5> bounds{};
+    for(size_t i=0;i<bounds.size();++i) {
+        int column=int(single?i:i%3);
+        int top=single || i<3?compare.top:synchronize.top;
+        int x=left+column*(side+gap);
+        bounds[i]={x,top,x+side,top+side};
+    }
+    return bounds;
+}
+void LayoutFilters(Preview& p,int dx)
+{
+    auto original=[&](int id) {
+        for(const auto& control:p.controls) if(GetDlgCtrlID(control.first)==id) return control.second;
+        return RECT{};
+    };
+    RECT gap{0,0,4,0};MapDialogRect(p.window,&gap);
+    const auto bounds=FilterBounds(original(IDC_EQUAL),original(IDC_COMPARE),original(IDC_SYNCHRONIZE),gap.right,dx);
+    const int ids[]={IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT};
+    for(size_t i=0;i<bounds.size();++i) {
+        const auto& r=bounds[i];
+        MoveWindow(GetDlgItem(p.window,ids[i]),r.left,r.top,r.right-r.left,r.bottom-r.top,FALSE);
+    }
+}
 void ButtonIcons(Preview& p)
 {
     HWND window=p.window;HDC dc=GetDC(window);int size=MulDiv(16,GetDeviceCaps(dc,LOGPIXELSX),96);
@@ -1364,6 +1394,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             RECT bounds{}; GetWindowRect(child, &bounds); MapWindowPoints(nullptr, window, reinterpret_cast<POINT*>(&bounds), 2);
             p->controls.push_back({child, bounds});
         }
+        LayoutFilters(*p,0);
         ConfigureDark(window);ButtonIcons(*p); Tooltips(window);ActionColumn(window);SizeStatus(window); Busy(*p, false); Status(*p); return TRUE;
     }
     if (!p) return FALSE;
@@ -1404,9 +1435,10 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (id == IDC_RIGHT_LABEL) { r.left += dx/2; r.right += dx/2; }
                 else if (id == IDC_COMPARE || id == IDC_STOP || id == IDC_SYNCHRONIZE || id == IDC_STOP_SYNC || id == IDC_SETTINGS || id == IDCANCEL) {r.left+=dx;r.right+=dx;}
                 else if (id==IDC_EQUAL || id==IDC_DIFFERENT || id==IDC_SINGLE || id==IDC_TORIGHT || id==IDC_TOLEFT)
-                {r.left+=dx/2;r.right+=dx/2;}
+                    continue; // Laid out as a group after the other controls.
                 MoveWindow(control.first, r.left, r.top, r.right - r.left, r.bottom - r.top, FALSE);
             }
+            LayoutFilters(*p,dx);
         }
         SizeStatus(window);
         // Erase exposed old child bounds as well as repainting the moved controls.

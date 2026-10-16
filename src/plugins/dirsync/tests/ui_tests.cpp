@@ -112,7 +112,7 @@ void Test(int dialog)
         for(DWORD id:{IDC_EQUAL,IDC_DIFFERENT,IDC_SINGLE,IDC_TORIGHT,IDC_TOLEFT}) {
             const auto& filter=control(id);
             Check((filter.style&BS_ICON)!=0 && (filter.style&BS_PUSHLIKE)!=0 && (filter.style&BS_TYPEMASK)==BS_CHECKBOX &&
-                (filter.style&WS_TABSTOP)!=0 && filter.width<=20 && !filter.text.empty(),
+                (filter.style&WS_TABSTOP)!=0 && filter.height==control(IDC_COMPARE).height && filter.width==14 && !filter.text.empty(),
                 "compact native icon toggle retains accessible name");
         }
         Check(control(IDC_EQUAL).y==control(IDC_DIFFERENT).y && control(IDC_EQUAL).y==control(IDC_SINGLE).y &&

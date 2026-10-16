@@ -125,6 +125,13 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
         ok &= button!=nullptr;
         p.filterChecks[i]=true;CheckDlgButton(window,filters[i],BST_CHECKED);
     }
+    for(int id:{IDC_COMPARE,IDC_SYNCHRONIZE})
+        ok &= CreateWindowExW(0,L"BUTTON",L"",WS_CHILD,645,id==IDC_COMPARE?39:69,132,21,window,HMENU(INT_PTR(id)),instance,nullptr)!=nullptr;
+    MoveWindow(GetDlgItem(window,IDC_EQUAL),528,39,21,21,FALSE);
+    for(int id:{IDC_EQUAL,IDC_COMPARE,IDC_SYNCHRONIZE}) {
+        RECT r{};HWND child=GetDlgItem(window,id);GetWindowRect(child,&r);
+        MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&r),2);p.controls.push_back({child,r});
+    }
     for(int id:{IDC_RECURSIVE,IDC_CONTENT,IDC_IGNORE,IDC_ASYMMETRIC,IDC_EMPTY,IDC_SELECTED})
         ok &= CreateWindowExW(0,L"BUTTON",L"",WS_CHILD|BS_AUTOCHECKBOX,0,0,20,20,window,HMENU(INT_PTR(id)),instance,nullptr)!=nullptr;
     for(int id:{IDC_LEFT,IDC_RIGHT})
@@ -179,8 +186,19 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
             GetGValue(faded)==(GetGValue(base)+GetGValue(bg))/2 && GetBValue(faded)==(GetBValue(base)+GetBValue(bg))/2;
         row.action=dirsync::Action::CopyRight;ok &= PreviewColor(row,6,bg,RGB(1,2,3))==base;
     }
-    for(int width:{900,1200}) {
+    for(int width:{900,1200,900,1200}) {
         SetWindowPos(window,nullptr,0,0,width,600,SWP_NOMOVE|SWP_NOZORDER);SizeStatus(window);
+        LayoutFilters(p,width-900);
+        RECT previous{};
+        for(size_t i=0;i<5;++i) {
+            RECT r{};HWND button=GetDlgItem(window,filters[i]);GetWindowRect(button,&r);
+            MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&r),2);
+            ok &= r.right-r.left==21 && r.bottom-r.top==21 && Checked(window,filters[i]);
+            ok &= r.top==(width==1200 || i<3?39:69);
+            if(i && (width==1200 || i!=3)) ok &= r.left>previous.right;
+            if(width==1200) ok &= r.right<645+(width-900);
+            previous=r;
+        }
         RECT client{},bounds{},status{};GetClientRect(window,&client);GetWindowRect(list,&bounds);GetWindowRect(bar,&status);
         MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&bounds),2);MapWindowPoints(nullptr,window,reinterpret_cast<POINT*>(&status),2);
         ok &= bounds.left==0 && bounds.right==client.right && bounds.bottom==status.top;

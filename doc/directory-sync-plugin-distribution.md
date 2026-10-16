@@ -117,3 +117,8 @@ Po rozbalení ověřeno všech 10 hashů manifestu a přesný inventář 11 soub
 Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\settings-light-drag-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
 SHA256: `73ed7bafaf795ae3f4e5639c89953a58d3e85d4291dbb637d2efc88a87c24706`.
 Balíček obsahuje aktuální návod, Settings/Close zarovnané s Compare/Synchronize a stejné nativní ikonové filtry. Rozbalením ověřeno 10 manifestových hashů a přesný inventář 11 souborů. Produkční SPL/SLG stejného sestavení byly přes Computer Use ověřeny v soukromém světlém 0.16 x64 hostiteli: filtry OFF/ON, skutečné zvětšování i zmenšování tahem, Settings/OK/Cancel a Close. Nová čistá instalace se neopakovala. Podrobnosti a limity jsou v datovaném UI záznamu.
+## 2026-10-16 — čtvercové adaptivní filtry
+
+Aktuální unsigned x64 preview: `C:\Samandarin\builds\dirsync-distribution\responsive-filters-20261016\plugin_5.0_dirsync_0.1_x64.zip`.
+SHA256: `bd2cc01451054879ce7e4fee2fcb4e0e915e563271ba17fe5999013c1bf8cad7`.
+Rozbalením ověřeno všech 10 manifestových hashů a přesný inventář 11 souborů. Produkční SPL/SLG stejného sestavení byly ověřeny přes Computer Use ve světlém 0.16 x64 hostiteli: menší čtvercové filtry, dva řádky při 917 px, jeden při 1223 px, návrat tahem a zachovaný stav/výsledky. Návod popisuje automatické přeuspořádání. Nová čistá instalace se neopakovala.
