@@ -262,6 +262,9 @@ int main()
             std::wstring chosen(root.data(),count);
             for(wchar_t part:{L'階',L'長',L'文'}) {chosen+=L"\\"+std::wstring(90,part);scan.Dir(L"\\\\?\\"+chosen);}
             Module module(dll);
+            using DisplayTest=unsigned (WINAPI*)();
+            auto display=reinterpret_cast<DisplayTest>(GetProcAddress(module.handle,"ProbeDisplayFormatting"));
+            Check(display && display()==22,"host name styles, long Unicode display paths and unchanged clipboard spelling");
             using FolderTest=unsigned (WINAPI*)(const wchar_t*);
             auto folderTest=reinterpret_cast<FolderTest>(GetProcAddress(module.handle,"ProbeFolderPath"));
             Check(chosen.size()>260 && folderTest && folderTest(chosen.c_str())==3,"folder picker preserves long Unicode names and expands shell aliases; missing folder is refused");

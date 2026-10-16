@@ -20,6 +20,57 @@ bool RecoveryLogged()
 }
 }
 // Exercise the same Unicode path expansion used by the native folder picker.
+extern "C" __declspec(dllexport) unsigned WINAPI ProbeDisplayFormatting()
+{
+    unsigned checks=0;
+    auto check=[&](bool ok) {if(!ok) throw std::runtime_error("panel display formatting");++checks;};
+    try {
+        BYTE lower[256]{},upper[256]{};
+        for(unsigned i=0;i<256;++i) lower[i]=upper[i]=BYTE(i);
+        for(unsigned i='A';i<='Z';++i) lower[i]=BYTE(i+'a'-'A');
+        for(unsigned i='a';i<='z';++i) upper[i]=BYTE(i+'A'-'a');
+        auto name=[&](const char* input,int format,bool directory=false) {
+            return dirsync::UnicodeNameCase(input,format,directory,lower,upper);
+        };
+        check(name("HELLO WORLD.TXT",1)=="Hello World.Txt");
+        check(name("HELLO WORLD.TXT",2)=="hello world.txt");
+        check(name("hello world.txt",3)=="HELLO WORLD.TXT");
+        check(name("MiXeD.Txt",4)=="MiXeD.Txt");
+        check(name("FOO.TXT",5)=="Foo.txt");
+        check(name("LONGERTHAN8.TXT",5)=="LONGERTHAN8.TXT");
+        check(name("mixed.txt",5)=="mixed.txt");
+        check(name("FOO.TXT",6)=="foo.txt");
+        check(name("foo.txt",6,true)=="FOO.TXT");
+        check(name("HELLO WORLD.TXT",7)=="Hello World.txt");
+        // Ordinary u8 literals have char8_t in C++20: keep UTF-8 in byte strings.
+        std::wstring original=std::wstring(300,L'Ž')+L" žluťoučký-漢字-😀.TXT";
+        auto utf8=[](const std::wstring& text) {
+            int n=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.c_str(),-1,nullptr,0,nullptr,nullptr);
+            std::string bytes(size_t(n),'\0');WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,text.c_str(),-1,bytes.data(),n,nullptr,nullptr);
+            bytes.resize(size_t(n)-1);return bytes;
+        };
+        const auto bytes=utf8(original);
+        for(int mode:{1,2,3,4,6,7}) {
+            auto transformed=dirsync::UnicodeNameCase(bytes,mode,false,lower,upper);std::wstring wide;
+            check(dirsync::DecodePath(transformed.c_str(),wide) && wide.find(L"漢字-😀")!=std::wstring::npos);
+            if(mode==2) check(wide==std::wstring(300,L'ž')+L" žluťoučký-漢字-😀.txt");
+            if(mode==3) check(wide==std::wstring(300,L'Ž')+L" ŽLUŤOUČKÝ-漢字-😀.TXT");
+        }
+        std::vector<bool> kinds;
+        const auto path=L"Parent\\"+original;
+        const auto displayed=dirsync::PanelRelativePath(path,false,6,[&](const std::wstring& part,int mode,bool dir) {
+            kinds.push_back(dir);std::wstring text;
+            dirsync::DecodePath(dirsync::UnicodeNameCase(utf8(part),mode,dir,lower,upper).c_str(),text);return text;
+        });
+        check(kinds==std::vector<bool>({true,false}));
+        check(displayed==L"PARENT\\"+std::wstring(300,L'ž')+L" žluťoučký-漢字-😀.txt");
+        check(path==L"Parent\\"+original);
+        dirsync::Row row;row.path=path;row.hasLeft=true;
+        Preview p;p.left=L"C:\\left";p.result.rows.push_back(row);
+        check(RowPaths(p,{0},0)==path); // Clipboard retains the real spelling.
+        return checks;
+    } catch(...) {return 0;}
+}
 extern "C" __declspec(dllexport) unsigned WINAPI ProbeFolderPath(const wchar_t* expected)
 {
     std::wstring full;

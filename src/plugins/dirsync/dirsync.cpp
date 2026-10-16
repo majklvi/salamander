@@ -10,6 +10,7 @@
 #include "delete.h"
 #include "resource.h"
 #include "previewlayout.h"
+#include "displayformat.h"
 #include "spl_gui.h"
 #include "../../third_party/darkmodelib/include/Darkmodelib.h"
 #include <thread>
@@ -380,6 +381,7 @@ struct Preview
 {
     enum class Intent { None, Apply, Summary, Copy, Save, Overwrite, Delete };
     HWND window = nullptr;
+    int sizeFormat=0,nameFormat=4;
     std::wstring left, right;
     std::wstring panelLeft, panelRight;
     dirsync::Options options;
@@ -420,6 +422,57 @@ struct Preview
 };
 Preview* active = nullptr;
 std::wstring Number(uint64_t n) { return std::to_wstring(n); }
+void ReadPanelFormat(Preview& p)
+{
+    if(!general) return;
+    int value=0;
+    // 0.16 returns the size value with a BOOL type tag; use its documented range.
+    if(general->GetConfigParameter(SALCFG_SIZEFORMAT,&value,sizeof(value),nullptr) && value>=0 && value<=2)
+        p.sizeFormat=value;
+    if(general->GetConfigParameter(SALCFG_FILENAMEFORMAT,&value,sizeof(value),nullptr) && value>=1 && value<=7)
+        p.nameFormat=value;
+}
+std::wstring PanelSize(uint64_t bytes,int format)
+{
+    if(!general) return Number(bytes);
+    char buffer[256]{};CQuadWord size{DWORD(bytes),DWORD(bytes>>32)};
+    const int mode=dirsync::PanelSizeMode(format);
+    if(mode<0) general->NumberToStr(buffer,size);
+    else general->PrintDiskSize(buffer,size,mode);
+    std::wstring text;dirsync::DecodePath(buffer,text);return text;
+}
+std::wstring PanelName(const std::wstring& name,int format,bool directory)
+{
+    if(!general || format==4 || name.empty()) return name;
+    const UINT cp=GetACP();BOOL substituted=FALSE;
+    const DWORD flags=cp==CP_UTF8?WC_ERR_INVALID_CHARS:WC_NO_BEST_FIT_CHARS;
+    BOOL* used=cp==CP_UTF8?nullptr:&substituted;
+    int count=WideCharToMultiByte(cp,flags,name.c_str(),-1,nullptr,0,nullptr,used);
+    if(count>0 && !substituted) {
+        std::vector<char> source(size_t(count),0),target(size_t(count)*4+1,0);
+        if(WideCharToMultiByte(cp,flags,name.c_str(),-1,source.data(),count,nullptr,used) && !substituted) {
+            general->AlterFileName(target.data(),source.data(),format,0,directory);
+            // This API uses ACP, so decode explicitly instead of guessing UTF-8.
+            int n=MultiByteToWideChar(cp,MB_ERR_INVALID_CHARS,target.data(),-1,nullptr,0);
+            if(n>0) {std::vector<wchar_t> wide(size_t(n),0);if(MultiByteToWideChar(cp,MB_ERR_INVALID_CHARS,target.data(),-1,wide.data(),n)) return wide.data();}
+        }
+    }
+    // Preserve all Unicode characters if the narrow SDK cannot represent a name.
+    count=WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,name.c_str(),-1,nullptr,0,nullptr,nullptr);
+    if(count<=0) return name;
+    std::string utf8(size_t(count),'\0');
+    if(!WideCharToMultiByte(CP_UTF8,WC_ERR_INVALID_CHARS,name.c_str(),-1,utf8.data(),count,nullptr,nullptr)) return name;
+    utf8.resize(size_t(count)-1);BYTE *lower=nullptr,*upper=nullptr;
+    general->GetLowerAndUpperCase(&lower,&upper);
+    if(!lower || !upper) return name;
+    utf8=dirsync::UnicodeNameCase(std::move(utf8),format,directory,lower,upper);
+    std::wstring text;return dirsync::DecodePath(utf8.c_str(),text)?text:name;
+}
+std::wstring PanelPath(const dirsync::Row& row,int format)
+{
+    const bool directory=(row.hasLeft && row.left.directory) || (row.hasRight && row.right.directory);
+    return dirsync::PanelRelativePath(row.path,directory,format,PanelName);
+}
 std::wstring Modified(uint64_t ticks)
 {
     FILETIME utc{DWORD(ticks), DWORD(ticks >> 32)}, local{};
@@ -430,15 +483,15 @@ std::wstring Modified(uint64_t ticks)
     GetTimeFormatEx(LOCALE_NAME_USER_DEFAULT, 0, &time, nullptr, clock, 80);
     return std::wstring(date) + L" " + clock;
 }
-std::wstring Cell(const dirsync::Row& row, int column)
+std::wstring Cell(const dirsync::Row& row, int column,const Preview& p)
 {
     switch (column)
     {
-    case 0: return row.path + (((row.hasLeft && row.left.directory) || (row.hasRight && row.right.directory)) ? L"\\" : L"");
-    case 1: return row.hasLeft && !row.left.directory ? Number(row.left.size) : L"";
+    case 0: return PanelPath(row,p.nameFormat);
+    case 1: return row.hasLeft && !row.left.directory ? PanelSize(row.left.size,p.sizeFormat) : L"";
     case 2: return row.hasLeft ? Modified(row.left.time) : L"";
     case 3: return L"     " + Text(IDS_ACTION + int(row.action));
-    case 4: return row.hasRight && !row.right.directory ? Number(row.right.size) : L"";
+    case 4: return row.hasRight && !row.right.directory ? PanelSize(row.right.size,p.sizeFormat) : L"";
     case 5: return row.hasRight ? Modified(row.right.time) : L"";
     case 6: return L"     " + Text(IDS_STATE + int(row.state));
     case 7: return Text(IDS_REASON + int(row.reason));
@@ -1350,6 +1403,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
     if (message == WM_INITDIALOG)
     {
         p = reinterpret_cast<Preview*>(l); p->window = window;
+        ReadPanelFormat(*p);
         SetWindowLongPtrW(window, DWLP_USER, reinterpret_cast<LONG_PTR>(p));
         SetDlgItemTextW(window, IDC_LEFT, p->left.c_str()); SetDlgItemTextW(window, IDC_RIGHT, p->right.c_str());
         SetDlgItemTextW(window, IDC_MASK, L"*.*");
@@ -1373,7 +1427,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         ListView_SetUnicodeFormat(list, TRUE);
         // Column captions and actions always come from the language module.
         for (int i = 0; i < 9; ++i)
-        { std::wstring title = Text(IDS_COLUMNS + i); LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH; c.pszText = &title[0]; c.cx = MulDiv(widths[i], dpi, 96); SendMessageW(list, LVM_INSERTCOLUMNW, i, LPARAM(&c)); }
+        { std::wstring title = Text(IDS_COLUMNS + i); LVCOLUMNW c{}; c.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_FMT; c.fmt=(i==1 || i==4)?LVCFMT_RIGHT:LVCFMT_LEFT; c.pszText = &title[0]; c.cx = MulDiv(widths[i], dpi, 96); SendMessageW(list, LVM_INSERTCOLUMNW, i, LPARAM(&c)); }
         RECT client{}, outer{}; GetClientRect(window, &client); GetWindowRect(window, &outer);
         p->initialClient = {client.right, client.bottom};
         p->minimumWindow = {outer.right - outer.left, outer.bottom - outer.top};
@@ -1491,7 +1545,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
         if (p->running) { p->closing = true; p->Stop(); }
         else { PersistSettings(window); EndDialog(window, 0); }
         return TRUE;
-    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ConfigureDark(window);ButtonIcons(*p); return TRUE;
+    case WM_SETTINGCHANGE: case WM_THEMECHANGED: ReadPanelFormat(*p);ConfigureDark(window);ButtonIcons(*p);InvalidateRect(GetDlgItem(window,IDC_LIST),nullptr,FALSE); return TRUE;
     case WM_CONTEXTMENU:
         if(reinterpret_cast<HWND>(w)==GetDlgItem(window,IDC_LIST)) {PreviewMenu(*p,l);return TRUE;}
         break;
@@ -1613,7 +1667,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             auto* info = reinterpret_cast<NMLVDISPINFOW*>(l);
             if ((info->item.mask & LVIF_TEXT) && info->item.iItem >= 0 && size_t(info->item.iItem) < p->visible.size())
             {
-                std::wstring text = Cell(p->result.rows[p->visible[size_t(info->item.iItem)]], info->item.iSubItem);
+                std::wstring text = Cell(p->result.rows[p->visible[size_t(info->item.iItem)]], info->item.iSubItem,*p);
                 if (info->item.cchTextMax > 0)
                 {
                     size_t length = std::min(text.size(), size_t(info->item.cchTextMax - 1));
@@ -1733,7 +1787,12 @@ public:
     CPluginInterfaceForMenuExtAbstract* WINAPI GetInterfaceForMenuExt() override { return &menu; }
     CPluginInterfaceForFSAbstract* WINAPI GetInterfaceForFS() override { return nullptr; }
     CPluginInterfaceForThumbLoaderAbstract* WINAPI GetInterfaceForThumbLoader() override { return nullptr; }
-    void WINAPI Event(int, DWORD) override {}
+    void WINAPI Event(int event, DWORD) override
+    {
+        if(event==PLUGINEVENT_CONFIGURATIONCHANGED && active && active->window) {
+            ReadPanelFormat(*active);InvalidateRect(GetDlgItem(active->window,IDC_LIST),nullptr,FALSE);
+        }
+    }
     void WINAPI ClearHistory(HWND) override {}
     void WINAPI AcceptChangeOnPathNotification(const char*, BOOL) override {}
     void WINAPI PasswordManagerEvent(HWND, int) override {}
