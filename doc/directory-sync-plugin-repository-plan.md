@@ -2,6 +2,8 @@
 
 17. října 2026. **Plán a úspěšná izolovaná místní zkouška; skutečný přesun ani publikace nebyly provedeny.** Připraveny neutrální texty a filtry, přejmenován dokument pozorování. Historie byla zkušebně filtrována pouze v oddělených místních klonech; původní fork, jeho refs/historie, sestavení, CI a SDK zůstávají zachované. Podrobnosti a přesný fixovaný vstup uvádí [protokol zkoušky exportu](directory-sync-plugin-export-rehearsal.md). Verze pluginu zůstává 0.1.4. Bez SMB testů.
 
+**Navazující místní ověření:** samostatné sestavení, všech pět x64 sad v Debug/Release, x64 ZIP a nezávislost na původním checkoutu jsou nyní [ověřené v izolovaném kandidátu](directory-sync-plugin-standalone-build.md). Vlastní workflow prošla statickou kontrolou; vzdálené CI/CodeQL dosud neběžely. Následující datovaný audit a migrační postup zůstávají výchozím plánem, nikoli tvrzením, že tato pozdější zkouška neproběhla.
+
 ## Závěr a doporučení
 
 Samostatný repozitář je proveditelný bez rozšíření SDK a bez sestavování salamand.exe. Doporučená varianta: vyfiltrovat celou historii vlastních zdrojů a dokumentace, přibalit přesně připnutý malý snapshot potřebného SDK a podpory vzhledu, potom samostatnými migračními commity upravit cesty, sestavení, balení a CI. Závislosti se při běžném buildu nestahují z pohyblivé větve. Přesun nespojovat s refaktoringem operací, výměnou knihovny vzhledu ani novými funkcemi.

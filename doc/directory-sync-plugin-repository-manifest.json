@@ -1,5 +1,5 @@
 {
-  "status": "local isolated history-export rehearsal passed; no remote repository created or published; original fork unchanged",
+  "status": "isolated local standalone build/package/CI candidate verified; no remote repository or publication; original source/history preserved",
   "auditCommit": "67ef93f1abf2a66bdb3feefb0ce05acd30830130",
   "referenceBase": "a84dbed6db632a9e63b5ed9f4bc6691e4cc5f449",
   "ownedSourceFiles": 46,
@@ -793,7 +793,8 @@
     "LICENSE",
     "doc/directory-sync-plugin-repository-plan.md",
     "doc/directory-sync-plugin-repository-manifest.json",
-    "doc/directory-sync-plugin-export-rehearsal.md"
+    "doc/directory-sync-plugin-export-rehearsal.md",
+    "doc/directory-sync-plugin-standalone-build.md"
   ],
   "observedBuildInputsToReplace": [
     {
@@ -847,7 +848,7 @@
       },
       {
         "source": "doc/directory-sync-plugin-repository-plan.md",
-        "sha256": "0dc1a5b6b7b8fe2e25701345901640bf123623604bbd9f5d116805f1d5d8bfa3"
+        "sha256": "2fc1c749fe366a3df8d4afd66d79376b0e6b9ca3a9bd98df3cc6f2bb0c2eaf40"
       }
     ]
   },
@@ -876,5 +877,53 @@
     "report": "doc/directory-sync-plugin-export-rehearsal.md",
     "tooling": "tools/directory-sync-export/ (source fork only; excluded from export selection)",
     "scope": "Owned historical paths retained except neutral observation filename; support snapshots added; no standalone build/package migration. Future source heads require rerun."
+  },
+  "standaloneBuildRehearsal": {
+    "sourceCommit": "fa7c9c0ca18a51de5d9367f2c889c2678554efec",
+    "candidateHead": "5d76d12832f0749457317880ab419ef436a85b62",
+    "candidateVersion": "0.1.4",
+    "report": "doc/directory-sync-plugin-standalone-build.md",
+    "workspace": "C:/Samandarin/builds/dirsync-standalone-20261017/work",
+    "independentClone": "C:\\Samandarin\\builds\\dirsync-independent-20261017\\čistý klon 漢字",
+    "buildMatrix": [
+      "Debug Win32",
+      "Debug x64",
+      "Debug ARM64",
+      "Release x64"
+    ],
+    "runtimeSuitesPerX64Configuration": 5,
+    "runtimeConfigurations": [
+      "Debug",
+      "Release"
+    ],
+    "trackedReadLogs": 42,
+    "uniqueReadPaths": 638,
+    "uniqueImportedProjects": 78,
+    "originalCheckoutReads": 0,
+    "unexpectedInputs": 0,
+    "functionalSourceChanges": 0,
+    "verifiedSourceResourceFiles": 31,
+    "verifiedVendorFiles": 52,
+    "packageHashedFiles": 47,
+    "packageFilesIncludingManifest": 48,
+    "packageSha256": "8d8be1317c2947a8c3cbed9859335b6982bb31b0259431444e5540414b7cc3a3",
+    "packageRelativeLinksMissing": 0,
+    "historyAuditObjects": {
+      "blob": 600,
+      "commit": 72,
+      "tree": 394,
+      "tag": 0
+    },
+    "historyAuditPaths": 4399,
+    "remainingReferences": 0,
+    "ciYamlValidator": "actionlint 1.7.12",
+    "workflowActionsPinned": true,
+    "localCiCommandsPassed": true,
+    "githubCiExecuted": false,
+    "codeqlAnalysisExecuted": false,
+    "remoteRepositoriesCreated": false,
+    "published": false,
+    "scope": "Local candidate only; no host GUI installation rerun; no SMB; no original SDK/source/build/workflow changes.",
+    "legacyBuildSheets": "Replaced by own common.props and regenerated build-support projects; old duplicate tests/*.vcxproj removed only in candidate."
   }
 }
