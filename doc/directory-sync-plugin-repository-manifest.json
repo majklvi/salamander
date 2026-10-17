@@ -186,9 +186,11 @@
       "sha256": "acc0467624a1d7ae33b4735e9df7d893af806819c20a792c510ecaa8177b3a26"
     },
     {
-      "source": "doc/directory-sync-plugin-tc-observations.md",
-      "proposedTarget": "docs/directory-sync-plugin-tc-observations.md",
-      "sha256": "aa64a5ab6981c66a1718942ab53a9cc496c20a12546df8e0fe650a41dc3ba3f7"
+      "source": "doc/directory-sync-plugin-reference-observations.md",
+      "proposedTarget": "docs/directory-sync-plugin-reference-observations.md",
+      "sha256": "aa64a5ab6981c66a1718942ab53a9cc496c20a12546df8e0fe650a41dc3ba3f7",
+      "sourceAtAuditCommit": "git-blob:7af5e446286f25b487cfa333a97cdcc50bd51d31",
+      "pathNote": "Neutral working-tree name; resolve the historical path by blob ID at auditCommit."
     },
     {
       "source": "doc/directory-sync-plugin-ui-automation.md",
@@ -799,5 +801,53 @@
       "sha256": "4405d0fdf0065add7717a1c705876469238612c2a8445cbf0f3301a24fe6c290",
       "observedBuildInput": true
     }
-  ]
+  ],
+  "exportPreparation": {
+    "status": "working-tree preparation only; no history rewritten and no repository exported",
+    "originalArchiveCommit": "af0e81bc1bccb6c733025fe31a97d53adf5cb32f",
+    "originalAuditHashes": "preserveHistory SHA-256 values describe auditCommit, not the prepared working tree",
+    "historicalPathDiscovery": "Include every historical name of the reference observations document, discovered from the source blob and git log --follow; normalize names in every exported tree.",
+    "rewriteScope": [
+      "all exported text blobs, including deleted historical versions",
+      "all exported paths",
+      "full commit and annotated tag messages",
+      "selected attribution and dependency snapshot text"
+    ],
+    "sdkSnapshotException": {
+      "source": "src/plugins/shared/spl_com.h",
+      "scope": "exported vendor copy only",
+      "change": "Neutralize the proxy implementation name in the compatibility comment; preserve declarations, notices and ABI. Record source and exported SHA-256 separately."
+    },
+    "verification": "Reject named-product references and its standalone two-letter abbreviation case-insensitively in every reachable exported blob, path, message and ref; also inspect historical source domains and help/fixture aliases. No allowlist. Audit git objects, not only the final checkout.",
+    "preparedInputs": [
+      {
+        "source": "doc/directory-sync-plugin-design.md",
+        "sha256": "a3e58e9590949a8220f8c7e2274533f88c2d177951db3bfc243638f5510644d5"
+      },
+      {
+        "source": "doc/directory-sync-plugin-directories.md",
+        "sha256": "edecbc3965c6337f263db87d91bd3f1bed93806640025c1a7ee801d2bb492792"
+      },
+      {
+        "source": "doc/directory-sync-plugin-implementation.md",
+        "sha256": "c7ec4fb69d85015e5709b1f5716e8cbb38522db32c243b5bb99d7a1471dcb00c"
+      },
+      {
+        "source": "doc/directory-sync-plugin-reference-observations.md",
+        "sha256": "0827880d3c4f7f127762218630e8cceff93ab0c339a8854c85dab9bcd65bc1ea"
+      },
+      {
+        "source": "doc/directory-sync-plugin-sdk.md",
+        "sha256": "4517c99c4089e6ff3e588de3d32ce0438cb86d226c0511bb5770cfbcb51a2fff"
+      },
+      {
+        "source": "src/plugins/dirsync/tests/engine_tests.cpp",
+        "sha256": "6605d2e188338295e1f514a1236ad12742f3bdc2f8b61a234d6153f475f39e17"
+      },
+      {
+        "source": "doc/directory-sync-plugin-repository-plan.md",
+        "sha256": "ac430fdd7040dc3d23cb52c395d5175871f5fe1aee9a1ecf235dd74ec3e3a93b"
+      }
+    ]
+  }
 }

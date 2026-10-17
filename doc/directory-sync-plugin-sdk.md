@@ -1,12 +1,14 @@
 # Synchronizační plugin a technický průzkum SDK 0.16
 
+Redakční příprava exportu (17. října 2026): názvy referenčního programu a odkazy na jeho web jsou nahrazeny neutrálním označením. Historické zdroje v plném znění zachovává [archiv původního forku](https://github.com/majklvi/salamander/tree/af0e81bc1bccb6c733025fe31a97d53adf5cb32f/doc). Cesty s prefixem `reference-sync-probe-` jsou dokumentační aliasy, nikoli přejmenované testovací adresáře. Výsledky a meze ověření se nemění.
+
 > **Datovaný návrh / evidence vývoje.** Aktuální stav, instalace, ovládání a omezení jsou v [hlavním návodu](directory-sync-plugin.md). Níže uvedené tehdejší rozsahy, názvy ovládacích prvků, počty testů a neprovedená ověření popisují příslušnou etapu; nejsou souhrnem současné verze.
 
 
 
 **Navazující stav (15. října 2026):** na samostatný pokyn uživatele implementována [kopie pouze do nových cílů](directory-sync-plugin-copy-new.md), včetně stagingu, Verify, metadat, průběhu a Stop. Původní návrhové pasáže níže nejsou tvrzením o přepisech či mazání; ty zůstávají neimplementované. SDK/hostitel beze změn, bez SMB testů. Přesné runtime výsledky a odchylku vlastní CREATE_NEW rezervace stagingu uvádí nový protokol.
 
-Doplněk k [návrhu chování a rozsahu](directory-sync-plugin-design.md). Původní audit SDK proběhl 14. října 2026 před implementací. K 15. říjnu je hotová [první etapa bez zápisů a její ověření](directory-sync-plugin-implementation.md); SDK zůstává nezměněné. Samostatné UI ověření předlohy TC 11.58 je zachyceno v [protokolu pozorování](directory-sync-plugin-tc-observations.md); technické záruky zápisového enginu tím nejsou ověřené.
+Doplněk k [návrhu chování a rozsahu](directory-sync-plugin-design.md). Původní audit SDK proběhl 14. října 2026 před implementací. K 15. říjnu je hotová [první etapa bez zápisů a její ověření](directory-sync-plugin-implementation.md); SDK zůstává nezměněné. Samostatné UI ověření předlohy 11.58 je zachyceno v [protokolu pozorování](directory-sync-plugin-reference-observations.md); technické záruky zápisového enginu tím nejsou ověřené.
 
 Audit proběhl v `C:\Samandarin\directory-sync-plugin` na commitu `a84dbed6db632a9e63b5ed9f4bc6691e4cc5f449`. Odkazy níže jsou připnuté na tento commit forku `majklvi/salamander`; API z jiných rozpracovaných větví se nepředpokládají.
 
@@ -14,7 +16,7 @@ Audit proběhl v `C:\Samandarin\directory-sync-plugin` na commitu `a84dbed6db632
 
 Nativní C++ plugin pro místní disky a Windows síťové cesty je proveditelný. Doporučeným základem je rozšíření nabídky pluginů, vlastní datový model porovnání a vlastní backend nad širokými Win32 API. Nejde o potvrzení, že existující SDK již poskytuje bezpečný synchronizační engine.
 
-D1 je rozhodnuté: první verze podporuje místní a SMB složky, včetně UNC a mapovaných SMB jednotek. FTP/SFTP, archivy a jiné pluginové souborové systémy jsou odložené. D2 potvrzuje variantu A bez historie: plánovač obousměrného režimu pracuje s aktuálním stavem bez databáze minulých synchronizací a neodvozuje mazání z absence protějšku. D3 potvrzuje variantu A: jednosměrně pouze asymetrie podle TC, bez samostatného přesného zrcadlení v první verzi. D4 potvrzuje vlastní složku obnovy pro přepisy i mazání, mimo oba synchronizované stromy; chyba uchování blokuje příslušnou destruktivní operaci. D5 potvrzuje variantu A podle tabulky hlavního návrhu: běžná data a vybrané vlastnosti, cílová pravidla oprávnění, podmíněný přenos ADS a výslovné meze speciálních souborů. Před zápisovou částí je nutné uzavřít dvě technická rozhodnutí:
+D1 je rozhodnuté: první verze podporuje místní a SMB složky, včetně UNC a mapovaných SMB jednotek. FTP/SFTP, archivy a jiné pluginové souborové systémy jsou odložené. D2 potvrzuje variantu A bez historie: plánovač obousměrného režimu pracuje s aktuálním stavem bez databáze minulých synchronizací a neodvozuje mazání z absence protějšku. D3 potvrzuje variantu A: jednosměrně pouze asymetrie podle předlohy, bez samostatného přesného zrcadlení v první verzi. D4 potvrzuje vlastní složku obnovy pro přepisy i mazání, mimo oba synchronizované stromy; chyba uchování blokuje příslušnou destruktivní operaci. D5 potvrzuje variantu A podle tabulky hlavního návrhu: běžná data a vybrané vlastnosti, cílová pravidla oprávnění, podmíněný přenos ADS a výslovné meze speciálních souborů. Před zápisovou částí je nutné uzavřít dvě technická rozhodnutí:
 
 1. Jak zpracovat kořenovou cestu z existujícího SDK 0.16 a bezpečně hlásit jeho omezení: uživatel 15. října 2026 rozhodl SDK ani hostitele pro první verzi nerozšiřovat.
 2. Jak provádět schválený plán s dlouhými cestami, obnovou a opětovným ověřením identity: `SafeFile` ani interaktivní Copy nejsou hotovým řešením.
@@ -147,7 +149,7 @@ Kontrakt adaptéru pluginu nad stávajícím SDK:
 
 Místní doplnění z 15. října: read-only engine nyní ukládá identity/ChangeTime a ověřuje snapshot před změnou návrhů a souhrnem. Řízené výměny souborů, rodičů a junction, změny po skenu a přesné hranice důkazu jsou v [protokolu implementace](directory-sync-plugin-implementation.md#ntfs-identity-a-změny-po-skenu-15-října-2026). [Návrh provedení a obnovy](directory-sync-plugin-execution-protocol.md) konkretizuje journal a recovery, ale nepovažuje read-only checkpoint za dostatečnou ochranu budoucího zápisu. Navazující [izolovaná NTFS sonda](directory-sync-plugin-ntfs-protocol-probe.md) prokázala konkrétní rename/sharing režimy, testované ACL/ADS a pádovou matici (347 assertions, 53 procesů v Debug i Release x64). Odhalila ovšem nekompatibilitu striktních rodičovských pinů s rename a možnost změnit ADS přes držený hlavní proud. Executor není implementován. Následným rozhodnutím uživatele byla úplná stabilita všech rodičů/proudů odložena nad rámec cílové úrovně jádra; aktuální rozsah V6 určuje sekce níže. SDK ani hostitel se nemění.
 
-Prostředí: Windows 10.0.26200.0, svazek C: NTFS. Samostatná diagnostická sonda mimo repozitář: `C:\Samandarin\tc-sync-probe-20261014-r2\probe-winapi.ps1`. Volá přímo `CopyFileExW` a `ReplaceFileW` přes P/Invoke; neobsahuje plugin ani synchronizační engine. Úspěšný výstup je v `winapi-e82ce1bf599f46c294089a3483bc6286\result.json` pod stejným testovacím kořenem.
+Prostředí: Windows 10.0.26200.0, svazek C: NTFS. Samostatná diagnostická sonda mimo repozitář: `C:\Samandarin\reference-sync-probe-20261014-r2\probe-winapi.ps1`. Volá přímo `CopyFileExW` a `ReplaceFileW` přes P/Invoke; neobsahuje plugin ani synchronizační engine. Úspěšný výstup je v `winapi-e82ce1bf599f46c294089a3483bc6286\result.json` pod stejným testovacím kořenem.
 
 | Sonda | Pozorování | Důsledek pro návrh |
 | --- | --- | --- |
@@ -180,8 +182,8 @@ Referenční worker otevírá zdroj i se share WRITE a vytváří nový cíl př
 
 Další souběhové reparse/ACL/ADS sondy, nativní relativní backend, crash replay a důkazy odolnosti vůči výpadku napájení jsou odložené, nikoli blokující předpoklady první verze. Dosavadní experimentální pádová matice se nepřepisuje jako neprovedená, ale nevyžaduje další rozšiřování. Úzké technické mapování jádra/SDK je [dokončeno v samostatném dokumentu](directory-sync-plugin-core-adapter.md), včetně přesných míst workeru, omezení lifetime SDK progressu, kandidátních wide API a běžných testů. Nevznikl executor ani nový runtime důkaz. V6 zůstává otevřená pro běžné integrační ověření budoucí implementace, ne jako projekt certifikace filesystemu.
 
-### Doplnění z dokončených testů TC V3
+### Doplnění z dokončených testů předlohy V3
 
-V noci ze 14. na 15. října 2026 byly přes Computer Use dokončeny místní testy přerušení zápisu a skutečné chyby Verify; podrobnosti a nezávislé hashe uvádí [třetí série protokolu](directory-sync-plugin-tc-observations.md). Po zastavení přenosu do prázdného cíle TC odstranil rozpracovanou kopii a nezačal další soubor. Po změně posledního bytu již zapsané kopie během pozastaveného Verify zobrazil CRC error; Abort ukončilo běh, ale vadnou kopii ponechalo.
+V noci ze 14. na 15. října 2026 byly přes Computer Use dokončeny místní testy přerušení zápisu a skutečné chyby Verify; podrobnosti a nezávislé hashe uvádí [třetí série protokolu](directory-sync-plugin-reference-observations.md). Po zastavení přenosu do prázdného cíle referenční program odstranil rozpracovanou kopii a nezačal další soubor. Po změně posledního bytu již zapsané kopie během pozastaveného Verify zobrazil CRC error; Abort ukončilo běh, ale vadnou kopii ponechalo.
 
 To podporuje požadavky posloupnosti V6 výše: ověření stagingu před commitem, explicitní neúspěch po chybě, zachování obnovy a odlišení dokončeného zápisu od úspěšně ověřené operace. Nejde o runtime důkaz navrženého backendu, přerušení přepisu ani podpory SMB.

@@ -41,7 +41,7 @@ void Matrix()
                 Check(row.action == Action::CopyRight, "date wins even over identical content");
         }
         const int expected = ignore ? (content ? 6 : 9) : (content ? 3 : 4);
-        Check(equal == expected, "eight TC combinations");
+        Check(equal == expected, "eight comparison option combinations");
         Entry a = File(L"single", 4, base);
         Check(Classify(&a, nullptr, o).action == Action::CopyRight, "left only");
         Check(Classify(nullptr, &a, o).action == (asymmetric ? Action::DeleteRight : Action::CopyLeft), "right only");

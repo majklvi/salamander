@@ -27,14 +27,14 @@ Navazující [došetření UI Automation a dokončené GUI Stop/Close](directory
 
 Navazující ověření [Stop/Close a chyb po publikaci](directory-sync-plugin-copy-cancellation.md): 375 copy assertions a 429 lifecycle kontrol Debug/Release x64. Nový záznam odděluje úspěšné nativní testy od omezeného GUI měření.
 
-Stav k 15. říjnu 2026: implementována kostra nativního pluginu `dirsync`, sken, porovnání a náhled **bez provádění změn**. Navazuje na [schválený návrh](directory-sync-plugin-design.md), [technický audit](directory-sync-plugin-sdk.md) a [pozorování TC](directory-sync-plugin-tc-observations.md).
+Stav k 15. říjnu 2026: implementována kostra nativního pluginu `dirsync`, sken, porovnání a náhled **bez provádění změn**. Navazuje na [schválený návrh](directory-sync-plugin-design.md), [technický audit](directory-sync-plugin-sdk.md) a [pozorování předlohy](directory-sync-plugin-reference-observations.md).
 
 ## Rozsah
 
 - Existující SDK Samandarin-0.16, minimální SDK verze 106. Žádné změny SDK hlaviček, virtuálních metod nebo hostitelského kódu. Registrace projektů, build adres a balíčku je přidána běžným způsobem.
 - `src/plugins/dirsync/dirsync.cpp`: vstup pluginu, snapshot fyzických panelů a sjednoceného výběru na hlavním vlákně, lokalizovaný modalní dialog, worker, Stop/Close a hostitelské darkmode přes sdílenou knihovnu. Návrat zachovává označení panelů.
 - `engine.cpp/.h`: samostatný engine bez SDK callbacků. Iterativní enumerace přes široká WinAPI, dlouhé prefixy, metadata v UTC a proudové binární porovnání. Otevření obsahu vyžaduje stabilní velikost/mtime proti skenu a při čtení nepovoluje běžné souběžné zapisovače.
-- Tolerance 3 s včetně, bez hodinové korekce. Čas mimo toleranci má přednost před obsahovým porovnáním, jak určuje ověřená tabulka TC. Ignorované datum a stejně staré rozdílné páry vyžadují ruční směr. Asymetrie nenavrhuje přepsání novějšího pravého páru; pravé jednostranné položky mají pouze návrh mazání.
+- Tolerance 3 s včetně, bez hodinové korekce. Čas mimo toleranci má přednost před obsahovým porovnáním, jak určuje ověřená tabulka předlohy. Ignorované datum a stejně staré rozdílné páry vyžadují ruční směr. Asymetrie nenavrhuje přepsání novějšího pravého páru; pravé jednostranné položky mají pouze návrh mazání.
 - Základní masky: `*`, `?`, `**`, kořenový `\`, vyloučení za `|`, více masek oddělených mezerou nebo středníkem, uvozovky pro mezery v názvu. Regex a uložená hledání jsou odmítnuta. Vyloučený podstrom se neprochází. U vybrané složky se zahrnou přímé děti i bez hlubší rekurze.
 - Nečitelné/neúplné podstromy a nepodporované reparse, cloudové či EFS položky jsou blokované a chrání protějšek. Konflikt soubor/složka blokuje i potomky. Nejednoznačné párování jmen nemá automatickou akci. Prázdná složka musí být skutečně prázdná, nikoli pouze prázdná po filtraci.
 - Náhled odděluje stav, akci a důvod. Podporuje výběr více řádků, ruční směr/přeskočení a filtry. Blokované a konfliktní řádky zůstávají viditelné. Souhrn počítá jen viditelné návrhy a uvádí počet skrytých řádků. Změna kořenů, masek nebo porovnávacích voleb zneplatní celý starý náhled.
@@ -48,11 +48,11 @@ Veškeré názvy Copy/Delete jsou **pouze návrhy**. V pluginu není executor, k
 | --- | --- |
 | Debug plugin + english.slg | Čisté sestavení Win32, x64 a ARM64; x64 též přes hlavní solution |
 | Release plugin + english.slg | Sestavení x64 |
-| Nativní `tests/dirsync_tests.vcxproj` | 205 úspěšných kontrol po doplnění místní matice cest a přerušení; zahrnují i původní porovnávací tabulku TC, masky, konflikty a ochranu protějšků |
+| Nativní `tests/dirsync_tests.vcxproj` | 205 úspěšných kontrol po doplnění místní matice cest a přerušení; zahrnují i původní porovnávací tabulku předlohy, masky, konflikty a ochranu protějšků |
 | Nezměněný hostitel ze základu 0.16 | Samostatně sestaven Debug i Release x64; plugin načten přes běžné menu Release hostitele |
-| Computer Use, světlé schéma | 16 řádků na původní TC sadě. Obsahové porovnání odhalilo rozdíl stejných velikostí a časů. Souhrn 5 kopií doprava / 20 B, 4 doleva / 18 B, 4 nerozhodnuté. Po skrytí pravolevých kopií 0 těchto kopií a 4 skryté řádky |
+| Computer Use, světlé schéma | 16 řádků na původní referenční sadě. Obsahové porovnání odhalilo rozdíl stejných velikostí a časů. Souhrn 5 kopií doprava / 20 B, 4 doleva / 18 B, 4 nerozhodnuté. Po skrytí pravolevých kopií 0 těchto kopií a 4 skryté řádky |
 | Computer Use, Windows Dark Mode schéma hostitele | Tmavý titulek, dialog, controly a seznam. Sjednocení levé selA a pravé selB dalo dva páry při zamčených kořenech. Maximalizace rozšířila seznam a přesunula spodní ovládání. Ruční směr změnil pouze vybraný řádek |
-| Důkaz bez zápisů do vstupů | Všech 30 souborů TC fixture po UI testech má původní SHA-256, délku a mtime |
+| Důkaz bez zápisů do vstupů | Všech 30 souborů referenční sady po UI testech má původní SHA-256, délku a mtime |
 
 Build a runtime jsou mimo checkout pod `C:\Samandarin\builds\dirsync`. Protokoly vstupů: `fixture-before.json` a `fixture-after-check.json`. Zkušební hostitel má vlastní `configstorage.ini` s RegFile a sousední `config.reg`; neupravuje konfiguraci instalovaného Salamanderu. Testovací instance byla po smoke testech ukončena.
 
@@ -60,7 +60,7 @@ Při přípravě se Debug hostitel zastavil na diagnostice evidence GDI handlů 
 
 ## Doplňující místní ověření cest a Stop/Close (15. října 2026)
 
-Ověřen stejný Release x64 hostitel 0.16 a plugin z commitu `8e1ac316`, s vlastní přenosnou konfigurací a Windows Dark Mode schématem. Ovládání skutečných panelů a náhledu proběhlo přes Computer Use. SMB nebylo použito. Nové fixture jsou oddělené od původních TC dat pod `C:\Samandarin\builds\dirsync\validation-20261015`.
+Ověřen stejný Release x64 hostitel 0.16 a plugin z commitu `8e1ac316`, s vlastní přenosnou konfigurací a Windows Dark Mode schématem. Ovládání skutečných panelů a náhledu proběhlo přes Computer Use. SMB nebylo použito. Nové fixture jsou oddělené od původních referenčních dat pod `C:\Samandarin\builds\dirsync\validation-20261015`.
 
 | Případ | Výsledek a hranice důkazu |
 | --- | --- |

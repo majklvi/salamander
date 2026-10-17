@@ -1,5 +1,7 @@
 # Návrh mazání adresářů a zacházení se skrytými položkami
 
+Redakční příprava exportu (17. října 2026): názvy referenčního programu a odkazy na jeho web jsou nahrazeny neutrálním označením. Historické zdroje v plném znění zachovává [archiv původního forku](https://github.com/majklvi/salamander/tree/af0e81bc1bccb6c733025fe31a97d53adf5cb32f/doc). Cesty s prefixem `reference-sync-probe-` jsou dokumentační aliasy, nikoli přejmenované testovací adresáře. Výsledky a meze ověření se nemění.
+
 16. října 2026. Návrh níže byl schválen a implementován; aktuální provedení a výsledky jsou v závěrečné části. Bez SMB testů a změn SDK.
 
 ## Zjištění z GUI referenčního správce souborů
@@ -19,7 +21,7 @@ F1 přímo ze souhrnu uvádí, že globální Delete all empty directories můž
 
 Žádné potvrzení provedení nebylo přijato, souhrny byly stornované. Nebylo testováno skutečné pořadí odstranění, chování při chybě či Stop ani obnovování adresářů v referenční aplikaci. Z náhledu se takové závěry nevyvozují. Skryté položky byly zahrnuté v aktuální konfiguraci; alternativní INI režimy nebyly v GUI přepínané.
 
-Dokumentované alternativy pro H/S: parametr `SyncHideHiddenSystem` rozlišuje zahrnutí všech položek (0), vynechání při H/S na obou stranách (1) nebo na kterékoli straně (2); přičtení 4 navazuje na nastavení hlavního programu. Jde o nápovědu citovanou ve [fóru předlohy](https://www.ghisler.ch/board/viewtopic.php?f=3&t=87296&p=482016#p482016), dostupnou také v [zveřejněném feedu](https://www.ghisler.ch/board/app.php/smartfeed/feed?sid=febfe7af8d0e722ebe5d99d64c8cffd1). Jednotlivé režimy včetně jejich dosahu na adresáře tento průchod nepotvrdil. Obecný popis: [Synchronize directories](https://www.ghisler.ch/wiki/index.php/Synchronize_directories).
+Dokumentované alternativy pro H/S: parametr `SyncHideHiddenSystem` rozlišuje zahrnutí všech položek (0), vynechání při H/S na obou stranách (1) nebo na kterékoli straně (2); přičtení 4 navazuje na nastavení hlavního programu. Jde o nápovědu citovanou ve fóru předlohy (historický zdroj v archivu původního forku), dostupnou také v zveřejněném feedu (historický zdroj v archivu původního forku). Jednotlivé režimy včetně jejich dosahu na adresáře tento průchod nepotvrdil. Obecný popis: Synchronize directories (historický zdroj v archivu původního forku).
 
 ## Současné chování pluginu
 
