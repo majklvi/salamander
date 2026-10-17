@@ -1,4 +1,6 @@
-# Directory Synchronization — aktuální návod
+# Directory Synchronization — archiv původního vývoje
+
+Od 17. října 2026 pokračuje samostatný vývoj v [majklvi/salamander-directory-sync](https://github.com/majklvi/salamander-directory-sync), větev main. Aktuální návod, hlášení chyb, sestavení a balíčky patří do nového repozitáře. Tato větev zůstává zachovaným archivem; níže je poslední návod původního společného checkoutu.
 
 Stav 17. října 2026, vývojová verze 0.1.4 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
 

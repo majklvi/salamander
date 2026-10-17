@@ -151,3 +151,11 @@ Pro CodeQL vycházet z [oficiálního postupu sestavení kompilovaných jazyků]
 Nový čistý klon se sestaví bez okolního checkoutu Salamanderu, bez jeho knihoven, bez lokálních C:\Samandarin cest a bez podpisového certifikátu. Všech pět sad a potřebná sestavení jsou zelená, CodeQL analyzuje skutečný plugin nebo je výslovně popsána nedostupnost služby. Dokumentace i balíček odkazují na nový zdroj, licence a historie jsou dohledatelné; konfigurace 0.1.4 se dál načte. Původní fork zůstává použitelný až do tohoto bodu. Při neúspěchu migrace se vývoj vrátí na nezměněnou původní větev, bez potřeby obnovovat přepsanou historii.
 
 Pro rozhodnutí už zbývá hlavně název/viditelnost nového repozitáře a způsob přibalování do hostitele. Technicky doporučená varianta je samostatná historie + lokální připnuté SDK/UI snapshoty + vlastní MSBuild/CI; nový SDK projekt nebo zásah do jádra nejsou podmínkou.
+
+## 2026-10-17 — zveřejněné místo samostatného vývoje
+
+Přesun byl schválen a publikován v [majklvi/salamander-directory-sync](https://github.com/majklvi/salamander-directory-sync), veřejný repozitář, výchozí větev main. Zafixovaný vstup exportu je ac4b64fe4ab96838c28ed36a93de03dc718d7d62. Všech 67 vlastních commitů má zachované autory a časy a mapu původních/exportovaných SHA v docs/migration/commit-map.tsv nového projektu. Navazují vlastní build/test/package skripty a CI. Verze pluginu zůstává 0.1.4, SDK ani identita konfigurace se nemění.
+
+Původní refs a objekty byly před exportem zálohovány do místního bundle. Očištění celé přenášené historie proběhlo v izolovaném exportu; originál nebyl přepsán. Zdrojová větev v tomto forku zůstává archivem, její zdroje a dosavadní distribuční položky se nyní neodstraňují. Nové funkční změny patří výhradně do samostatného projektu. Napojení hostitelského instalátoru na připnuté budoucí vydání je další samostatný krok.
+
+Výsledky převzetí, audit historie, odkazy na vlastní Actions a ověření balíčku jsou v docs/migration/repository-migration.md nového projektu. Validační draft #30 se po úspěšném převzetí uzavře bez merge do samandarin-0.16.
