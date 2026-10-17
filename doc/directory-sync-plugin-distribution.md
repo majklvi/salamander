@@ -4,6 +4,8 @@
 
 Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\status-panes-0.1.4-20261017\plugin_5.0_dirsync_0.1.4_x64.zip`, SHA-256 `690e32f6630fc8b718f638ca56f34f8670e7747ad1c56bbf14545d58c65f852d`. SPL i oba SLG hlásí **0.1.4 (x64)**. Archiv byl znovu rozbalen a ověřeno všech 12 hashů manifestu; přiložený návod a pilotní pokyny mají aktuální verzi. [Samostatné oddíly a ověření](directory-sync-plugin-status-bar.md) nahrazují souhrnný pravý text ve status baru. Bez SMB testů a změn SDK.
 
+GUI ověření stejného balíčku 0.1.4 bylo následně dokončeno v českém světlém i tmavém režimu: živé porovnávání, dvě synchronizace pouze nových cílů a maximalizace/obnovení. [Podrobnosti, hranice ověření a kontrola 32 výstupních souborů](directory-sync-plugin-status-bar.md#gui-ověření-světlého-a-tmavého-režimu). Kód ani archiv se při ověření neměnily.
+
 ## 2026-10-17 — aktualizace 0.1.3: přímé odstranění z menu
 
 Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\immediate-delete-0.1.3-20261017-final\plugin_5.0_dirsync_0.1.3_x64.zip`, SHA-256 `bcefbf3d57b67fc348e314e9684b4d1ec4821c1ec136ae75d18982360a773dd4`. Nahrazuje předchozí balíček 0.1.3. SPL i oba SLG hlásí **0.1.3 (x64)**; archiv byl znovu rozbalen a všech 12 hashů manifestu ověřeno. Přiložené návody rozlišují návrhy synchronizace a přímé odstranění vybraných položek do Koše / se Shiftem trvale.
