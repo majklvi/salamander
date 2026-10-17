@@ -250,6 +250,14 @@ int main()
         std::vector<wchar_t> exe(32768); DWORD n=GetModuleFileNameW(nullptr,exe.data(),DWORD(exe.size()));
         Check(n>0 && n<exe.size(),"executable path"); std::wstring dll(exe.data(),n);
         dll.resize(dll.find_last_of(L'\\')+1); dll+=L"dirsync_lifecycle_probe.dll";
+        {
+            Fixture immediate;Module module(dll);
+            using ImmediateTest=unsigned (WINAPI*)(const wchar_t*,const wchar_t*);
+            auto test=reinterpret_cast<ImmediateTest>(GetProcAddress(module.handle,"ProbeImmediateDeletion"));
+            unsigned passed=test?test(immediate.left.c_str(),immediate.right.c_str()):0;
+            std::cout<<"Immediate Shell deletion: "<<passed<<" checks passed\n";
+            Check(passed>=35,"actual Recycle Bin/ADS, permanent/both-side deletion, scope, empty directories, stale, cancellation and sharing failure");
+        }
         Fixture scan; for(int i=0;i<256;++i) scan.Dir(scan.left+L"\\d"+std::to_wstring(i));
         {
             // CI may return an 8.3 TEMP ancestor (e.g. RUNNER~1). The picker

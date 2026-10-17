@@ -2,6 +2,10 @@
 
 Stav 16. října 2026. **První rozsah menu je implementovaný; níže zůstává původní průzkum a návrh, na konci je aktuální evidence.** Aktuální funkce a omezení popisuje [návod](directory-sync-plugin.md). Kontextová nabídka schránky v tabulkových souhrnech je samostatná existující funkce.
 
+## Aktualizace 2026-10-17: okamžité odstranění
+
+Návrhové příkazy nyní výslovně říkají „Označit ke kopírování…“ a „Označit k přeskočení“. Oddělená sekce **Odstranit vybrané…** s levou/pravou/oběma stranami je implementovaná: bez Shiftu do Koše, se Shiftem při aktivaci strany trvale; vždy vlastní potvrzení výběru. Není součástí synchronizačního plánu a nepoužívá Uchovat originály. [Aktuální návrh a skutečné NTFS/GUI ověření](directory-sync-plugin-immediate-delete.md). Následující oddíly zachovávají historický průzkum a starší rozsah.
+
 ## Provedený průzkum
 
 Skutečný Computer Use průchod v referenčním správci souborů, verze **11.58 x64**, dialog Synchronize directories. Použita pouze místní izolovaná NTFS sada `C:\Samandarin\builds\dirsync-menu-20261016\left` a `right`. Čtyři dvojice souborů, levostranný a pravostranný Unicode soubor a podadresář `sub` s jedním souborem na každé straně: osm výsledných souborových řádků, dvanáct fyzických souborů. Ověřeno obousměrné i asymetrické porovnání, Subdirs a by content; maska `*.*`.

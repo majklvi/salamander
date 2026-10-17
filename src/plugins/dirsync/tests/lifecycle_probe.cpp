@@ -430,17 +430,17 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbeStopControls()
     auto enabled=[&](int id) {return IsWindowEnabled(GetDlgItem(window,id))!=FALSE;};
     Busy(p,false);ok &= !enabled(IDC_STOP) && !enabled(IDC_STOP_SYNC) && enabled(IDC_COMPARE) && enabled(IDC_SYNCHRONIZE) && enabled(IDC_SETTINGS);
     for(auto intent:{Preview::Intent::None,Preview::Intent::Apply,Preview::Intent::Summary,Preview::Intent::Copy,
-        Preview::Intent::Save,Preview::Intent::Overwrite,Preview::Intent::Delete}) {
+        Preview::Intent::Save,Preview::Intent::Overwrite,Preview::Intent::Delete,Preview::Intent::ImmediateDelete}) {
         p.running=true;p.validating=intent!=Preview::Intent::None;p.intent=intent;p.cancel=false;
         Busy(p,true);int activeStop=StopControl(p),inactiveStop=activeStop==IDC_STOP?IDC_STOP_SYNC:IDC_STOP;
-        const bool files=intent==Preview::Intent::Copy || intent==Preview::Intent::Save || intent==Preview::Intent::Overwrite || intent==Preview::Intent::Delete;
+        const bool files=intent==Preview::Intent::Copy || intent==Preview::Intent::Save || intent==Preview::Intent::Overwrite || intent==Preview::Intent::Delete || intent==Preview::Intent::ImmediateDelete;
         ok &= activeStop==(files?IDC_STOP_SYNC:IDC_STOP) && enabled(activeStop) && !enabled(inactiveStop);
         ok &= !enabled(IDC_COMPARE) && !enabled(IDC_SYNCHRONIZE) && !enabled(IDC_SETTINGS);
         DialogBody(window,WM_COMMAND,inactiveStop,0);ok &= !p.cancel;
         DialogBody(window,WM_COMMAND,activeStop,0);ok &= p.cancel;
     }
     p.validating=false;p.intent=Preview::Intent::None;
-    for(bool* flag:{&p.copying,&p.saving,&p.overwriting,&p.deleting}) {
+    for(bool* flag:{&p.copying,&p.saving,&p.overwriting,&p.deleting,&p.immediateDeleting}) {
         *flag=true;Busy(p,true);ok &= enabled(IDC_STOP_SYNC) && !enabled(IDC_STOP);*flag=false;
     }
     p.running=false;p.cancel=false;Busy(p,false);
@@ -706,4 +706,96 @@ extern "C" __declspec(dllexport) unsigned WINAPI ProbeRelease(BOOL force)
         active = nullptr; probe.reset();
     }
     return status;
+}
+
+// Actual Shell deletion on isolated synthetic NTFS data, not a mocked executor.
+extern "C" __declspec(dllexport) unsigned WINAPI ProbeImmediateDeletion(const wchar_t* left,const wchar_t* right)
+{
+    unsigned checks=0;std::vector<std::wstring> files,dirs;
+    auto cleanup=[&]() {for(const auto& f:files) {SetFileAttributesW(dirsync::ApiPath(f).c_str(),FILE_ATTRIBUTE_NORMAL);DeleteFileW(dirsync::ApiPath(f).c_str());}
+        for(auto it=dirs.rbegin();it!=dirs.rend();++it) RemoveDirectoryW(dirsync::ApiPath(*it).c_str());};
+    auto check=[&](bool ok) {if(!ok) throw std::runtime_error("immediate Shell deletion");++checks;};
+    auto exists=[](const std::wstring& path){return GetFileAttributesW(dirsync::ApiPath(path).c_str())!=INVALID_FILE_ATTRIBUTES;};
+    auto data=[&](const std::wstring& path) {
+        HANDLE h=CreateFileW(dirsync::ApiPath(path).c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
+        check(h!=INVALID_HANDLE_VALUE);if(h==INVALID_HANDLE_VALUE) return;
+        files.push_back(path);DWORD n=0;bool ok=WriteFile(h,"sync",4,&n,nullptr)!=FALSE && n==4;CloseHandle(h);check(ok);
+    };
+    auto read=[](const std::wstring& path) {
+        HANDLE h=CreateFileW(dirsync::ApiPath(path).c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,nullptr,OPEN_EXISTING,0,nullptr);
+        if(h==INVALID_HANDLE_VALUE) return false;char bytes[4]{};DWORD n=0;
+        bool ok=ReadFile(h,bytes,4,&n,nullptr)!=FALSE && n==4 && memcmp(bytes,"sync",4)==0;CloseHandle(h);return ok;
+    };
+    try {
+        std::wstring l=left,r=right;
+        data(l+L"\\pair-ž漢.txt");data(l+L"\\pair-ž漢.txt:note");data(r+L"\\pair-ž漢.txt");
+        data(l+L"\\keep.txt");data(r+L"\\keep.txt");
+        data(l+L"\\hidden.txt");data(r+L"\\hidden.txt");SetFileAttributesW((r+L"\\hidden.txt").c_str(),FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM);
+        check(CreateDirectoryW((r+L"\\protected").c_str(),nullptr)!=FALSE);dirs.push_back(r+L"\\protected");data(r+L"\\protected\\unselected.txt");
+        check(CreateDirectoryW((r+L"\\empty").c_str(),nullptr)!=FALSE);dirs.push_back(r+L"\\empty");
+        std::atomic<bool> cancel{false};dirsync::Progress progress;dirsync::CopyProgress transfer;dirsync::Options options;options.asymmetric=true;options.emptyDirectories=true;
+        auto scan=[&]() {return dirsync::Compare(l,r,options,cancel,progress);};auto result=scan();
+        auto index=[&](const dirsync::Result& model,const std::wstring& name) {for(size_t i=0;i<model.rows.size();++i) if(model.rows[i].path==name) return i;throw std::runtime_error("missing immediate fixture row");};
+        auto pair=index(result,L"pair-ž漢.txt");
+        check(dirsync::ImmediateSelection(result,{pair,pair},2).size()==2);
+        check(dirsync::ImmediateSelection(result,{pair},0).size()==1 && dirsync::ImmediateSelection(result,{pair},1).size()==1);
+        check(dirsync::ImmediateSelection(result,{},2).empty() && dirsync::ImmediateSelection(result,{SIZE_MAX},2).empty());
+        auto item=dirsync::ImmediateSelection(result,{pair},0).front();dirsync::ImmediateOutcome outcome;
+        dirsync::ImmediateSink sink(item,outcome,cancel,true);
+        check(sink.PreDeleteItem(0,nullptr)==HRESULT_FROM_WIN32(ERROR_NOT_SUPPORTED) && exists(item.path));
+        cancel=true;check(sink.PreDeleteItem(TSF_DELETE_RECYCLE_IF_POSSIBLE,nullptr)==HRESULT_FROM_WIN32(ERROR_CANCELLED));cancel=false;
+        result.rows[pair].action=dirsync::Action::None; // Explicit delete is independent of Skip/proposal.
+        auto recycled=dirsync::ImmediateDelete(result,{pair},0,true,nullptr,cancel,progress,transfer);
+        check(SUCCEEDED(recycled.error) && recycled.items.size()==1 && recycled.items[0].deleted && !exists(item.path));
+        check(!recycled.items[0].recycledPath.empty() && read(recycled.items[0].recycledPath) && read(recycled.items[0].recycledPath+L":note"));
+        check(exists(r+L"\\pair-ž漢.txt") && exists(l+L"\\keep.txt") && exists(r+L"\\protected\\unselected.txt"));
+        result=scan();pair=index(result,L"pair-ž漢.txt");
+        auto permanent=dirsync::ImmediateDelete(result,{pair},1,false,nullptr,cancel,progress,transfer);
+        check(SUCCEEDED(permanent.error) && permanent.items.size()==1 && permanent.items[0].deleted && permanent.items[0].recycledPath.empty());
+        result=scan();auto hidden=index(result,L"hidden.txt");
+        auto both=dirsync::ImmediateDelete(result,{hidden},2,false,nullptr,cancel,progress,transfer);
+        check(SUCCEEDED(both.error) && both.items.size()==2 && both.items[0].deleted && both.items[1].deleted);
+        result=scan();auto protectedRow=index(result,L"protected");
+        auto blocked=dirsync::ImmediateDelete(result,{protectedRow},1,false,nullptr,cancel,progress,transfer);
+        check(blocked.error==HRESULT_FROM_WIN32(ERROR_DIR_NOT_EMPTY) && exists(r+L"\\protected\\unselected.txt"));
+        result=scan();auto empty=index(result,L"empty");
+        auto emptyRemoved=dirsync::ImmediateDelete(result,{empty},1,true,nullptr,cancel,progress,transfer);
+        check(SUCCEEDED(emptyRemoved.error) && emptyRemoved.items.size()==1 && emptyRemoved.items[0].deleted && !exists(r+L"\\empty"));
+        result=scan();auto keep=index(result,L"keep.txt");
+        cancel=true;auto stopped=dirsync::ImmediateDelete(result,{keep},2,false,nullptr,cancel,progress,transfer);cancel=false;
+        check(stopped.cancelled && exists(l+L"\\keep.txt") && exists(r+L"\\keep.txt"));
+        HANDLE lock=CreateFileW((r+L"\\keep.txt").c_str(),GENERIC_READ,FILE_SHARE_READ|FILE_SHARE_WRITE,nullptr,OPEN_EXISTING,0,nullptr);
+        check(lock!=INVALID_HANDLE_VALUE);
+        auto locked=dirsync::ImmediateDelete(result,{keep},1,false,nullptr,cancel,progress,transfer);CloseHandle(lock);
+        check(FAILED(locked.error) && exists(r+L"\\keep.txt"));
+        result=scan();keep=index(result,L"keep.txt");data(r+L"\\changed-after-scan.txt");
+        auto stale=dirsync::ImmediateDelete(result,{keep},2,false,nullptr,cancel,progress,transfer);
+        check(stale.stale && FAILED(stale.error) && stale.items.empty() && exists(l+L"\\keep.txt") && exists(r+L"\\keep.txt"));
+        result=scan();protectedRow=index(result,L"protected");auto child=index(result,L"protected\\unselected.txt");
+        auto tree=dirsync::ImmediateDelete(result,{protectedRow,child},1,false,nullptr,cancel,progress,transfer);
+        check(SUCCEEDED(tree.error) && tree.items.size()==2 && !exists(r+L"\\protected"));
+        data(l+L"\\stop-a.txt");data(l+L"\\stop-b.txt");result=scan();
+        auto first=index(result,L"stop-a.txt"),second=index(result,L"stop-b.txt");
+        dirsync::ImmediateTestHook()=[&](size_t completed){if(completed==1) cancel=true;};
+        auto partial=dirsync::ImmediateDelete(result,{first,second},0,false,nullptr,cancel,progress,transfer);
+        dirsync::ImmediateTestHook()={};cancel=false;
+        check(partial.cancelled && partial.items.size()==1 && !exists(l+L"\\stop-a.txt") && exists(l+L"\\stop-b.txt"));
+        std::wstring relative;
+        for(wchar_t c:{L'階',L'Ž'}) {relative+=std::wstring(110,c)+L"\\";
+            auto folder=l+L"\\"+relative.substr(0,relative.size()-1);check(CreateDirectoryW(dirsync::ApiPath(folder).c_str(),nullptr)!=FALSE);dirs.push_back(folder);}
+        relative+=L"dlouhý-漢字.txt";auto longFile=l+L"\\"+relative;data(longFile);data(longFile+L":note");
+        result=scan();auto longIndex=index(result,relative);
+        auto longReport=dirsync::ImmediateDelete(result,{longIndex},0,true,nullptr,cancel,progress,transfer);
+        std::printf("Immediate long Unicode recycle: HRESULT=0x%08lx, UTF16=%zu\n",ULONG(longReport.error),longFile.size());
+        check(longFile.size()>260 && ((SUCCEEDED(longReport.error) && longReport.items.size()==1 && longReport.items[0].deleted &&
+            read(longReport.items[0].recycledPath) && read(longReport.items[0].recycledPath+L":note")) ||
+            (FAILED(longReport.error) && exists(longFile) && read(longFile+L":note"))));
+        data(r+L"\\readonly.txt");check(SetFileAttributesW((r+L"\\readonly.txt").c_str(),FILE_ATTRIBUTE_READONLY)!=FALSE);
+        result=scan();auto readonly=index(result,L"readonly.txt");check(dirsync::ImmediateSelection(result,{readonly},1).empty() && exists(r+L"\\readonly.txt"));
+        check(CreateDirectoryW((r+L"\\directory-ads").c_str(),nullptr)!=FALSE);dirs.push_back(r+L"\\directory-ads");data(r+L"\\directory-ads:note");
+        result=scan();auto directoryAds=index(result,L"directory-ads");
+        auto adsBlocked=dirsync::ImmediateDelete(result,{directoryAds},1,false,nullptr,cancel,progress,transfer);
+        check(FAILED(adsBlocked.error) && exists(r+L"\\directory-ads") && read(r+L"\\directory-ads:note"));
+        cleanup();return checks;
+    } catch(const std::exception& e) {std::printf("Immediate deletion failed after %u checks: %s\n",checks,e.what());dirsync::ImmediateTestHook()={};cleanup();return 0;}
 }

@@ -23,9 +23,14 @@ Výsledky jsou seskupené podle relativních adresářů (`\` je kořen). Pod z�
 
 Vyzkoušejte běžné kopírování, přepis a malé vlastní odstranění; poté ruční obnovu do nového kontrolního adresáře. U většího seznamu sledujte odezvu, filtry, klávesnici a změny velikosti okna. Uveďte i zkušenost s jiným DPI či více monitory. Není nutné opakovat laboratorní chybové testy.
 
+
+## Přímé odstranění z kontextového menu
+
+Horní „Označit ke kopírování…“ / „Označit k přeskočení“ pouze mění návrhy. Oddělené **Odstranit vybrané… → Vlevo… / Vpravo… / Na obou stranách…** odstraňuje právě zvýrazněné položky. Bez Shiftu do Koše, se Shiftem při aktivaci příkazu strany trvale. Režim a skutečné cesty ověřte v potvrzení OK/Storno. Uchovat originály se na tento příkaz nevztahuje; trvalé mazání nemá zálohu pluginu. Adresáře musí být prázdné, rodič nevybírá potomky. První chyba zastaví dávku a po běhu je nutné nové Porovnat. Obnovu z Koše provádějte v Koši Windows.
+
 ## Obnova a hlavní omezení
 
-- Při ON se před přepisem/mazáním nejprve uloží a ověří zařazené originály. V cestě uvedené v souhrnu najdete `manifest.jsonl` a prováděcí protokol. Při OFF **nevzniká nová záloha ani trvalý protokol a nepoužívá se Koš**. Starší zálohy se automaticky neuklízejí a zabírají místo.
+- Při ON se před přepisem/mazáním nejprve uloží a ověří zařazené originály. V cestě uvedené v souhrnu najdete `manifest.jsonl` a prováděcí protokol. U synchronizačních příkazů při OFF **nevzniká nová záloha ani trvalý protokol a nepoužívá se Koš**. Starší zálohy se automaticky neuklízejí a zabírají místo.
 - Ruční obnova: v manifestu použijte `saved` u úspěšně uložené položky. Strukturu podle adresářových záznamů nejprve vytvořte v novém kontrolním adresáři; soubory přeneste běžným F5 z jejich uložených cest. Nekopírujte celý pomocný strom běhu do původního kořene. Ověřená obnova zahrnuje strukturu, souborová data, ADS a souborový čas. F7 vytvoří adresáře s novými časy; přesná obnova adresářových metadat a původních oprávnění není automatická.
 - Skryté a systémové položky jsou zahrnuté podle masky a rozsahu, i když je hlavní panely nezobrazují. Atributy H/S ukazuje tooltip řádku. By content porovnává pouze hlavní data, nikoli ADS; pevná tolerance časů je 3 sekundy.
 - Samostatné kopírování prázdných adresářů zatím není podporované. Reparse/junction/symlink, EFS a nepodporované cloud/offline položky se blokují; adresáře s vlastními ADS se před mazáním odmítnou. Read-only cíle se nepřepisují ani nemažou obcházením atributů.

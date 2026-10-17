@@ -1,5 +1,11 @@
 # Directory Synchronization: balíček a čistá konfigurace 0.16
 
+## 2026-10-17 — aktualizace 0.1.3: přímé odstranění z menu
+
+Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\immediate-delete-0.1.3-20261017-final\plugin_5.0_dirsync_0.1.3_x64.zip`, SHA-256 `bcefbf3d57b67fc348e314e9684b4d1ec4821c1ec136ae75d18982360a773dd4`. Nahrazuje předchozí balíček 0.1.3. SPL i oba SLG hlásí **0.1.3 (x64)**; archiv byl znovu rozbalen a všech 12 hashů manifestu ověřeno. Přiložené návody rozlišují návrhy synchronizace a přímé odstranění vybraných položek do Koše / se Shiftem trvale.
+
+[Ověření a omezení](directory-sync-plugin-immediate-delete.md): skutečné NTFS Shell testy, české tmavé GUI a obě varianty odstranění. GUI běželo před závěrečným doplněním read-only / adresářových ADS guardů a upřesněním výsledkového popisku; finální binární moduly prošly nativními testy a čtyřmi sestaveními. Nejde o opakování čisté instalace celé aplikace. Bez SMB testů a změn SDK.
+
 ## 2026-10-17 — aktualizace 0.1.3: symetrické sloupce
 
 Aktuální archiv: `C:\Samandarin\builds\dirsync-distribution\symmetric-0.1.3-20261017\plugin_5.0_dirsync_0.1.3_x64.zip`, SHA-256 `d5054971b319bf99ff3dd8f9abc926cb7442de933c04e9997c33ac8e79231bd2`. Nahrazuje níže uvedený první balíček 0.1.3. Verze zůstává **0.1.3**. Záhlaví jsou standardně krátká, hlavní sloupce symetrické; nové zapamatované nastavení umožňuje výslovně označit strany. Aktualizované příručky jsou uvnitř ZIP. Archiv znovu rozbalen a ověřeno všech 12 hashů manifestu. [Ověření](directory-sync-plugin-columns.md) zahrnuje anglický světlý i český tmavý náhled, restart a klávesnici. Bez SMB testů a změn SDK.

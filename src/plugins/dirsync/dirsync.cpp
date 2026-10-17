@@ -8,6 +8,7 @@
 #include "recovery.h"
 #include "overwrite.h"
 #include "delete.h"
+#include "shell_delete.h"
 #include "resource.h"
 #include "previewlayout.h"
 #include "displayformat.h"
@@ -406,17 +407,17 @@ INT_PTR CALLBACK InformationDialog(HWND window,UINT message,WPARAM w,LPARAM l)
     } catch(...) {EndDialog(window,IDCANCEL);return TRUE;}
     return FALSE;
 }
-bool InformationBox(HWND parent,int title,InfoRows rows,const std::wstring& notes,bool confirm=false)
+bool InformationBox(HWND parent,int title,InfoRows rows,const std::wstring& notes,bool confirm=false,bool planScope=true)
 {
-    if(confirm) rows.insert(rows.begin(),{Text(IDS_UI_SCOPE_LABEL),Text(IDS_UI_SCOPE_VALUE)});
-    Information info{title,std::move(rows),confirm?Text(IDS_UI_SCOPE_NOTE)+L"\n\n"+Text(IDS_UI_ADS_NOTE)+L"\n\n"+notes:notes,confirm,{}, {}, {}};
+    if(confirm && planScope) rows.insert(rows.begin(),{Text(IDS_UI_SCOPE_LABEL),Text(IDS_UI_SCOPE_VALUE)});
+    Information info{title,std::move(rows),confirm && planScope?Text(IDS_UI_SCOPE_NOTE)+L"\n\n"+Text(IDS_UI_ADS_NOTE)+L"\n\n"+notes:notes,confirm,{}, {}, {}};
     INT_PTR result=DialogBoxParamW(language,MAKEINTRESOURCEW(IDD_INFORMATION),parent,InformationDialog,LPARAM(&info));
     if(result==-1) Message(parent,IDS_FAILED);
     return result==IDOK;
 }
 struct Preview
 {
-    enum class Intent { None, Apply, Summary, Copy, Save, Overwrite, Delete };
+    enum class Intent { None, Apply, Summary, Copy, Save, Overwrite, Delete, ImmediateDelete };
     HWND window = nullptr;
     int sizeFormat=0,nameFormat=4;
     std::wstring left, right;
@@ -440,6 +441,8 @@ struct Preview
     dirsync::RecoveryReport recoveryReport;
     dirsync::OverwriteReport overwriteReport;
     dirsync::DeleteReport deleteReport;
+    dirsync::ImmediateReport immediateReport;
+    bool immediateDeleting=false,immediateRecycle=true;
     std::wstring recoveryRoot,tipText;
     std::vector<size_t> copyRows;
     bool copying = false, hasCopyReport = false;
@@ -859,9 +862,9 @@ void Status(Preview& p)
 {
     std::wstring state; wchar_t counts[512]{};
     if(p.running) {
-        if(p.copying || p.saving || p.overwriting || p.deleting) {
-            state=Text(p.deleting?IDS_UI_OP_DELETE:p.overwriting?IDS_UI_OP_OVERWRITE:p.saving?IDS_UI_OP_SAVE:IDS_UI_OP_COPY);
-            wchar_t item[128]{};uint64_t total=(p.overwriting || p.deleting)?p.transferCount:uint64_t(p.copyRows.size());
+        if(p.copying || p.saving || p.overwriting || p.deleting || p.immediateDeleting) {
+            state=Text((p.deleting || p.immediateDeleting)?IDS_UI_OP_DELETE:p.overwriting?IDS_UI_OP_OVERWRITE:p.saving?IDS_UI_OP_SAVE:IDS_UI_OP_COPY);
+            wchar_t item[128]{};uint64_t total=(p.overwriting || p.deleting || p.immediateDeleting)?p.transferCount:uint64_t(p.copyRows.size());
             swprintf_s(item,Text(IDS_UI_TRANSFER).c_str(),std::min(p.copyProgress.item.load()+1,total),total);
             state+=L" | "+std::wstring(item);
             swprintf_s(counts,Text(IDS_UI_TRANSFER_STATS).c_str(),p.copyProgress.copied.load(),p.copyProgress.verified.load(),p.copyProgress.completed.load());
@@ -1071,9 +1074,9 @@ void Filter(Preview& p)
 }
 int StopControl(const Preview& p)
 {
-    const bool files=p.copying || p.saving || p.overwriting || p.deleting ||
+    const bool files=p.copying || p.saving || p.overwriting || p.deleting || p.immediateDeleting ||
         (p.validating && (p.intent==Preview::Intent::Copy || p.intent==Preview::Intent::Save ||
-            p.intent==Preview::Intent::Overwrite || p.intent==Preview::Intent::Delete));
+            p.intent==Preview::Intent::Overwrite || p.intent==Preview::Intent::Delete || p.intent==Preview::Intent::ImmediateDelete));
     return files?IDC_STOP_SYNC:IDC_STOP;
 }
 void Busy(Preview& p, bool busy)
@@ -1282,6 +1285,10 @@ void PreviewCommand(Preview& p,const std::vector<size_t>& rows,int command)
         if(PlanEnabled(p,command)) ValidatePreview(p,PlanIntent(command));return;
     }
     if(rows.empty()) return;
+    if(command>=40 && command<=42) {
+        p.immediateRecycle=(GetKeyState(VK_SHIFT)&0x8000)==0;
+        ValidatePreview(p,Preview::Intent::ImmediateDelete,&rows,command-40);return;
+    }
     if(command>=10 && command<=12) {
         auto text=RowPaths(p,rows,command-10);
         if(!text.empty() && (text.size()>INT_MAX || !general->CopyTextToClipboardW(text.c_str(),int(text.size()),FALSE,p.window)))
@@ -1355,6 +1362,12 @@ void PreviewMenu(Preview& p,LPARAM position)
         {MNTT_IT,IDS_MENU_REVERSE,MNTS_B|MNTS_I|MNTS_A,ReverseProposal+1,-1,0,nullptr},
         {MNTT_IT,IDS_MENU_DELETE,MNTS_B|MNTS_I|MNTS_A,4,-1,0,nullptr},
         {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
+        {MNTT_PB,IDS_IMMEDIATE_MENU,MNTS_B|MNTS_I|MNTS_A,22,-1,0,nullptr},
+        {MNTT_IT,IDS_IMMEDIATE_LEFT,MNTS_B|MNTS_I|MNTS_A,41,-1,0,nullptr},
+        {MNTT_IT,IDS_IMMEDIATE_RIGHT,MNTS_B|MNTS_I|MNTS_A,42,-1,0,nullptr},
+        {MNTT_IT,IDS_IMMEDIATE_BOTH,MNTS_B|MNTS_I|MNTS_A,43,-1,0,nullptr},
+        {MNTT_PE,0,0,0,-1,0,nullptr},
+        {MNTT_SP,-1,MNTS_B|MNTS_I|MNTS_A,0,-1,0,nullptr},
         {MNTT_PB,IDS_MENU_PATHS,MNTS_B|MNTS_I|MNTS_A,20,-1,0,nullptr},
         {MNTT_IT,IDS_MENU_RELATIVE,MNTS_B|MNTS_I|MNTS_A,11,-1,0,nullptr},
         {MNTT_IT,IDS_MENU_FULL_LEFT,MNTS_B|MNTS_I|MNTS_A,12,-1,0,nullptr},
@@ -1380,6 +1393,9 @@ void PreviewMenu(Preview& p,LPARAM position)
                 for(size_t index:rows) if(Proposal(p,index,proposal,action)) {enabled=true;break;}
             menu->EnableItem(proposal+1,FALSE,enabled);
         }
+        if(auto* remove=menu->GetSubMenu(22,FALSE))
+            for(int side=0;side<3;++side) remove->EnableItem(41+side,FALSE,
+                !p.failed && !dirsync::ImmediateSelection(p.result,rows,side).empty());
         if(auto* paths=menu->GetSubMenu(20,FALSE))
             for(int side=0;side<3;++side) paths->EnableItem(11+side,FALSE,std::any_of(rows.begin(),rows.end(),[&](size_t index) {
                 return index<p.result.rows.size() && (!side || (side==1?p.result.rows[index].hasLeft:p.result.rows[index].hasRight));
@@ -1710,6 +1726,43 @@ void DeleteFiles(Preview& p)
         SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_COMPARE)),TRUE);
     }
 }
+void ImmediateDeleteSelection(Preview& p)
+{
+    const int side=p.requestedAction;const bool recycle=p.immediateRecycle;
+    const auto candidates=dirsync::ImmediateSelection(p.result,p.requestedRows,side);
+    if(candidates.empty()) {Message(p.window,IDS_IMMEDIATE_EMPTY);return;}
+    InfoRows fields;
+    Field(fields,IDS_IMMEDIATE_SIDE,Text(side==0?IDS_IMMEDIATE_LEFT:side==1?IDS_IMMEDIATE_RIGHT:IDS_IMMEDIATE_BOTH));
+    Field(fields,IDS_IMMEDIATE_MODE,Text(recycle?IDS_IMMEDIATE_RECYCLE:IDS_IMMEDIATE_PERMANENT));
+    Field(fields,IDS_IMMEDIATE_SELECTED,uint64_t(candidates.size()));
+    for(const auto& item:candidates) fields.push_back({Text(item.side?IDS_COLUMNS+9:IDS_COLUMNS),item.path});
+    if(!InformationBox(p.window,IDS_IMMEDIATE_CONFIRM,std::move(fields),Text(IDS_IMMEDIATE_NOTE),true,false)) return;
+    p.cancel=false;p.failed=false;p.immediateReport={};p.immediateDeleting=true;p.running=true;
+    p.progress.scanned=0;p.progress.compared=0;p.progress.readBytes=0;
+    p.copyProgress.completed=0;p.copyProgress.item=0;p.copyProgress.copied=0;p.copyProgress.verified=0;
+    p.copyProgress.phase=dirsync::CopyPhase::Checking;p.transferCount=candidates.size();
+    Busy(p,true);Status(p);SendMessageW(p.window,WM_NEXTDLGCTL,WPARAM(GetDlgItem(p.window,IDC_STOP_SYNC)),TRUE);
+    try {
+        const auto selected=p.requestedRows;
+        p.worker=std::thread([&p,selected,side,recycle]() {
+            try {p.immediateReport=dirsync::ImmediateDelete(p.result,selected,side,recycle,p.window,p.cancel,p.progress,p.copyProgress);}
+            catch(...) {p.failed=true;}
+            PostMessageW(p.window,Done,0,0);
+        });
+        SetTimer(p.window,1,150,nullptr);
+    } catch(...) {p.failed=true;p.running=false;p.immediateDeleting=false;Busy(p,false);Status(p);Message(p.window,IDS_FAILED);}
+}
+void ImmediateSummary(Preview& p)
+{
+    InfoRows fields;
+    Field(fields,IDS_IMMEDIATE_MODE,Text(p.immediateRecycle?IDS_IMMEDIATE_RECYCLE:IDS_IMMEDIATE_PERMANENT));
+    Field(fields,IDS_IMMEDIATE_DONE,uint64_t(std::count_if(p.immediateReport.items.begin(),p.immediateReport.items.end(),[](const auto& item){return item.deleted;})));
+    if(FAILED(p.immediateReport.error)) Field(fields,IDS_IMMEDIATE_ERROR,uint64_t(ULONG(p.immediateReport.error)));
+    Field(fields,IDS_IMMEDIATE_SELECTED,p.transferCount);
+    Field(fields,IDS_UI_PENDING,p.transferCount-p.copyProgress.completed.load());
+    for(const auto& item:p.immediateReport.items) fields.push_back({item.path,item.deleted?Text(IDS_IMMEDIATE_DONE):Number(ULONG(item.error))});
+    InformationBox(p.window,IDS_IMMEDIATE_RESULT,std::move(fields),Text(IDS_IMMEDIATE_RESULT_NOTE));
+}
 INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
 {
     Preview* p = reinterpret_cast<Preview*>(GetWindowLongPtrW(window, DWLP_USER));
@@ -1808,7 +1861,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
     case WM_TIMER: Status(*p); return TRUE;
     case Done:
         p->Join(); p->running = false; KillTimer(window, 1);
-        if(!p->validating && !p->copying && !p->saving && !p->overwriting && !p->deleting) {
+        if(!p->validating && !p->copying && !p->saving && !p->overwriting && !p->deleting && !p->immediateDeleting) {
             p->defaults.clear();for(const auto& row:p->result.rows) p->defaults.push_back(row.action);
         }
         if (p->validating) { p->result = std::move(p->checkedResult); p->validating = false; }
@@ -1838,6 +1891,11 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
             if(!p->deleteReport.recovery.runDirectory.empty()) NotifyPath(settings.recoveryRoot);
             if(!p->closing) { if(p->failed) Message(window,IDS_DELETE_FAILED); else DeleteSummary(*p); }
         }
+        if(p->immediateDeleting) {
+            p->immediateDeleting=false;p->result.stale=true;p->result.snapshot.reset();Status(*p);
+            NotifyPath(p->left);NotifyPath(p->right);
+            if(!p->closing) {if(p->failed) Message(window,IDS_FAILED);else ImmediateSummary(*p);}
+        }
         if (p->closing) { PersistSettings(window); EndDialog(window, 0); }
         else
         {
@@ -1856,6 +1914,7 @@ INT_PTR CALLBACK DialogBody(HWND window, UINT message, WPARAM w, LPARAM l)
                 else if (intent == Preview::Intent::Save) SaveOriginals(*p);
                 else if (intent == Preview::Intent::Overwrite) Overwrite(*p);
                 else if (intent == Preview::Intent::Delete) DeleteFiles(*p);
+                else if(intent==Preview::Intent::ImmediateDelete) ImmediateDeleteSelection(*p);
             }
         }
         return TRUE;
