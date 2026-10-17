@@ -1,6 +1,6 @@
 # Plán samostatného repozitáře Directory Synchronization
 
-17. října 2026. **Pouze audit a plán; přesun nebyl proveden.** Připraveny neutrální texty a přejmenován dokument pozorování. Nebyl vytvořen repozitář, exportována/přepsána historie ani změněno sestavení, CI nebo SDK. Verze pluginu zůstává 0.1.4. Bez SMB testů.
+17. října 2026. **Plán a úspěšná izolovaná místní zkouška; skutečný přesun ani publikace nebyly provedeny.** Připraveny neutrální texty a filtry, přejmenován dokument pozorování. Historie byla zkušebně filtrována pouze v oddělených místních klonech; původní fork, jeho refs/historie, sestavení, CI a SDK zůstávají zachované. Podrobnosti a přesný fixovaný vstup uvádí [protokol zkoušky exportu](directory-sync-plugin-export-rehearsal.md). Verze pluginu zůstává 0.1.4. Bez SMB testů.
 
 ## Závěr a doporučení
 
@@ -76,7 +76,7 @@ Výchozí historie je lineární. Neimportovat všechny větve a release tagy Sa
 
 ## Neutrální export celé historie
 
-Toto je závazné upřesnění exportu z 17. října 2026. Neutralizace není provedena v historii forku. Připraveny jsou pouze aktuální vlastní texty a názvy; provedení filtrů patří až ke schválenému přesunu.
+Toto je závazné upřesnění exportu z 17. října 2026. Neutralizace není provedena v historii forku. Aktuální vlastní texty a názvy jsou neutrální; filtry už byly úspěšně vyzkoušeny nad celou přenášenou historií v izolovaných místních klonech. Publikace a skutečná migrace sestavení zůstávají neschválené.
 
 ### Rozsah a pravidla
 
@@ -87,7 +87,7 @@ Toto je závazné upřesnění exportu z 17. října 2026. Neutralizace není pr
 - Nepřenášet původní celý `doc/third_party.md`. Nový záznam: „Referenční správce souborů a jeho komunita — podklady pro chování a použitelnost; pouze výzkum, bez převzetí kódu, grafiky nebo nápovědy. Původní podklady a autorství: archiv forku, commit `af0e81bc1bccb6c733025fe31a97d53adf5cb32f`, `doc/third_party.md`.“ Odkaz může mířit na tento soubor v připnutém commitu. Copyrighty, SPDX a licence převzatého kódu se zachovají.
 - Sdílené SDK ve forku zůstává beze změny. Pouze budoucí kopie `vendor/samandarin-sdk/spl_com.h` dostane neutrální komentář `// (including proxy builds) pass CFileData with the original` v místě poznámky o kompatibilitě. Žádná deklarace, pořadí metod, licence ani ABI se nemění. Manifest musí rozlišit původní hash a hash exportované kopie a tuto komentářovou odchylku popsat. Neprohlašovat poté celý vendor snapshot za bajtově totožný s referencí.
 
-### Provedení až při migraci
+### Postup exportu (vyzkoušen místně)
 
 1. V odděleném klonu bez sdílených objektů sestavit úplný seznam cest a verzí z dosažitelné historie zafixovaného migračního HEAD. Seznam historických názvů musí zahrnout i jméno před přejmenováním dokumentu pozorování. Originální bundle a podrobný audit s původními texty uchovat mimo budoucí export.
 2. Připravit deterministické textové a cestové filtry pro zaznamenanou verzi git-filter-repo. Prostá náhrada finálního checkoutu ani následný opravný commit nestačí. Použít transformaci blobů/cest a podle potřeby zpráv v každém exportovaném commitu; korekturu českých pádů provést i ve starších formulacích. Licence/oznámení o autorství nepřepisovat. Filtry samotné a logy obsahující původní hledané názvy nepřibalovat do exportu; uchovat je jako migrační evidenci u původního forku mimo vybraný rozsah.
@@ -98,7 +98,7 @@ Toto je závazné upřesnění exportu z 17. října 2026. Neutralizace není pr
 
 ### Stav přípravy
 
-V aktuálních vlastních souborech je neutrální znění, přejmenovaný dokument a opravené odkazy; produkční chování se nemění. Původní zdroje výzkumu a původní SDK komentář nadále existují v původním forku mimo exportovaný vlastní rozsah. Manifest rozlišuje datovaný audit a připravené vstupy. Kontrola přípravy: ve vlastních zdrojích a dokumentech není výskyt odstraňovaných názvů, zkratky, instalačních názvů ani identifikujících domén; relativní odkazy a SHA-256 připravených vstupů byly ověřeny. `git diff --check` prošel. Změna v C++ je pouze diagnostický popisek testu, běhový kód se nemění; nové sestavení ani GUI test nebyly potřebné. Úplný důkaz čisté přenesené historie, konečné hashe vendor kopie a mapa commitů vzniknou až při skutečné migraci; nyní nebyl proveden žádný export ani přepis historie.
+V aktuálních vlastních souborech je neutrální znění, přejmenovaný dokument a opravené odkazy; produkční chování se nemění. Původní zdroje výzkumu a původní SDK komentář nadále existují v původním forku mimo exportovaný vlastní rozsah. Manifest rozlišuje datovaný audit a připravené vstupy. Kontrola přípravy: ve vlastních zdrojích a dokumentech není výskyt odstraňovaných názvů, zkratky, instalačních názvů ani identifikujících domén; relativní odkazy a SHA-256 připravených vstupů byly ověřeny. `git diff --check` prošel. Změna v C++ je pouze diagnostický popisek testu, běhový kód se nemění; nové sestavení ani GUI test nebyly potřebné. [Místní zkouška exportu](directory-sync-plugin-export-rehearsal.md) nyní dokládá čistou přenesenou historii, mapu všech 65 vlastních commitů a hashe kandidátních vendor kopií pro vstup `3552fafb`. Shodný výsledek byl zopakován a nezávisle znovu auditován z čerstvého klonu. Tyto důkazy platí pro fixovaný zkušební vstup; při skutečné migraci je nutné je obnovit po všech dalších změnách. Historie původního forku se nepřepisovala.
 
 ## Dokumentace a balíček
 

@@ -1,5 +1,5 @@
 {
-  "status": "plan-only; no files extracted or relocated",
+  "status": "local isolated history-export rehearsal passed; no remote repository created or published; original fork unchanged",
   "auditCommit": "67ef93f1abf2a66bdb3feefb0ce05acd30830130",
   "referenceBase": "a84dbed6db632a9e63b5ed9f4bc6691e4cc5f449",
   "ownedSourceFiles": 46,
@@ -792,7 +792,8 @@
   "additionalMigrationInputs": [
     "LICENSE",
     "doc/directory-sync-plugin-repository-plan.md",
-    "doc/directory-sync-plugin-repository-manifest.json"
+    "doc/directory-sync-plugin-repository-manifest.json",
+    "doc/directory-sync-plugin-export-rehearsal.md"
   ],
   "observedBuildInputsToReplace": [
     {
@@ -803,7 +804,7 @@
     }
   ],
   "exportPreparation": {
-    "status": "working-tree preparation only; no history rewritten and no repository exported",
+    "status": "neutral committed inputs and filters verified in local isolated export; production migration not performed",
     "originalArchiveCommit": "af0e81bc1bccb6c733025fe31a97d53adf5cb32f",
     "originalAuditHashes": "preserveHistory SHA-256 values describe auditCommit, not the prepared working tree",
     "historicalPathDiscovery": "Include every historical name of the reference observations document, discovered from the source blob and git log --follow; normalize names in every exported tree.",
@@ -846,8 +847,34 @@
       },
       {
         "source": "doc/directory-sync-plugin-repository-plan.md",
-        "sha256": "ac430fdd7040dc3d23cb52c395d5175871f5fe1aee9a1ecf235dd74ec3e3a93b"
+        "sha256": "0dc1a5b6b7b8fe2e25701345901640bf123623604bbd9f5d116805f1d5d8bfa3"
       }
     ]
+  },
+  "localExportRehearsal": {
+    "sourceCommit": "3552fafbec51af9f47044f9c33484660a0643aa2",
+    "filterToolVersion": "2.47.0",
+    "filterToolModuleSha256": "67447413e273fc76809289111748870b6f6072f08b17efe94863a92d810b7d94",
+    "resultHead": "4d3e8003aa3806afb755dad0781529e4778f0b9b",
+    "mappedSourceTip": "7bada5be386677ef82c3b300ce9d6c292e4f3172",
+    "verifiedOwnedCommits": 65,
+    "resultCommitsIncludingLocalSupport": 66,
+    "sourceBlobsCompared": 500,
+    "redactedHistoricalBlobs": 55,
+    "reachableBlobsAudited": 554,
+    "reachableTreesAudited": 374,
+    "historicalPathOccurrencesAudited": 3602,
+    "remainingReferences": 0,
+    "vendorFiles": 52,
+    "vendorCommentOnlyChanges": 1,
+    "commitMapSha256": "993c25e81d86d787cd33d061e41d05eb952bb346db80a7890cf1851cfa93501a",
+    "repeatedExportIdentical": true,
+    "freshCloneAuditPassed": true,
+    "negativeControlsPassed": true,
+    "sourceRefsAndStatusPreservedDuringExport": true,
+    "published": false,
+    "report": "doc/directory-sync-plugin-export-rehearsal.md",
+    "tooling": "tools/directory-sync-export/ (source fork only; excluded from export selection)",
+    "scope": "Owned historical paths retained except neutral observation filename; support snapshots added; no standalone build/package migration. Future source heads require rerun."
   }
 }
