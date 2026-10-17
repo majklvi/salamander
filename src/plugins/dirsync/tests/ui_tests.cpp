@@ -242,6 +242,8 @@ int main()
             const auto pattern=text(id);Check(pattern.find(L"{0}")!=std::wstring::npos,"localized difference template has substitution");
             Check(dirsync::RelativeValue(pattern,L"123").find(L"123")!=std::wstring::npos,"localized difference substitution");
         }
+        for(int id=IDS_STATUS_COPIED;id<=IDS_STATUS_BLOCKED;++id)
+            Check(!text(id).empty() && text(id).find(L'|')==std::wstring::npos,"individual status metrics localized without pipe separators");
         for(int id=IDS_IMMEDIATE_MENU;id<=IDS_IMMEDIATE_EMPTY;++id) Check(!text(id).empty(),"immediate removal strings localized");
         Test(IDD_PREVIEW); Test(IDD_INFORMATION);Test(IDD_APPEARANCE); std::cout << checks << " resource/layout checks passed\n"; return 0;
     }

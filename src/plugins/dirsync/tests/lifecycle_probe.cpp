@@ -263,6 +263,33 @@ extern "C" __declspec(dllexport) BOOL WINAPI ProbePreviewControls(const wchar_t*
             GetGValue(faded)==(GetGValue(base)+GetGValue(bg))/2 && GetBValue(faded)==(GetBValue(base)+GetBValue(bg))/2;
         row.action=dirsync::Action::CopyRight;ok &= PreviewColor(row,6,bg,RGB(1,2,3))==base;
     }
+    // Native status parts track the operation; each metric is a separate pane.
+    auto partCount=[&]() {Status(p);return int(SendMessageW(bar,SB_GETPARTS,0,0));};
+    ok &= partCount()==5;
+    p.running=true;ok &= partCount()==3;
+    p.progress.readBytes=1024;ok &= partCount()==4;
+    p.copying=true;p.copyRows={0,1};ok &= partCount()==5;
+    p.cancel=true;ok &= partCount()==5;
+    p.cancel=false;p.copying=false;p.running=false;p.progress.readBytes=0;
+    for(int dpi:{96,120,144,192,240}) {
+        HFONT font=CreateFontW(-MulDiv(11,dpi,96),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,DEFAULT_QUALITY,DEFAULT_PITCH,L"MS Shell Dlg");
+        SendMessageW(bar,WM_SETFONT,WPARAM(font),FALSE);
+        int initial[5]={0,0,0,0,-1};SendMessageW(bar,SB_SETPARTS,5,LPARAM(initial));
+        const std::wstring full=L"Unicode žluťoučký 漢字: 18446744073709551615";
+        for(int i=0;i<5;++i) StatusPane(window,i,full);
+        for(int width:{450,900,1600,700}) {
+            SetWindowPos(window,nullptr,0,0,width,600,SWP_NOMOVE|SWP_NOZORDER);SizeStatus(window);
+            int edges[5]={};ok &= SendMessageW(bar,SB_GETPARTS,5,LPARAM(edges))==5;
+            RECT area{};GetClientRect(bar,&area);
+            ok &= edges[0]>0 && edges[0]>=area.right/5 && edges[4]==-1;
+            for(int i=1;i<4;++i) ok &= edges[i]>edges[i-1] && edges[i]<area.right;
+            wchar_t tip[128]{};SendMessageW(bar,SB_GETTIPTEXTW,MAKEWPARAM(4,128),LPARAM(tip));
+            ok &= full==tip;
+        }
+        SendMessageW(bar,WM_SETFONT,WPARAM(GetStockObject(DEFAULT_GUI_FONT)),FALSE);DeleteObject(font);
+    }
+    Status(p);
     for(int width:{900,1200,900,1200}) {
         SetWindowPos(window,nullptr,0,0,width,600,SWP_NOMOVE|SWP_NOZORDER);SizeStatus(window);
         LayoutFilters(p,width-900);

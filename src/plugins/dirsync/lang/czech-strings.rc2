@@ -102,10 +102,6 @@ BEGIN
     IDS_UI_COMPARE "Porovnávání obsahu"
     IDS_UI_VALIDATE "Kontrola plánu"
     IDS_UI_TRANSFER "Položka %llu / %llu"
-    IDS_UI_TRANSFER_STATS "Zkopírováno %llu B | ověřeno %llu B | dokončeno %llu"
-    IDS_UI_SCAN_STATS "Prohledáno %llu | porovnáno %llu"
-    IDS_UI_READ_STATS "Přečteno %llu B | prohledáno %llu | dvojice %llu"
-    IDS_UI_ROWS "Řádky %llu | viditelné %llu | skryté %llu | blokované %llu"
     IDS_UI_FINISHED "Běh dokončen – zkontrolujte výsledek a znovu porovnejte"
     IDS_UI_STOPPING "Zastavování – čeká se na aktuální operaci"
     IDS_UI_SUMMARY "OK"
@@ -252,4 +248,18 @@ BEGIN
     IDS_IMMEDIATE_ERROR "Kód chyby (HRESULT)"
     IDS_IMMEDIATE_RESULT_NOTE "Porovnání již není aktuální; spusťte nové Porovnat. Dokončené změny zůstávají zachované. Položky přesunuté do Koše lze obnovit z Koše Windows; trvalé odstranění nemá obnovu pluginu."
     IDS_IMMEDIATE_EMPTY "Výběr neobsahuje žádnou dostupnou položku pro odstranění na této straně."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_STATUS_COPIED "Zkopírováno %llu B"
+    IDS_STATUS_VERIFIED "Ověřeno %llu B"
+    IDS_STATUS_DONE "Dokončeno %llu"
+    IDS_STATUS_READ "Přečteno %llu B"
+    IDS_STATUS_SCANNED "Prohledáno %llu"
+    IDS_STATUS_COMPARED "Porovnáno %llu"
+    IDS_STATUS_ROWS "Řádky %llu"
+    IDS_STATUS_VISIBLE "Viditelné %llu"
+    IDS_STATUS_HIDDEN "Skryté %llu"
+    IDS_STATUS_BLOCKED "Blokované %llu"
 END

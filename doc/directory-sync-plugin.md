@@ -1,8 +1,10 @@
 # Directory Synchronization — aktuální návod
 
-Stav 17. října 2026, vývojová verze 0.1.3 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
+Stav 17. října 2026, vývojová verze 0.1.4 pro současný **Samandarin 0.16**, bez rozšíření SDK. Tento dokument je výchozí přehled aktuálního chování. Ostatní dokumenty zachovávají návrh a datovanou evidenci jednotlivých etap; jejich tehdejší omezení a počty testů nepředstavují dnešní stav.
 
 Pro pilotní používání začněte [krátkými pokyny včetně hlášení chyb](directory-sync-plugin-pilot-guide.md), přiloženými v balíčku jako `PILOT.cs.md`.
+
+Stavový řádek od 0.1.4 používá samostatné nativní oddíly: stav operace a jednotlivé počty řádků nebo průběhu. Šířky se přizpůsobují textu a oknu; celý údaj je dostupný v tooltipu.
 
 ## Instalace a spuštění
 

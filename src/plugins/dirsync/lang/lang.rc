@@ -206,10 +206,6 @@ BEGIN
     IDS_UI_COMPARE "Comparing content"
     IDS_UI_VALIDATE "Checking plan"
     IDS_UI_TRANSFER "Item %llu / %llu"
-    IDS_UI_TRANSFER_STATS "Copied %llu B | verified %llu B | complete %llu"
-    IDS_UI_SCAN_STATS "Scanned %llu | compared %llu"
-    IDS_UI_READ_STATS "Read %llu B | scanned %llu | pairs %llu"
-    IDS_UI_ROWS "Rows %llu | visible %llu | hidden %llu | blocked %llu"
     IDS_UI_FINISHED "Run finished - inspect result and Compare again"
     IDS_UI_STOPPING "Stopping - waiting for the current operation"
     IDS_UI_SUMMARY "OK"
@@ -356,4 +352,18 @@ BEGIN
     IDS_IMMEDIATE_ERROR "Error code (HRESULT)"
     IDS_IMMEDIATE_RESULT_NOTE "The comparison is now out of date; Compare again. Completed changes remain in place. Recycled items can be restored from the Windows Recycle Bin; permanent deletion has no plugin recovery."
     IDS_IMMEDIATE_EMPTY "No available items are selected for removal on this side."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_STATUS_COPIED "Copied %llu B"
+    IDS_STATUS_VERIFIED "Verified %llu B"
+    IDS_STATUS_DONE "Complete %llu"
+    IDS_STATUS_READ "Read %llu B"
+    IDS_STATUS_SCANNED "Scanned %llu"
+    IDS_STATUS_COMPARED "Compared %llu"
+    IDS_STATUS_ROWS "Rows %llu"
+    IDS_STATUS_VISIBLE "Visible %llu"
+    IDS_STATUS_HIDDEN "Hidden %llu"
+    IDS_STATUS_BLOCKED "Blocked %llu"
 END

@@ -835,13 +835,32 @@ void StatusPane(HWND window,int part,const std::wstring& text)
     SendDlgItemMessageW(window,IDC_STATUS,SB_SETTEXTW,part,LPARAM(text.c_str()));
     SendDlgItemMessageW(window,IDC_STATUS,SB_SETTIPTEXTW,part,LPARAM(text.c_str()));
 }
+void LayoutStatusPanes(HWND window)
+{
+    HWND bar=GetDlgItem(window,IDC_STATUS);RECT client{};GetClientRect(bar,&client);
+    int count=int(SendMessageW(bar,SB_GETPARTS,0,0));if(count<1 || count>5) return;
+    HDC dc=GetDC(bar);auto font=SelectObject(dc,reinterpret_cast<HFONT>(SendMessageW(bar,WM_GETFONT,0,0)));
+    const int padding=MulDiv(16,GetDeviceCaps(dc,LOGPIXELSX),96);
+    std::vector<int> widths(size_t(count),0),edges(size_t(count),0);int total=0;
+    for(int i=1;i<count;++i) {
+        const size_t length=LOWORD(SendMessageW(bar,SB_GETTEXTLENGTHW,i,0));
+        std::vector<wchar_t> text(length+1);SendMessageW(bar,SB_GETTEXTW,i,LPARAM(text.data()));
+        SIZE size{};GetTextExtentPoint32W(dc,text.data(),int(length),&size);
+        widths[i]=size.cx+padding;total+=widths[i];
+    }
+    SelectObject(dc,font);ReleaseDC(bar,dc);
+    // Leave room for the operation/state; narrow windows retain full pane tooltips.
+    const int available=std::max(0L,client.right-padding),budget=available*72/100;
+    int used=0;for(int i=1;i<count;++i) {if(total>budget) widths[i]=int(int64_t(widths[i])*budget/total);used+=widths[i];}
+    edges[0]=available-used;
+    for(int i=1;i<count;++i) edges[i]=edges[i-1]+widths[i];
+    edges.back()=-1;SendMessageW(bar,SB_SETPARTS,count,LPARAM(edges.data()));
+}
 void SizeStatus(HWND window)
 {
     HWND bar=GetDlgItem(window,IDC_STATUS);
-    SendMessageW(bar,WM_SIZE,0,0);
+    SendMessageW(bar,WM_SIZE,0,0);LayoutStatusPanes(window);
     RECT client{};GetClientRect(window,&client);
-    int parts[]={client.right*44/100,-1};
-    SendMessageW(bar,SB_SETPARTS,2,LPARAM(parts));
     // Native status-bar height can differ from the resource's nominal DU height.
     // Join the list to its actual top edge at every size, with no outer margins.
     HWND list=GetDlgItem(window,IDC_LIST);RECT bounds{},status{};
@@ -860,19 +879,21 @@ bool PendingOptions(const Preview& p)
 }
 void Status(Preview& p)
 {
-    std::wstring state; wchar_t counts[512]{};
+    std::wstring state;std::vector<std::wstring> metrics;
+    auto metric=[&](int id,uint64_t value) {wchar_t text[128]{};swprintf_s(text,Text(id).c_str(),value);metrics.emplace_back(text);};
     if(p.running) {
         if(p.copying || p.saving || p.overwriting || p.deleting || p.immediateDeleting) {
             state=Text((p.deleting || p.immediateDeleting)?IDS_UI_OP_DELETE:p.overwriting?IDS_UI_OP_OVERWRITE:p.saving?IDS_UI_OP_SAVE:IDS_UI_OP_COPY);
             wchar_t item[128]{};uint64_t total=(p.overwriting || p.deleting || p.immediateDeleting)?p.transferCount:uint64_t(p.copyRows.size());
             swprintf_s(item,Text(IDS_UI_TRANSFER).c_str(),std::min(p.copyProgress.item.load()+1,total),total);
-            state+=L" | "+std::wstring(item);
-            swprintf_s(counts,Text(IDS_UI_TRANSFER_STATS).c_str(),p.copyProgress.copied.load(),p.copyProgress.verified.load(),p.copyProgress.completed.load());
+            metrics.emplace_back(item);
+            metric(IDS_STATUS_COPIED,p.copyProgress.copied.load());metric(IDS_STATUS_VERIFIED,p.copyProgress.verified.load());
+            metric(IDS_STATUS_DONE,p.copyProgress.completed.load());
         } else {
             uint64_t bytes=p.progress.readBytes.load();
             state=Text(p.validating?IDS_UI_VALIDATE:bytes?IDS_UI_COMPARE:IDS_UI_SCAN);
-            if(bytes) swprintf_s(counts,Text(IDS_UI_READ_STATS).c_str(),bytes,p.progress.scanned.load(),p.progress.compared.load());
-            else swprintf_s(counts,Text(IDS_UI_SCAN_STATS).c_str(),p.progress.scanned.load(),p.progress.compared.load());
+            if(bytes) metric(IDS_STATUS_READ,bytes);
+            metric(IDS_STATUS_SCANNED,p.progress.scanned.load());metric(IDS_STATUS_COMPARED,p.progress.compared.load());
         }
         if(p.cancel) state=Text(IDS_UI_STOPPING);
     } else {
@@ -882,9 +903,15 @@ void Status(Preview& p)
         else state=Text(PendingOptions(p)?IDS_OPTIONS_PENDING:p.result.snapshot?IDS_UI_COMPLETE:IDS_UI_READY);
         uint64_t blocked=0;
         for(const auto& row:p.result.rows) if(row.state==dirsync::State::Blocked || row.state==dirsync::State::Conflict) ++blocked;
-        swprintf_s(counts,Text(IDS_UI_ROWS).c_str(),uint64_t(p.result.rows.size()),uint64_t(p.visible.size()),uint64_t(p.result.rows.size()-p.visible.size()),blocked);
+        metric(IDS_STATUS_ROWS,uint64_t(p.result.rows.size()));metric(IDS_STATUS_VISIBLE,uint64_t(p.visible.size()));
+        metric(IDS_STATUS_HIDDEN,uint64_t(p.result.rows.size()-p.visible.size()));metric(IDS_STATUS_BLOCKED,blocked);
     }
-    StatusPane(p.window,0,state);StatusPane(p.window,1,counts);
+    int edges[5]={};edges[metrics.size()]=-1;
+    if(SendDlgItemMessageW(p.window,IDC_STATUS,SB_GETPARTS,0,0)!=LRESULT(metrics.size()+1))
+        SendDlgItemMessageW(p.window,IDC_STATUS,SB_SETPARTS,metrics.size()+1,LPARAM(edges));
+    StatusPane(p.window,0,state);
+    for(size_t i=0;i<metrics.size();++i) StatusPane(p.window,int(i+1),metrics[i]);
+    LayoutStatusPanes(p.window);
 }
 bool RowVisible(const dirsync::Row& row,const std::array<bool,5>& filters)
 {
@@ -2231,7 +2258,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     if (!language) return nullptr;
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES}; InitCommonControlsEx(&controls);
     ConfigureDark(nullptr);
-    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1.3", "Copyright (c) 2026 Open Salamander Authors",
+    entry->SetBasicPluginData(general->LoadStr(language, IDS_NAME), FUNCTION_LOADSAVECONFIGURATION|FUNCTION_CONFIGURATION, "0.1.4", "Copyright (c) 2026 Open Salamander Authors",
                               general->LoadStr(language, IDS_DESCRIPTION), "DirectorySync");
     return &plugin;
 }
