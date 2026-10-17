@@ -1,0 +1,803 @@
+{
+  "status": "plan-only; no files extracted or relocated",
+  "auditCommit": "67ef93f1abf2a66bdb3feefb0ce05acd30830130",
+  "referenceBase": "a84dbed6db632a9e63b5ed9f4bc6691e4cc5f449",
+  "ownedSourceFiles": 46,
+  "existingDocumentationFiles": 30,
+  "ownedHistoryCommits": [
+    "cdab3172d76754856ab5860563d4751c45de5a57",
+    "8e1ac3169271c3b3746642cdc559652e95e67ed8",
+    "7bcb6a7467698e9b497993c7ead1cf040db00396",
+    "22cdb3ab0b6e8bae0415abe9e49b2f44e90ddbf7",
+    "b8a6f4097b8c6ce33d88de8b7572bceee3d67b55",
+    "84a00530772f6504b7009d7f67039d1acb83a03a",
+    "a8527e118315e4c16ee2771c9d65b6609223cfad",
+    "10a3a1fdd55f85434290b855b1553a61bbbe462c",
+    "3b3b722b26b4589f667f8d463e09459b754f29c7",
+    "043c1a80869c688885f5e2066eac95340775ecb6",
+    "20de5c9d561052302f5920b1bb582010135d3237",
+    "a6d1b3affaff2dac0e6cca70a8d2e4400120486b",
+    "62c6f5831acb1638b1b94840d0d86aa87fb7e42f",
+    "14e62ac343d77eb236676ac1410e9dea7ecc7b60",
+    "a325ed71a612e9685711fb9e6ec2cb854b2dd328",
+    "072b47db86711ea702970c6eb5cd885ea818137e",
+    "a8c7fca0b58a83867374dfc58094e4ecaabc0008",
+    "f25ac934f9dc24eab5d2aeb6c6af6d5b35d52c75",
+    "2fbe222febcefa2362a4e1fbfc52d1cd7ba64946",
+    "304be984781737df9ec047a2d5d6c99cb3f480c8",
+    "afe054bb02b57e72e2c1870f36e65c3a72c333b0",
+    "9cec2e960a1a9cf544c6c761256e511114c5eec8",
+    "d0f919e297cb63f894f816e8345c9404479ed7d2",
+    "b5d64fbaf89b65f6cd898b0b7434266763cc85f7",
+    "95fc7e6d7d97ee8ceeb5c92676a62dbf98653090",
+    "a712558c01a2a079afb959e0000037dc9a192096",
+    "c73a6dcc83b877c0665344067783509f0cad8bc7",
+    "ed1fd278cb748938de89ffbc5ff8652be32c772a",
+    "ae476aed900bea35dc9ad35c0e8ad76457649805",
+    "ed73086d05e6d69f516d04a754b81409f779d5e4",
+    "0d0df43001c89c1590938a8898d77b07835a5022",
+    "a2a9806ae250a23be178679d94be9d105e417348",
+    "a25d59effe1d3b4006b7d3307715cc93a27e0a89",
+    "5a180ddc3f1e516c37a0f3935033891eae61bd7a",
+    "391a4bf866ebe7165bcb54acd7e173c1f39c4927",
+    "0d1a5d0d0b455b7a79ac4762da39f9f6c482766b",
+    "76b4169055c7fb1a68e28a70b7c70333822d6a8c",
+    "5106fa3cd8d7f36a617aeafad495e2b551a00fd1",
+    "ff2175d3ec6a9db1b26e7c9f1c36d2a86ec04617",
+    "aefc159d18793340d845145b4f4b8ad42a6a82ff",
+    "de23d64521f862847246289938172cc5d38059e6",
+    "bcfd33a75d55947736e12d2086dca35fe0801825",
+    "b61aa9ddf9b658571dc46c8de90c0a4adc82c847",
+    "8acdbd98ff396a156a7aa30c54b3ce294beafc80",
+    "c1dbd38d21b656d8a434408c364cbcfe1a0c7b2d",
+    "410dcfb724578d1de114d569029247c0ea8aa20f",
+    "2210680445e760de74be65c297a067838faf8f8a",
+    "30401108160db6f852a0625425978471cc877105",
+    "070a0d1bb8bd529e554b8a91770c7b2a53b671a5",
+    "836a13111be8b0c34f1d1ea733c0851ef4339991",
+    "0b916faf0361df428e4c6e6d28942b55e6789171",
+    "dac7a1be1188e8d700e0ed00e5466fc938a7fc3d",
+    "dfc27edbcca001380998094f2b7dd3acdd27417f",
+    "adcb354daeac90279caa385442ed7ddf99778125",
+    "d60f39b44d3d6cf670e531fa6d2e44f98b9104e1",
+    "e87e3424643080bf9aa8bd0495eeea9aa1b3f5e9",
+    "0e8072c7a1cbcf0c1ce7de8dcc2077cc81ee97e9",
+    "2ce899262e24846698913b9a58786b03b6cfaadc",
+    "da86b979c1638a8f694167298f0baccc4a15c8c5",
+    "eb76fdf9882fa9a6c7d25c2afeafde1bb9c96cd5",
+    "2c15b9360a7653eefdebfea2254a6b932c23b863",
+    "26f4a813fb9dfdd1494893f21bc470a20204ff60",
+    "67ef93f1abf2a66bdb3feefb0ce05acd30830130"
+  ],
+  "preserveHistory": [
+    {
+      "source": "doc/directory-sync-plugin-columns.md",
+      "proposedTarget": "docs/directory-sync-plugin-columns.md",
+      "sha256": "8dfe7ff0ddeb8f9081d46814d384a4057d409e94c57277dff1ab64217a49ddce"
+    },
+    {
+      "source": "doc/directory-sync-plugin-context-menu.md",
+      "proposedTarget": "docs/directory-sync-plugin-context-menu.md",
+      "sha256": "8e468c7e5528bc41f73f121f9d29446dc3d3c731c17d21f2a8110882ac90f813"
+    },
+    {
+      "source": "doc/directory-sync-plugin-copy-cancellation.md",
+      "proposedTarget": "docs/directory-sync-plugin-copy-cancellation.md",
+      "sha256": "55f145ae254de816e8db03a545a21891953ee993f92d488c915ffbb88d1af97a"
+    },
+    {
+      "source": "doc/directory-sync-plugin-copy-new.md",
+      "proposedTarget": "docs/directory-sync-plugin-copy-new.md",
+      "sha256": "923a0df9b04d0d4ff7761d6eeb339a728a4ce572a5c71146de5c2a6895068966"
+    },
+    {
+      "source": "doc/directory-sync-plugin-copy-space.md",
+      "proposedTarget": "docs/directory-sync-plugin-copy-space.md",
+      "sha256": "42921491843e15a43f669c4facd74815c725c479c20dc421cf8223b6081d960c"
+    },
+    {
+      "source": "doc/directory-sync-plugin-copy-unload.md",
+      "proposedTarget": "docs/directory-sync-plugin-copy-unload.md",
+      "sha256": "b02764d0316d8580f6d3ac9e1515f45e26355e11ebc391c9efed3f1c1b017bb2"
+    },
+    {
+      "source": "doc/directory-sync-plugin-core-adapter.md",
+      "proposedTarget": "docs/directory-sync-plugin-core-adapter.md",
+      "sha256": "bfce545ca127573c1969f04ccd4c0a0afcf8e5fb743286213d0d1f40601deecb"
+    },
+    {
+      "source": "doc/directory-sync-plugin-delete.md",
+      "proposedTarget": "docs/directory-sync-plugin-delete.md",
+      "sha256": "1847cbbbbda2b9178678551d8ba421f21035f21fa96091b959ba9ce7128fbc6c"
+    },
+    {
+      "source": "doc/directory-sync-plugin-design.md",
+      "proposedTarget": "docs/directory-sync-plugin-design.md",
+      "sha256": "455e7ef124c3153b84455f39ae036931605f7f7cca1490ec74010a6619a580b2"
+    },
+    {
+      "source": "doc/directory-sync-plugin-directories.md",
+      "proposedTarget": "docs/directory-sync-plugin-directories.md",
+      "sha256": "80af05afccc84c44b93d7dd7092843fc4899f9922ed7d20c97560f36fe150146"
+    },
+    {
+      "source": "doc/directory-sync-plugin-distribution.md",
+      "proposedTarget": "docs/directory-sync-plugin-distribution.md",
+      "sha256": "acb8801e78c17b155c06ad44b5ab4f71129c09b500889a11f175094a7f68ea8a"
+    },
+    {
+      "source": "doc/directory-sync-plugin-execution-protocol.md",
+      "proposedTarget": "docs/directory-sync-plugin-execution-protocol.md",
+      "sha256": "bdd4410dfad6998b38b4e1f3bb8080007b91dc0de68c0fdb5ae61e8566e3b88a"
+    },
+    {
+      "source": "doc/directory-sync-plugin-grouping.md",
+      "proposedTarget": "docs/directory-sync-plugin-grouping.md",
+      "sha256": "7626a0ecb01356d58068bfa5c249f5e62707848afff341358868337ec95d45b6"
+    },
+    {
+      "source": "doc/directory-sync-plugin-immediate-delete.md",
+      "proposedTarget": "docs/directory-sync-plugin-immediate-delete.md",
+      "sha256": "41b19da6b610c95ad3d2c4b1aa1d9ba5fd5cc24b9fc71896bc7eacd77999ed73"
+    },
+    {
+      "source": "doc/directory-sync-plugin-implementation.md",
+      "proposedTarget": "docs/directory-sync-plugin-implementation.md",
+      "sha256": "6e34ceee62504524bd7017205cbfe4b89c340a6592038b83b5b124df1b18a38a"
+    },
+    {
+      "source": "doc/directory-sync-plugin-ntfs-protocol-probe.md",
+      "proposedTarget": "docs/directory-sync-plugin-ntfs-protocol-probe.md",
+      "sha256": "5fb5e1156460864b44e0de43a716ff03957a3fcf2e4e47f625a1ecc4288c65f0"
+    },
+    {
+      "source": "doc/directory-sync-plugin-overwrite.md",
+      "proposedTarget": "docs/directory-sync-plugin-overwrite.md",
+      "sha256": "ff4311666f4e2c7bd7c5a09a3836361dd8f154c9feee23881ba32cb1cbb80205"
+    },
+    {
+      "source": "doc/directory-sync-plugin-pilot-guide.md",
+      "proposedTarget": "docs/directory-sync-plugin-pilot-guide.md",
+      "sha256": "61286a4b00b9b2e18f4968237d3b0cccb09601f06851d8eec45aa11a3b1739d5"
+    },
+    {
+      "source": "doc/directory-sync-plugin-pilot.md",
+      "proposedTarget": "docs/directory-sync-plugin-pilot.md",
+      "sha256": "858b98aded56f47fc69778c76ecab883295e99e6b6cbcaa3fccbaba232e34b31"
+    },
+    {
+      "source": "doc/directory-sync-plugin-recovery.md",
+      "proposedTarget": "docs/directory-sync-plugin-recovery.md",
+      "sha256": "130ef15572ad7ae4bdefe14a69eafeb9133fc85dd5677919436d0f16c12712ba"
+    },
+    {
+      "source": "doc/directory-sync-plugin-relative.md",
+      "proposedTarget": "docs/directory-sync-plugin-relative.md",
+      "sha256": "4e545f1c16b92b76d7297d8f07aa9299ee72e41d0b570c8bf005b44569021fc3"
+    },
+    {
+      "source": "doc/directory-sync-plugin-sdk.md",
+      "proposedTarget": "docs/directory-sync-plugin-sdk.md",
+      "sha256": "89e1922dd14891024d6f209b4ab16506e05048c8198bb5500e603a4039e8da88"
+    },
+    {
+      "source": "doc/directory-sync-plugin-status-bar.md",
+      "proposedTarget": "docs/directory-sync-plugin-status-bar.md",
+      "sha256": "acc0467624a1d7ae33b4735e9df7d893af806819c20a792c510ecaa8177b3a26"
+    },
+    {
+      "source": "doc/directory-sync-plugin-tc-observations.md",
+      "proposedTarget": "docs/directory-sync-plugin-tc-observations.md",
+      "sha256": "aa64a5ab6981c66a1718942ab53a9cc496c20a12546df8e0fe650a41dc3ba3f7"
+    },
+    {
+      "source": "doc/directory-sync-plugin-ui-automation.md",
+      "proposedTarget": "docs/directory-sync-plugin-ui-automation.md",
+      "sha256": "8b466d39006c4083b090dca9398b0647c7a05a0a8ae1084060f3b5fb26f011bf"
+    },
+    {
+      "source": "doc/directory-sync-plugin-ui.md",
+      "proposedTarget": "docs/directory-sync-plugin-ui.md",
+      "sha256": "2878f06205e03376de26e5ee1c8d01f8fbdf8e8aa99eda704cd4e25d4e7ce40e"
+    },
+    {
+      "source": "doc/directory-sync-plugin-vhd-results.md",
+      "proposedTarget": "docs/directory-sync-plugin-vhd-results.md",
+      "sha256": "3eea0bfd014361c163d50b71b25d765ce04858bfaee7f955984294e531c9dd44"
+    },
+    {
+      "source": "doc/directory-sync-plugin-vhd-runbook.md",
+      "proposedTarget": "docs/directory-sync-plugin-vhd-runbook.md",
+      "sha256": "e310fcb93007abe8338bf1100eea81572561cfa13a51538f723871415004f8ba"
+    },
+    {
+      "source": "doc/directory-sync-plugin-workflow.md",
+      "proposedTarget": "docs/directory-sync-plugin-workflow.md",
+      "sha256": "c0799c8133185871a9427a3ba8cd083439232077a89a79a1fa0fbe0fb2569564"
+    },
+    {
+      "source": "doc/directory-sync-plugin.md",
+      "proposedTarget": "docs/directory-sync-plugin.md",
+      "sha256": "8adb38ff2d4c2efffd6a09c7660cb847d4f0f0aacbd1be6f7eba34bffec50e42"
+    },
+    {
+      "source": "src/plugins/dirsync/copy.cpp",
+      "proposedTarget": "src/copy.cpp",
+      "sha256": "23c4a75c4f5288d5bb197ea3379bab93967d310aa49e1f049d281859681191ef"
+    },
+    {
+      "source": "src/plugins/dirsync/copy.h",
+      "proposedTarget": "src/copy.h",
+      "sha256": "bb56f6f921bd510d4793175a53174f3fa00add3017153d38c3ccbe50739911bc"
+    },
+    {
+      "source": "src/plugins/dirsync/create-icon.ps1",
+      "proposedTarget": "tools/create-icon.ps1",
+      "sha256": "786a5f3c72da4f07009950964bf8f5ec625ac6a79c51500078332ac3c087e17f"
+    },
+    {
+      "source": "src/plugins/dirsync/delete.h",
+      "proposedTarget": "src/delete.h",
+      "sha256": "3c662db721d59bd4cf8e5143230cd11bc706800dad2b4c18c47e386f1df051e7"
+    },
+    {
+      "source": "src/plugins/dirsync/dirsync.cpp",
+      "proposedTarget": "src/dirsync.cpp",
+      "sha256": "e648c4aa5acffa3efd0dedfe6b8f6b1d0650d813e4ecc986443d6e8b0c38e39f"
+    },
+    {
+      "source": "src/plugins/dirsync/dirsync.def",
+      "proposedTarget": "src/dirsync.def",
+      "sha256": "f0295f7aca57224e551319c381a7d4f48a2e9f0fea24b8b68ddc5311f089cbca"
+    },
+    {
+      "source": "src/plugins/dirsync/dirsync.ico",
+      "proposedTarget": "src/dirsync.ico",
+      "sha256": "fdaa4f3d0706169946e6022f0d7e79e4ba6ae176fecbcad833a31a08ab62e819"
+    },
+    {
+      "source": "src/plugins/dirsync/dirsync.png",
+      "proposedTarget": "src/dirsync.png",
+      "sha256": "bb63890ee1f0860d83babe1d33fd75f80581ce7e76b97a24cbc57c4ac6391789"
+    },
+    {
+      "source": "src/plugins/dirsync/dirsync.rc",
+      "proposedTarget": "src/dirsync.rc",
+      "sha256": "d98b0992d0f06c092cd3ed6e4fdf8fe4d0450a23d70aefd8c4f73801d0d019d7"
+    },
+    {
+      "source": "src/plugins/dirsync/displayformat.h",
+      "proposedTarget": "src/displayformat.h",
+      "sha256": "75f2ebc8b1710161a8e899aaadd3094fdaaebefa20f86cc5ee47bcb08b01a811"
+    },
+    {
+      "source": "src/plugins/dirsync/engine.cpp",
+      "proposedTarget": "src/engine.cpp",
+      "sha256": "533fb1677edde94cc58d0afed880131921b4f3b9dd43927e5893ed4df0315ebd"
+    },
+    {
+      "source": "src/plugins/dirsync/engine.h",
+      "proposedTarget": "src/engine.h",
+      "sha256": "c2e39f35e9d2e5af1940a2139414584f2bc036e43b0c32c44f41196e4fe12879"
+    },
+    {
+      "source": "src/plugins/dirsync/lang/czech-strings.rc2",
+      "proposedTarget": "src/lang/czech-strings.rc2",
+      "sha256": "aa4b096577a150baed08d43ab782ff4bd72ce3150db6da6d5803064ff03d8b1d"
+    },
+    {
+      "source": "src/plugins/dirsync/lang/czech-versinfo.rc2",
+      "proposedTarget": "src/lang/czech-versinfo.rc2",
+      "sha256": "285e444b717f5538ee02f43a316b62cfd167582a2ec68d4a72d29202c905655c"
+    },
+    {
+      "source": "src/plugins/dirsync/lang/czech.rc",
+      "proposedTarget": "src/lang/czech.rc",
+      "sha256": "d21f809e609718e45d8b09fe5b365df30d326c9538cc5a5e2a48236b94c8fca2"
+    },
+    {
+      "source": "src/plugins/dirsync/lang/lang.rc",
+      "proposedTarget": "src/lang/lang.rc",
+      "sha256": "c6f97e86a55fe12ee7571401747e96f4b6bedb8ad7f78627cf096f43d8ab1dd5"
+    },
+    {
+      "source": "src/plugins/dirsync/overwrite.h",
+      "proposedTarget": "src/overwrite.h",
+      "sha256": "937d0e179e911ff72f8bf1dcae785a726f2bca6585e3117388369fc943cd2780"
+    },
+    {
+      "source": "src/plugins/dirsync/package.ps1",
+      "proposedTarget": "tools/package.ps1",
+      "sha256": "28837c51a1e7616e7081faa1acad83a41ac5766ed2afcdc4fc09dd7a505a6f50"
+    },
+    {
+      "source": "src/plugins/dirsync/precomp.cpp",
+      "proposedTarget": "src/precomp.cpp",
+      "sha256": "e74fb4672e0a61e10407091c426f2386308691cd5a1b593946e6fb7f1e576782"
+    },
+    {
+      "source": "src/plugins/dirsync/precomp.h",
+      "proposedTarget": "src/precomp.h",
+      "sha256": "ebffc2d73821e153787ad20b0e69e88aa37ae79e211c1f18982ed755d98a5bf3"
+    },
+    {
+      "source": "src/plugins/dirsync/previewlayout.h",
+      "proposedTarget": "src/previewlayout.h",
+      "sha256": "3c9c489cc666b7ca1729e3577c2051bd5931285dab399cb43d95d9e9e3678d01"
+    },
+    {
+      "source": "src/plugins/dirsync/recovery.h",
+      "proposedTarget": "src/recovery.h",
+      "sha256": "2e92401d6d31dccf59f43fdb570f4f696d0586ee86d8492a12d0456a0419948e"
+    },
+    {
+      "source": "src/plugins/dirsync/resource.h",
+      "proposedTarget": "src/resource.h",
+      "sha256": "60433be93bcabff5e8e546cfff2437513d6676071f40545524ddbf5bd7c4de69"
+    },
+    {
+      "source": "src/plugins/dirsync/shell_delete.h",
+      "proposedTarget": "src/shell_delete.h",
+      "sha256": "0d6681308f994bc9c1f484caa063025e16fd2980d473257d7b96a7bbb39b7134"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/copy_space_faults.cpp",
+      "proposedTarget": "tests/copy_space_faults.cpp",
+      "sha256": "1022ca3112e9ce49613ad42c02827dec16780ecb8cfcf3912e6d261e224a1dd4"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/copy_space_faults.h",
+      "proposedTarget": "tests/copy_space_faults.h",
+      "sha256": "1bebda65bafeb587695f291efb14a6eb9e4586596707bed522e6436db2e352bf"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/copy_tests.cpp",
+      "proposedTarget": "tests/copy_tests.cpp",
+      "sha256": "0a582d317554fac54d5ec1de8e175ac1502ab263ce151dacc3bbeaf9f42147b4"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/dirsync_copy_tests.vcxproj",
+      "proposedTarget": "tests/dirsync_copy_tests.vcxproj",
+      "sha256": "ee727eed723ef0cb5c5a5aab728e2bfef40b99e0841e91eb1ca49bdf5a1b3e83"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/dirsync_lifecycle_probe.vcxproj",
+      "proposedTarget": "tests/dirsync_lifecycle_probe.vcxproj",
+      "sha256": "3eb715126b410dc7a0798c51de8b6f1a064fd3c63151cf6ff8663328286d6727"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/dirsync_lifecycle_tests.vcxproj",
+      "proposedTarget": "tests/dirsync_lifecycle_tests.vcxproj",
+      "sha256": "ede1eff2c0c570ec3af6ae99e0f6c407ba881897a366d8382c14c00a21672569"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/dirsync_tests.vcxproj",
+      "proposedTarget": "tests/dirsync_tests.vcxproj",
+      "sha256": "b1f50e88fd7cce1b577721994b2fb89dec80e1c33e649fcd95174ab4b2de4277"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/dirsync_ui_czech_tests.vcxproj",
+      "proposedTarget": "tests/dirsync_ui_czech_tests.vcxproj",
+      "sha256": "2ca6003d401c44d4a1fcbbe8e4ac2dbb4f8f1b0bc4566ec8b45a85be3802bb74"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/dirsync_ui_tests.vcxproj",
+      "proposedTarget": "tests/dirsync_ui_tests.vcxproj",
+      "sha256": "d613967eea4f786dbf1419f6c1f440eddf8e0a16b077fae5c4783eeac95d751d"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/engine_tests.cpp",
+      "proposedTarget": "tests/engine_tests.cpp",
+      "sha256": "053db2030fa0f13b8f8f6628bb133762334d64f2e75631cc3fce603a1c3b76b8"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/lifecycle_probe.cpp",
+      "proposedTarget": "tests/lifecycle_probe.cpp",
+      "sha256": "017155de2eddce4ed6964a02db77654f8889c7ccde50c7b0637290ef43f391f9"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/lifecycle_tests.cpp",
+      "proposedTarget": "tests/lifecycle_tests.cpp",
+      "sha256": "ff49b47ddc190d5e3bd2a4033590e831f1406e2281fa781b6183cfee45d5d06e"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/prepare-clipboard-probe.ps1",
+      "proposedTarget": "tests/prepare-clipboard-probe.ps1",
+      "sha256": "e09b465e28d0a3ee904057b0455544d811615fc124d7bf3e1d5f16b2ecbbc137"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/protocol_probe.cpp",
+      "proposedTarget": "tests/protocol_probe.cpp",
+      "sha256": "1a36a75d1faa9622ca680928719a06777ccc643c6a809231166022e089c497e2"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/protocol_probe.vcxproj",
+      "proposedTarget": "tests/protocol_probe.vcxproj",
+      "sha256": "49f8bbbc35461e971b5f4309dd4aa33aded9c652a6c578d855ad8d77f757bc4f"
+    },
+    {
+      "source": "src/plugins/dirsync/tests/ui_tests.cpp",
+      "proposedTarget": "tests/ui_tests.cpp",
+      "sha256": "88138078eedbf53ba64f257b83628ea30c025fb2515b66eaff63c280f77a58d7"
+    },
+    {
+      "source": "src/plugins/dirsync/vcxproj/dirsync.props",
+      "proposedTarget": "build-support/dirsync.props",
+      "sha256": "053456a713e07c8e4a4587775df7256d430777fcd9d4ba2f5bb87eb771e7e70a"
+    },
+    {
+      "source": "src/plugins/dirsync/vcxproj/dirsync.vcxproj",
+      "proposedTarget": "build-support/dirsync.vcxproj",
+      "sha256": "6cf0c045903bb4ea7a19afc80fb4bfe63ccc9dce893510964aede6f7dd86a672"
+    },
+    {
+      "source": "src/plugins/dirsync/vcxproj/lang_dirsync.props",
+      "proposedTarget": "build-support/lang_dirsync.props",
+      "sha256": "4543e53554c0a9f5f5afbf9a902c2d127c2c091803b962d95544dd44750d49b9"
+    },
+    {
+      "source": "src/plugins/dirsync/vcxproj/lang_dirsync.vcxproj",
+      "proposedTarget": "build-support/lang_dirsync.vcxproj",
+      "sha256": "9e296cdb8b6a842a9791a647bab391e687ed269caa6ae32d81473db4bacc042b"
+    },
+    {
+      "source": "src/plugins/dirsync/vcxproj/lang_dirsync_czech.vcxproj",
+      "proposedTarget": "build-support/lang_dirsync_czech.vcxproj",
+      "sha256": "fc6bd98a570b395f5452337a94153842bde9fffce01e3afe1d3069a8c127b352"
+    },
+    {
+      "source": "src/plugins/dirsync/versinfo.rh2",
+      "proposedTarget": "src/versinfo.rh2",
+      "sha256": "da54c369bc48b65e5438bc68e460ba9ba3efe61e3aafd31aca541caa93a9e31a"
+    }
+  ],
+  "vendorSnapshot": [
+    {
+      "source": "src/common/winlibdpi.h",
+      "proposedTarget": "vendor/samandarin-ui/common/winlibdpi.h",
+      "sha256": "70d3741e630b7b920e4baa258054dd08aacb81fafb964f14751289978c5833a3",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/darkmode.cpp",
+      "proposedTarget": "vendor/samandarin-ui/darkmode.cpp",
+      "sha256": "cb94396ce4d4f705fb6cb556d74673495137ff1712dfe134b385fc0a05fd0e84",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/darkmode.h",
+      "proposedTarget": "vendor/samandarin-ui/darkmode.h",
+      "sha256": "b642f11bea20efd6ecea820022651b505b8bb5ea7ff3b109e8f4a9cad10995ed",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/darkmode_backend_darkmodelib.cpp",
+      "proposedTarget": "vendor/samandarin-ui/darkmode_backend_darkmodelib.cpp",
+      "sha256": "36d9049a2b240f84f12579bf3208afd693ca77fb8bc0d73fe184ad0d0aa077c5",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/darkmode_backend_darkmodelib.h",
+      "proposedTarget": "vendor/samandarin-ui/darkmode_backend_darkmodelib.h",
+      "sha256": "aa96d57d99b3d4bd18ce3803fe805fe6bb42b992be976b4dac1d398aa35330ba",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/filenamecase.h",
+      "proposedTarget": "vendor/samandarin-ui/filenamecase.h",
+      "sha256": "2ddc547734eb31eec12603fcd448e1fc44c552d639a1415e052f80ffa9549295",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/dbg.cpp",
+      "proposedTarget": "vendor/samandarin-sdk/dbg.cpp",
+      "sha256": "de361f71037f49a2a7f5c1286e736b8dd080d4770a94e7197998cbf7224a5b42",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/dbg.h",
+      "proposedTarget": "vendor/samandarin-sdk/dbg.h",
+      "sha256": "8c90037e224595ba3a2d0ace24bdc3f7a08ad2c8aa4737ad61fb85458c05709e",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/spl_base.h",
+      "proposedTarget": "vendor/samandarin-sdk/spl_base.h",
+      "sha256": "f3a359651ca6e960945d4ccebf2ef0b0dd540e6084c739a9d9138548b7d8539e",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/spl_com.h",
+      "proposedTarget": "vendor/samandarin-sdk/spl_com.h",
+      "sha256": "9350ce3c73d775fa31661c7a9372f17baade8b0a05aa5b68d48e7f2ae8243ca3",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/spl_gen.h",
+      "proposedTarget": "vendor/samandarin-sdk/spl_gen.h",
+      "sha256": "34d60cbf3f69e478d3ac487447e8587d44852e9259598d4691cb50edc66e0bd2",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/spl_gui.h",
+      "proposedTarget": "vendor/samandarin-sdk/spl_gui.h",
+      "sha256": "d98a2913345c677b4ebb10e7660307143dd7ea46bd84b5cb4224c78c04f72954",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/spl_menu.h",
+      "proposedTarget": "vendor/samandarin-sdk/spl_menu.h",
+      "sha256": "061e80a38d9de5da572a2eee8b1a5aced6e31e4f4742d89c59c59585f19696d9",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/spl_vers.h",
+      "proposedTarget": "vendor/samandarin-sdk/spl_vers.h",
+      "sha256": "310bd2d8342dbf179859474a87275f074d2a1bd515aab78aa85f82100960c31b",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/plugins/shared/versinfo.rc2",
+      "proposedTarget": "vendor/samandarin-sdk/versinfo.rc2",
+      "sha256": "e7047463bc580b9dccb543b387785f9b434fe517c5fb39bc631ed29f60d13f6e",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/salamand.rh",
+      "proposedTarget": "vendor/samandarin-ui/salamand.rh",
+      "sha256": "4c5a038c2d63b169287477bfb6d4fb4aca05ef16dd66212c6bb54ef59b48a8c3",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/LICENSE-MIT.md",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/LICENSE-MIT.md",
+      "sha256": "471c268c94891d5482c1c8d24f53cc26f27ca9ec9a26b966e969ca8ffffefbac",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/LICENSE.md",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/LICENSE.md",
+      "sha256": "2728888d62a600aac5c21481270989fe0576311c8c583423e1cf4e87d086db06",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/README.md",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/README.md",
+      "sha256": "7a0988f38893e4e61abc49bafe9cef0ca3e2bfe8cc49055de975f59d24deb86e",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/VENDORED_FROM.md",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/VENDORED_FROM.md",
+      "sha256": "4be7876945e1466ef2fc5a9f79a1413ac4fecfcea9f5bc01d3deb070bc16d28f",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/docs/Dark.ini",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/docs/Dark.ini",
+      "sha256": "4ec477e1393dfce22cb74866f45019b3b9599565904937b09bcaa357f41fde2d",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/docs/LICENSE-PolyHook_2_0.md",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/docs/LICENSE-PolyHook_2_0.md",
+      "sha256": "e74944ec8945c9625ef0b5f3220dacfae5590aeb27d9888941108f102fa0989e",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/docs/LICENSE-UAHMenuBar.md",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/docs/LICENSE-UAHMenuBar.md",
+      "sha256": "37bbe3ccc956d23d875fa0e3e9d04ed0b3a7fcc884be979d0acb023e7d0018e3",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/docs/LICENSE-win32-darkmode.md",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/docs/LICENSE-win32-darkmode.md",
+      "sha256": "58b30e56c6b9d2ba4be3e41e717e01ae5404516f16bab328228409e70abe5fcc",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/include/Darkmodelib.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/include/Darkmodelib.h",
+      "sha256": "3c6e9c38cb897e0d134111de1742f102d5a5a1404b963983554b30aa3a65a072",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/Darkmodelib.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/Darkmodelib.cpp",
+      "sha256": "6d08fc88dee4a4abe210b8b1498a6fe605a2d2c7b8b58873501a1178eb3b2c7a",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibColor.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibColor.cpp",
+      "sha256": "55810a1506ed36856dacb3b89f550aa45f11b93acbd9ef4840486e0d715ed103",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibColor.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibColor.h",
+      "sha256": "7709be75b9d239a23d691afa64df3923fcbc01856d299cb71ab555e81e004542",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibDpi.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibDpi.cpp",
+      "sha256": "6c739f281f7a80b1272e414e468b88193f0041d9f58c34749e9fb9084c780622",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibDpi.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibDpi.h",
+      "sha256": "f83cf88663a8e7851570a68b591e1190d7ca59d912a523d352da48178bfcaa1b",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibGlyph.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibGlyph.h",
+      "sha256": "f6839d54a212d102c4cded6fe5cb9b4a15cde2fdc4e71da0c37244ad43d49f24",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibHook.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibHook.cpp",
+      "sha256": "ed514b5e6b8159e1c78c959733af93f653fa4cc3464d720e8a16f702bfdc1361",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibHook.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibHook.h",
+      "sha256": "4d5f45bc69698397b6a375d58b05b628b14378d5f14b202a2c01613b5950bfae",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibIni.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibIni.cpp",
+      "sha256": "54bb79a801d359e24dca1eb943cc10443790d2c64767b5a2146557e87ddb62e8",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibIni.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibIni.h",
+      "sha256": "8bd1183dcc31ddd9c92cf1e9f715f6e1233441241d9677dfc9120427f04644ef",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibPaintHelper.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibPaintHelper.cpp",
+      "sha256": "ab8bfd4b676dbe20ea7903bc50e2b06e1d88a47a65d7a994222c064fa3bbf01b",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibPaintHelper.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibPaintHelper.h",
+      "sha256": "a9c690bf4478a36b135107d9ff5d2e9c2727ea906a2eb914b8e81e8e672cd959",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibSubclass.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibSubclass.cpp",
+      "sha256": "de9444e09445f81d4bbda00a199de6f81da913ff8ce072f42dfc44fe33075aa0",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibSubclass.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibSubclass.h",
+      "sha256": "8e2dd56e9fbcb7e7ccd38c0b1898211fc11e3fd13d28771e1daf8795ccb66332",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibSubclassControl.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibSubclassControl.cpp",
+      "sha256": "40b0d9b2799bc1043f4eb8e19d92e9d808007f99718802831078842c125b0a09",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibSubclassControl.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibSubclassControl.h",
+      "sha256": "063c6bfb18232d98f46026b61f26288cbdef7fa07ddae6535dac98a0cf9971f9",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibSubclassWindow.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibSubclassWindow.cpp",
+      "sha256": "a54eed24ceef224372a560ce128485e0d2dcccffe2440056e30162eb03d376a1",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibSubclassWindow.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibSubclassWindow.h",
+      "sha256": "0820e6cca1610d2eb26d9127dccb2e78dc1da28e9a0e22c9c2ebcda8cc07e428",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibWinApi.cpp",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibWinApi.cpp",
+      "sha256": "17f4d43ff34e7d8239d45f90ae0693627b9618efcd5f425de80ca20cde2450ef",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/DmlibWinApi.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/DmlibWinApi.h",
+      "sha256": "3d33c560d587688a6fb127fe34913bee1d8bea19737ffdc28607b3f651f8c4a3",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/IatHook.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/IatHook.h",
+      "sha256": "383bf32498cb9c5318a015dbab451f67ef67b6b34401d9fa6b781f909eb8d0b9",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/ModuleHelper.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/ModuleHelper.h",
+      "sha256": "cbe64f94f366a8cc487299aebd9ea81f6d0e675b76fb70027b21db20858783c1",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/StdAfx.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/StdAfx.h",
+      "sha256": "8c42f6ff16e400853e9d33b8a2d2c9781eeb745210345cb417c2038dc130c46a",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/UAHMenuBar.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/UAHMenuBar.h",
+      "sha256": "e05ee9687855a26d51e4490d53f12f4568c7d638d968f1d0f8d54996da47122c",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/Version.h",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/Version.h",
+      "sha256": "c7cb33693c1d64fa540bd8468583c868f26e7503ff38d8fb6c4aa10d0564f559",
+      "observedBuildInput": true
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/dmlib.def",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/dmlib.def",
+      "sha256": "e6768cdf78f170e645491a319f46054cf8450ad57e0470ed87a526c49fb9b620",
+      "observedBuildInput": false
+    },
+    {
+      "source": "src/third_party/darkmodelib/src/dmlib.rc",
+      "proposedTarget": "vendor/samandarin-ui/third_party/darkmodelib/src/dmlib.rc",
+      "sha256": "d7ce1bf6986cef0b6b375b2ec66eef9333840c8ea123cd692af3577c10eb0dd0",
+      "observedBuildInput": false
+    }
+  ],
+  "existingBuildImportsToReplace": [
+    "src/plugins/shared/vcxproj/arm64.props",
+    "src/plugins/shared/vcxproj/lang_base.props",
+    "src/plugins/shared/vcxproj/lang_debug.props",
+    "src/plugins/shared/vcxproj/lang_release.props",
+    "src/plugins/shared/vcxproj/plugin_base.props",
+    "src/plugins/shared/vcxproj/plugin_debug.props",
+    "src/plugins/shared/vcxproj/plugin_release.props",
+    "src/plugins/shared/vcxproj/root.props",
+    "src/plugins/shared/vcxproj/x64.props",
+    "src/plugins/shared/vcxproj/x86.props"
+  ],
+  "integrationToRecreateSelectively": [
+    "AGENTS.md",
+    "README.md",
+    "doc/third_party.md",
+    "doc/runbook-setup/inno_setup_salamander_x64.iss",
+    "src/vcxproj/salamand.sln",
+    "src/plugins/shared/baseaddr_x86.txt",
+    "src/plugins/shared/baseaddr_x64.txt",
+    "src/plugins/shared/baseaddr_arm64.txt"
+  ],
+  "additionalMigrationInputs": [
+    "LICENSE",
+    "doc/directory-sync-plugin-repository-plan.md",
+    "doc/directory-sync-plugin-repository-manifest.json"
+  ],
+  "observedBuildInputsToReplace": [
+    {
+      "source": "src/plugins/shared/baseaddr_x64.txt",
+      "proposedTarget": "vendor/samandarin-sdk/baseaddr_x64.txt",
+      "sha256": "4405d0fdf0065add7717a1c705876469238612c2a8445cbf0f3301a24fe6c290",
+      "observedBuildInput": true
+    }
+  ]
+}
