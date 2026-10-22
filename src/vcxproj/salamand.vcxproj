@@ -952,6 +952,8 @@
     <ClInclude Include="..\color.h">
     </ClInclude>
     <ClInclude Include="..\common\widepath.h" />
+    <ClInclude Include="..\fileactionpath.h" />
+    <ClInclude Include="..\viewerpath.h" />
     <ClInclude Include="..\common\allochan.h">
     </ClInclude>
     <ClInclude Include="..\common\array.h">
