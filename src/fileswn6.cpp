@@ -13,6 +13,7 @@
 #include "dialogs.h"
 #include "worker.h"
 #include "workerpath.h"
+#include "branch_view_text.h"
 #include "cache.h"
 #include "pack.h"
 #include "shellib.h"
@@ -2640,6 +2641,9 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
     CQuadWord fileSizeLoc = fileSize;
     char message[2 * MAX_PATH + 200];
     COperation op;
+    const std::string ownedFileName = fileNameW != NULL && *fileNameW != 0 ?
+        SalWideToMultiBytePath(fileNameW, CP_UTF8) : std::string(fileName);
+    fileName = const_cast<char*>(ownedFileName.c_str());
     switch (type)
     {
     case atCopy:
@@ -2656,9 +2660,6 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
             if (type == atMove && !script->ShowStatus)
                 script->ShowStatus = TRUE; // move with the encrypted attribute set is done via copy, so we need to show status
         }
-        const std::string ownedFileName = fileNameW != NULL && *fileNameW != 0 ?
-            SalWideToMultiBytePath(fileNameW, CP_UTF8) : std::string(fileName);
-        fileName = const_cast<char*>(ownedFileName.c_str());
         op.Attr = sourceFileAttr;
         BOOL skip;
         if ((op.SourceName = BuildName(sourcePath, fileName, fileDOSName, &skip,
@@ -3040,6 +3041,15 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             return skip;
         }
+        std::wstring sourceW;
+        if (fileNameW != NULL && *fileNameW != 0)
+        {
+            sourceW = GetPathW() != NULL && GetPathW()[0] != 0 && IsTheSamePath(sourcePath, GetPath()) ? std::wstring(GetPathW()) : SalMultiByteToWidePathUtf8OrAcp(sourcePath);
+            SalPathAppendW(sourceW, fileNameW);
+        }
+        else
+            sourceW = SalMultiByteToWidePathUtf8OrAcp(op.SourceName);
+        op.SetSourceNameW(SalPathAddExtendedPrefixW(sourceW.c_str()).c_str());
         op.TargetName = NULL;
         script->Add(op);
         if (!script->IsGood())
@@ -3061,27 +3071,18 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 script->BytesPerCluster = d1 * d2;
         }
 
-        char name[2 * MAX_PATH]; // + MAX_PATH is a reserve (Windows makes paths longer than MAX_PATH)
-        int l = (int)strlen(sourcePath);
-        memmove(name, sourcePath, l);
-        if (name[l - 1] != '\\')
-            name[l++] = '\\';
-        memmove(name + l, fileName, 1 + strlen(fileName)); // name is always < MAX_PATH
+        std::wstring nameW = SalMultiByteToWidePathUtf8OrAcp(sourcePath);
+        const std::wstring baseW = fileNameW != NULL ? std::wstring(fileNameW) : SalMultiByteToWidePathUtf8OrAcp(fileName);
+        SalPathAppendW(nameW, baseW.c_str());
+        const std::string name = SalWideToMultiBytePath(nameW.c_str(), CP_UTF8);
+        nameW = SalPathAddExtendedPrefixW(nameW.c_str());
         CQuadWord s;
         DWORD err = NO_ERROR;
         if (FileBasedCompression && !onlySize &&                                         // if compression is even possible
             (sourceFileAttr & (FILE_ATTRIBUTE_COMPRESSED | FILE_ATTRIBUTE_SPARSE_FILE))) // if the file is compressed or sparse (sparse file)
         {
-            s.LoDWord = GetCompressedFileSize(name, &s.HiDWord);
+            s.LoDWord = GetCompressedFileSizeW(nameW.c_str(), &s.HiDWord);
             err = GetLastError();
-            if (err == ERROR_FILE_NOT_FOUND && fileDOSName != NULL && strcmp(fileName, fileDOSName) != 0)
-            {                                                            // workaround for computing the size of a file that must be accessed via DOS-name when we cannot do it via the UNICODE name (the multibyte version of the name converted back to UNICODE doesn't match the original file name)
-                memmove(name + l, fileDOSName, 1 + strlen(fileDOSName)); // name is always < MAX_PATH
-                s.LoDWord = GetCompressedFileSize(name, &s.HiDWord);
-                err = GetLastError();
-                if (s.LoDWord == 0xFFFFFFFF && err != NO_ERROR)
-                    memmove(name + l, fileName, 1 + strlen(fileName)); // (name is always < MAX_PATH - in case of an error, the report will use the full name instead of the DOS name
-            }
         }
         else
         {
@@ -3091,8 +3092,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             if (!script->SkipAllCountSizeErrors)
             {
-                sprintf(message, LoadStr(IDS_GETCOMPRFILESIZEERROR), name, GetErrorText(err));
-                script->SkipAllCountSizeErrors = SalMessageBox(HWindow, message, LoadStr(IDS_ERRORTITLE),
+                const std::string errorMessage = Salamander::BranchViewText::FormatCompressedSizeError(
+                    LoadStr(IDS_GETCOMPRFILESIZEERROR), name.c_str(), GetErrorText(err));
+                script->SkipAllCountSizeErrors = SalMessageBox(HWindow, errorMessage.c_str(), LoadStr(IDS_ERRORTITLE),
                                                                MB_YESNO | MB_ICONEXCLAMATION) == IDYES;
                 UpdateWindow(MainWindow->HWindow);
             }
@@ -3169,7 +3171,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             return skip;
         }
-        op.TargetName = (char*)(DWORD_PTR)((SalGetFileAttributes(op.SourceName) & attrsData->AttrAnd) | attrsData->AttrOr);
+        std::wstring sourceW;
+        if (fileNameW != NULL && *fileNameW != 0)
+        {
+            sourceW = GetPathW() != NULL && GetPathW()[0] != 0 && IsTheSamePath(sourcePath, GetPath()) ? std::wstring(GetPathW()) : SalMultiByteToWidePathUtf8OrAcp(sourcePath);
+            SalPathAppendW(sourceW, fileNameW);
+        }
+        else
+            sourceW = SalMultiByteToWidePathUtf8OrAcp(op.SourceName);
+        sourceW = SalPathAddExtendedPrefixW(sourceW.c_str());
+        op.SetSourceNameW(sourceW.c_str());
+        op.TargetName = (char*)(DWORD_PTR)((GetFileAttributesW(sourceW.c_str()) & attrsData->AttrAnd) | attrsData->AttrOr);
         script->Add(op);
         if (!script->IsGood())
         {

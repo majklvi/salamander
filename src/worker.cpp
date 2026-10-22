@@ -7,6 +7,7 @@
 #include "cfgdlg.h"
 #include "worker.h"
 #include "workerpath.h"
+#include "operationrecycle.h"
 #include "common/widepath.h"
 
 #include <Aclapi.h>
@@ -7397,12 +7398,13 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
 }
 
 BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
-                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData)
+                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData, const wchar_t* exactName)
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
     BOOL invalidName = FileNameIsInvalid(name, TRUE);
 
+    std::wstring nameW = WorkerOperationPathW(name, exactName);
     DWORD err;
     while (1)
     {
@@ -7443,7 +7445,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
                     }
                 }
             }
-            ClearReadOnlyAttr(name, attr); // ensure it can be deleted
+            WorkerClearReadOnlyW(nameW, attr); // ensure it can be deleted
 
             err = ERROR_SUCCESS;
             BOOL useRecycleBin;
@@ -7488,32 +7490,13 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             if (useRecycleBin)
             {
-                char nameList[MAX_PATH + 1];
-                int l = (int)strlen(name) + 1;
-                memmove(nameList, name, l);
-                nameList[l] = 0;
-                if (!PathContainsValidComponents(nameList, FALSE))
-                {
-                    err = ERROR_INVALID_NAME;
-                }
-                else
-                {
-                    CShellExecuteWnd shellExecuteWnd;
-                    SHFILEOPSTRUCT opCode;
-                    memset(&opCode, 0, sizeof(opCode));
-
-                    opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
-
-                    opCode.wFunc = FO_DELETE;
-                    opCode.pFrom = nameList;
-                    opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                    opCode.lpszProgressTitle = "";
-                    err = SHFileOperation(&opCode);
-                }
+                CShellExecuteWnd shellExecuteWnd;
+                const HWND owner = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
+                err = RecycleOperationFileW(owner, WorkerOperationPathW(name, exactName));
             }
             else
             {
-                if (DeleteFile(name) == 0)
+                if (DeleteFileW(nameW.c_str()) == 0)
                     err = GetLastError();
             }
         }
@@ -7566,7 +7549,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
         }
         if (!invalidName)
         {
-            DWORD attr2 = SalGetFileAttributes(name); // get the current attribute state
+            DWORD attr2 = GetFileAttributesW(nameW.c_str()); // get the current attribute state
             if (attr2 != INVALID_FILE_ATTRIBUTES)
                 attr = attr2;
         }
@@ -10875,7 +10858,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 if (op->Opcode == ocDeleteFile)
                 {
                     Error = !DoDeleteFile(hProgressDlg, op->SourceName, op->Size,
-                                          script, totalDone, op->Attr, dlgData);
+                                          script, totalDone, op->Attr, dlgData, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL);
                 }
                 else
                 {
