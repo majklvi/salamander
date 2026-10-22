@@ -12,6 +12,7 @@
 #include "fileswnd.h"
 #include "dialogs.h"
 #include "worker.h"
+#include "workerpath.h"
 #include "cache.h"
 #include "pack.h"
 #include "shellib.h"
@@ -22,10 +23,9 @@ namespace
 {
 std::wstring SalMultiByteToWidePathUtf8OrAcp(const char* path)
 {
-    std::wstring wide = SalMultiByteToWidePath(path, CP_UTF8);
-    if (wide.empty() && GetACP() != CP_UTF8)
-        wide = SalMultiByteToWidePath(path, CP_ACP);
-    return wide;
+    // flags=0 replaces invalid UTF-8 rather than failing, so test strictly before
+    // selecting the legacy ACP fallback used by ordinary non-UTF-8 panels.
+    return SalMultiByteToWidePath(path, IsValidPathUtf8Text(path) ? CP_UTF8 : CP_ACP);
 }
 
 std::wstring SalPathAddExtendedPrefixIfNeededW(const std::wstring& path)
@@ -2884,7 +2884,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         HANDLE in;
                         if (!invalidSrcName)
                         {
-                            in = HANDLES_Q(CreateFile(op.SourceName, GENERIC_READ,
+                            in = HANDLES_Q(CreateFileW(WorkerOperationPathW(op.SourceName, op.SourceNameWValid ? op.SourceNameW.c_str() : NULL).c_str(), GENERIC_READ,
                                                       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                         }
