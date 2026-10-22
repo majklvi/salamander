@@ -392,7 +392,7 @@ try {
                 '-B',
                 (Join-Path $repositoryRoot 'src\plugins\automation\tests\selection_snapshot_tests.py'),
                 '--configuration', $Configuration,
-                '--scope', 'Automation'
+                '--scope', 'All'
             )
         },
         @{
