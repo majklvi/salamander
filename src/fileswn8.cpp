@@ -13,6 +13,8 @@
 #include "worker.h"
 #include "pack.h"
 #include "mapi.h"
+#include "common/widepath.h"
+#include "operationrecycle.h"
 
 
 static std::wstring ConfirmDeleteTextToWideWithCodePage(const char* text, UINT codePage, DWORD flags)
@@ -125,6 +127,53 @@ BOOL PathContainsValidComponents(char* path, BOOL cutPath)
 BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileData* oneFile)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::DeleteThroughRecycleBin(, %d,)", selCount);
+
+    if (Is(ptDisk))
+    {
+        // IFileOperation accepts exact Unicode identities across different parents and
+        // supports long paths. Never feed a synthetic root/name pair to the recycle bin.
+        IFileOperation* operation = NULL;
+        HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                           IID_PPV_ARGS(&operation));
+        if (FAILED(result))
+            return FALSE;
+        operation->SetOwnerWindow(MainWindow->HWindow);
+        operation->SetOperationFlags(FOF_ALLOWUNDO | FOFX_RECYCLEONDELETE | FOFX_ADDUNDORECORD | FOFX_EARLYFAILURE);
+        const int total = selCount > 0 ? selCount : 1;
+        for (int item = 0; item < total && SUCCEEDED(result); ++item)
+        {
+            const CFileData* file = oneFile;
+            if (selCount > 0)
+                file = selection[item] < Dirs->Count ? &Dirs->At(selection[item]) : &Files->At(selection[item] - Dirs->Count);
+            const std::wstring path = GetItemFullPathW(*file);
+            std::wstring shellPath;
+            if (FAILED(OperationRecyclePath(path, shellPath)))
+            {
+                result = HRESULT_FROM_WIN32(ERROR_INVALID_NAME);
+                break; // the recycle bin may trim trailing dots/spaces and delete a different item
+            }
+            IShellItem* shellItem = NULL;
+            result = SHCreateItemFromParsingName(shellPath.c_str(), NULL, IID_PPV_ARGS(&shellItem));
+            if (SUCCEEDED(result))
+            {
+                result = operation->DeleteItem(shellItem, NULL);
+                shellItem->Release();
+            }
+        }
+        // Queueing is all-or-nothing: a missing/unparsable item must not silently
+        // delete only the remaining part of the user's selection.
+        if (SUCCEEDED(result))
+            result = operation->PerformOperations();
+        BOOL aborted = TRUE;
+        operation->GetAnyOperationsAborted(&aborted);
+        operation->Release();
+        if (FAILED(result))
+        {
+            const DWORD error = HRESULT_FACILITY(result) == FACILITY_WIN32 ? HRESULT_CODE(result) : ERROR_GEN_FAILURE;
+            SalMessageBox(HWindow, GetErrorText(error), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        }
+        return SUCCEEDED(result) && !aborted;
+    }
 
     int i = 0;
     char path[MAX_PATH];
@@ -454,7 +503,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         BOOL canUseRecycleBin = TRUE;
         if (type == atDelete)
         {
-            if (MyGetDriveType(GetPath()) != DRIVE_FIXED)
+            if (OperationRecycleDriveTypeW(SalPathAddExtendedPrefixW(GetPathW())) != DRIVE_FIXED)
             {
                 recycle = 0;              // none
                 canUseRecycleBin = FALSE; // it will not work because Windows does not support it
@@ -663,10 +712,14 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     {
                         CFileData* dir = (count == 0) ? f : ((indexes[0] < Dirs->Count) ? &Dirs->At(indexes[0]) : &Files->At(indexes[0] - Dirs->Count));
 
+                        const std::wstring sourceDirectoryW = GetItemDirectoryW(*dir);
+                        const std::string sourceDirectory = SalWideToMultiBytePath(sourceDirectoryW.c_str(), CP_UTF8);
+                        const std::wstring fullSource = GetItemFullPathW(*dir);
+                        const std::string sourceBaseName = SalWideToMultiBytePath(SalPathFindFileNameW(fullSource.c_str()), CP_UTF8);
                         if (SalSplitWindowsPath(HWindow, LoadStr(type == atCopy ? IDS_COPY : IDS_MOVE),
                                                 LoadStr(type == atCopy ? IDS_ERRORCOPY : IDS_ERRORMOVE),
                                                 count, path, secondPart, pathIsDir, backslashAtEnd || mustBePath,
-                                                dir->Name, GetPath(), mask))
+                                                sourceBaseName.c_str(), sourceDirectory.c_str(), mask))
                         {
                             if (nextFocus[0] != 0 && secondPart[0] == 0)
                                 copyToExistingDir = TRUE;

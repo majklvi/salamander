@@ -1,0 +1,88 @@
+// SPDX-FileCopyrightText: 2026 Samandarin Contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Only the window, component check and Google Drive query are facades.
+// The whole root-preparation block and path-buffer methods are production code.
+#include <windows.h>
+#include <crtdbg.h>
+#include <cstdio>
+#include <cstring>
+#include <string>
+#include <vector>
+#include "@@HEADER@@"
+#define SAL_MAX_PATH 32768
+#define ptDisk 1
+#define TRACE_I(value) ((void)0)
+@@BUFFERS@@
+static int Checks=0, Failures=0, ComponentChecks=0;
+static std::string OverlayRoot;
+static void Check(bool value,const char* name) {
+    ++Checks;if(!value){++Failures;std::printf("FAIL: %s\n",name);}
+}
+static BOOL PathContainsValidComponents(const char* path,BOOL) {
+    ++ComponentChecks; Check(path && *path,"component query receives complete nonempty root");return TRUE;
+}
+struct OverlayFacade {
+    BOOL IsGoogleDrivePath(const char* path) { OverlayRoot=path;return FALSE; }
+} ShellIconOverlays;
+struct WindowFacade {
+    std::string Path; bool Disk=true;
+    BOOL Is(int type) {return Disk && type==ptDisk;}
+    const char* GetPath(){return Path.c_str();}
+};
+static std::string Utf8(const std::wstring& value) {
+    const int count=WideCharToMultiByte(CP_UTF8,0,value.c_str(),-1,nullptr,0,nullptr,nullptr);
+    std::vector<char> bytes(count);
+    WideCharToMultiByte(CP_UTF8,0,value.c_str(),-1,bytes.data(),count,nullptr,nullptr);
+    return bytes.data();
+}
+static void Prepare(WindowFacade* window,const std::wstring& expectedRoot) {
+    const std::string original=window->Path;
+    OverlayRoot.clear();ComponentChecks=0;
+@@PREPARE@@
+    (void)isGoogleDrivePath;
+    if(!window->Disk) {
+        Check(path[0]==0 && wPath[0]==0 && name==path && wName==wPath,"non-disk scratch remains empty");
+        Check(ComponentChecks==0 && OverlayRoot.empty(),"non-disk preparation does not query disk helpers");
+        return;
+    }
+    std::string expected=original;
+    if(expected.back()!=static_cast<char>(92))expected+=static_cast<char>(92);
+    std::wstring wide=expectedRoot;
+    if(wide.back()!=static_cast<wchar_t>(92))wide+=static_cast<wchar_t>(92);
+    Check(std::string(path)==expected,"complete narrow parent is preserved without truncation");
+    Check(std::wstring(wPath)==wide,"UTF8-first or ACP conversion preserves the wide parent");
+    Check(name==path+expected.size() && *name==0,"narrow suffix follows the entire byte parent");
+    Check(wName==wPath+wide.size() && *wName==0,"wide suffix follows characters rather than UTF8 bytes");
+    Check(!pathIsInvalid && ComponentChecks==1 && OverlayRoot==expected,"existing validation and overlay root query retain exact input");
+    Check(window->Path==original,"panel root is not modified");
+    Check(iconPathBuffer.Capacity()>=(int)expected.size()+1 &&
+          iconWidePathBuffer.Capacity()>=(int)wide.size()+1,"both scratch capacities include the terminator");
+    Check(iconPathBuffer.Data()[iconPathBuffer.Capacity()-1]==0 &&
+          iconWidePathBuffer.Data()[iconWidePathBuffer.Capacity()-1]==0,"scratch tail guards remain untouched");
+    Check(_CrtCheckMemory()!=FALSE,"native debug heap integrity after root preparation");
+}
+int main() {
+    const std::wstring slash(1,static_cast<wchar_t>(92));
+    const std::wstring drive=L"C:"+slash;
+    const std::vector<std::wstring> roots={
+        drive+L"ascii",
+        drive,
+        drive+L"\u017elu\u0165ou\u010dk\u00fd"+slash+L"\u6771\u4eac",
+        slash+slash+L"server"+slash+L"share"+slash+L"\u6771\u4eac"+slash,
+        drive+std::wstring(85,static_cast<wchar_t>(0x6f22)),
+        drive+std::wstring(110,static_cast<wchar_t>(0x6f22)),
+        drive+std::wstring(90,L'a')+slash+std::wstring(90,L'b')+slash+std::wstring(90,L'c'),
+        drive+std::wstring(SAL_MAX_PATH-4,L'a')};
+    for(const auto& root:roots){WindowFacade window;window.Path=Utf8(root);Prepare(&window,root);}
+    // ACP fallback fixture is conditional on the machine's actual ACP encoding.
+    if(GetACP()!=CP_UTF8) {
+        WindowFacade window;window.Path="C:";window.Path+=static_cast<char>(92);window.Path+=static_cast<char>(0xe8);
+        wchar_t converted[16]={};
+        int count=MultiByteToWideChar(CP_ACP,0,window.Path.c_str(),-1,converted,16);
+        Check(count>0,"ACP fixture is representable on this machine");
+        if(count>0)Prepare(&window,converted);
+    }
+    WindowFacade nonDisk;nonDisk.Disk=false;nonDisk.Path="plugin://unchanged";Prepare(&nonDisk,L"");
+    std::printf("Icon reader scratch: %d checks, %d failures; actual preparation, no shell or file I/O.\n",Checks,Failures);
+    return Failures?1:0;
+}

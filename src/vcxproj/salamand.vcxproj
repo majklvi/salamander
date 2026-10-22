@@ -952,6 +952,12 @@
     <ClInclude Include="..\color.h">
     </ClInclude>
     <ClInclude Include="..\common\widepath.h" />
+    <ClInclude Include="..\fileactionpath.h" />
+    <ClInclude Include="..\viewerpath.h" />
+    <ClInclude Include="..\workerpath.h" />
+    <ClInclude Include="..\panel_temporary_selection.h" />
+    <ClInclude Include="..\operationrecycle.h" />
+    <ClInclude Include="..\branch_view_text.h" />
     <ClInclude Include="..\common\allochan.h">
     </ClInclude>
     <ClInclude Include="..\common\array.h">
@@ -1054,6 +1060,7 @@
     </ClInclude>
     <ClInclude Include="..\plugins\shared\spl_fs.h">
     </ClInclude>
+    <ClInclude Include="..\plugins\shared\spl_diskselection.h" />
     <ClInclude Include="..\plugins\shared\spl_gen.h">
     </ClInclude>
     <ClInclude Include="..\plugins\shared\spl_gui.h">

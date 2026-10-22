@@ -1,7 +1,8 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "viewerpath.h"
 
 #include "common/winlibdpi.h"
 
@@ -1246,33 +1247,13 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 else
                 {
-                    if (FileNamesEnumData.LastFileName[0] != 0) // zname plne jmeno souboru na 'index', zkontrolujeme jestli nedoslo k rozesunuti/sesunuti pole + pripadne dohledame novy index
+                    int matchingIndex = Salamander::ViewerPaths::FindIndex(index, count,
+                        FileNamesEnumData.LastFileName,
+                        [this](int i) { return GetItemFullPathW(Files->At(i)); });
+                    if (matchingIndex >= 0)
                     {
-                        int pathLen = (int)strlen(GetPath());
-                        if (StrNICmp(GetPath(), FileNamesEnumData.LastFileName, pathLen) == 0)
-                        { // cesta k souboru se musi shodovat s cestou v panelu ("always true")
-                            const char* name = FileNamesEnumData.LastFileName + pathLen;
-                            if (*name == '\\' || *name == '/')
-                                name++;
-
-                            CFileData* f = (index >= 0 && index < count) ? &Files->At(index) : NULL;
-                            BOOL nameIsSame = f != NULL && StrICmp(name, f->Name) == 0;
-                            if (nameIsSame)
-                                indexNotFound = FALSE;
-                            if (f == NULL || !nameIsSame)
-                            { // jmeno na indexu 'index' neni FileNamesEnumData.LastFileName, zkusime najit novy index tohoto jmena
-                                int i;
-                                for (i = 0; i < count && StrICmp(name, Files->At(i).Name) != 0; i++)
-                                    ;
-                                if (i != count) // novy index nalezen
-                                {
-                                    indexNotFound = FALSE;
-                                    index = i;
-                                }
-                            }
-                        }
-                        else
-                            TRACE_E("Unexpected situation in WM_USER_ENUMFILENAMES: paths are different!");
+                        index = matchingIndex;
+                        indexNotFound = FALSE;
                     }
                     if (index >= count)
                     {
@@ -1389,8 +1370,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 if (FileNamesEnumData.Found)
                 {
-                    lstrcpyn(FileNamesEnumData.FileName, GetPath(), MAX_PATH);
-                    SalPathAppend(FileNamesEnumData.FileName, Files->At(index).Name, MAX_PATH);
+                    FileNamesEnumData.FileName = GetItemFullPathW(Files->At(index));
                     FileNamesEnumData.LastFileIndex = index;
                 }
                 else

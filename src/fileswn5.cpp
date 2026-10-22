@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "fileactionpath.h"
 
 #include <new>
 #include <string>
@@ -925,34 +926,8 @@ static void BuildArchiveCacheKey(char* key, int keySize, const char* archiveName
 }
 
 
-static std::wstring FileActionTextToWide(const char* text)
-{
-    std::wstring wide = SalMultiByteToWidePath(text, CP_UTF8);
-    if (wide.empty() && GetACP() != CP_UTF8)
-        wide = SalMultiByteToWidePath(text, CP_ACP);
-    return wide;
-}
-
 static BOOL CreateProcessForFileAction(const char* cmdLine, const char* currentDir, STARTUPINFO* si, PROCESS_INFORMATION* pi)
 {
-    std::wstring cmdLineW = FileActionTextToWide(cmdLine);
-    if (cmdLineW.empty())
-        return HANDLES(CreateProcess(NULL, (char*)cmdLine, NULL, NULL, FALSE,
-                                     NORMAL_PRIORITY_CLASS, NULL, currentDir, si, pi));
-
-    std::wstring currentDirW;
-    LPCWSTR currentDirParam = NULL;
-    if (currentDir != NULL && *currentDir != 0)
-    {
-        currentDirW = FileActionTextToWide(currentDir);
-        if (!currentDirW.empty())
-        {
-            if (currentDirW.length() >= MAX_PATH && !SalIsExtendedLengthPathW(currentDirW.c_str()))
-                currentDirW = SalPathAddExtendedPrefixW(currentDirW.c_str());
-            currentDirParam = currentDirW.c_str();
-        }
-    }
-
     STARTUPINFOW siW;
     memset(&siW, 0, sizeof(siW));
     siW.cb = sizeof(siW);
@@ -971,8 +946,8 @@ static BOOL CreateProcessForFileAction(const char* cmdLine, const char* currentD
     siW.hStdOutput = si->hStdOutput;
     siW.hStdError = si->hStdError;
 
-    BOOL created = NOHANDLES(CreateProcessW(NULL, &cmdLineW[0], NULL, NULL, FALSE,
-                                            NORMAL_PRIORITY_CLASS, NULL, currentDirParam, &siW, pi));
+    BOOL created = NOHANDLES(Salamander::FileActionPaths::LaunchProcess(cmdLine, currentDir,
+                                            NORMAL_PRIORITY_CLASS, &siW, pi));
     if (created)
     {
         HANDLES_ADD(__htProcess, __hoCreateProcess, pi->hProcess);
@@ -1204,12 +1179,12 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
     BeginStopRefresh(); // snooper takes a break
 
     // if no item is selected, select the one under focus and store its name
-    char temporarySelected[MAX_PATH];
-    temporarySelected[0] = 0;
+    CPanelTemporarySelection temporarySelected;
+    temporarySelected.Clear();
     if ((!setCompress || Configuration.CnfrmNTFSPress) &&
         (!setEncryption || Configuration.CnfrmNTFSCrypt))
     {
-        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+        SelectFocusedItemAndGetName(temporarySelected);
     }
 
     if (Is(ptDisk))
@@ -1706,7 +1681,6 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
     CALL_STACK_MESSAGE6("CFilesWindow::ViewFile(%s, %d, %u, %d, %d)", name, altView, handlerID,
                         enumFileNamesSourceUID, enumFileNamesLastFileIndex);
     // verify that the file is on an accessible path
-    char path[SAL_MAX_PATH + 10];
     if (name == NULL) // file from the panel
     {
         if (Is(ptDisk) || Is(ptZIPArchive))
@@ -1720,9 +1694,8 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
         char* backSlash = strrchr(name, '\\');
         if (backSlash != NULL)
         {
-            memcpy(path, name, backSlash - name);
-            path[backSlash - name] = 0;
-            if (CheckPath(TRUE, path) != ERROR_SUCCESS)
+            std::string path(name, backSlash - name);
+            if (CheckPath(TRUE, path.c_str()) != ERROR_SUCCESS)
                 return;
         }
     }
@@ -1743,57 +1716,11 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
             {
                 if (enumFileNamesLastFileIndex == -1)
                     enumFileNamesLastFileIndex = i - Dirs->Count;
-                std::wstring wideName = GetPathW() != NULL && GetPathW()[0] != 0 ? std::wstring(GetPathW()) : FileActionTextToWide(GetPath());
-                SalPathAppendW(wideName, f->UseWideName() ? f->NameW : FileActionTextToWide(f->Name).c_str());
+                const std::wstring wideName = GetItemFullPathW(*f);
                 unicodeDiskFileName = SalWideToMultiBytePath(wideName.c_str(), CP_UTF8);
-
-                lstrcpyn(path, GetPath(), SAL_MAX_PATH);
-                if (GetPath()[strlen(GetPath()) - 1] != '\\')
-                    strcat(path, "\\");
-                char* s = path + strlen(path);
-                if ((s - path) + f->NameLen >= SAL_MAX_PATH)
-                {
-                    if (!unicodeDiskFileName.empty())
-                    {
-                        name = (char*)unicodeDiskFileName.c_str();
-                    }
-                    else if (f->DosName != NULL && strlen(f->DosName) + (s - path) < SAL_MAX_PATH)
-                        strcpy(s, f->DosName);
-                    else
-                    {
-                        SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE),
-                                      MB_OK | MB_ICONEXCLAMATION);
-                        return;
-                    }
-                }
-                else
-                {
-                    strcpy(s, f->Name);
-                    name = path;
-                }
-                // try whether the file name is valid, otherwise try its DOS name
-                // (handles files accessible only through Unicode or DOS names)
-                if (name == path && SalGetFileAttributes(path) == 0xffffffff)
-                {
-                    DWORD err = GetLastError();
-                    if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
-                    {
-                        if (!unicodeDiskFileName.empty())
-                        {
-                            name = (char*)unicodeDiskFileName.c_str();
-                        }
-                        else if (f->DosName != NULL && strlen(f->DosName) + (s - path) < SAL_MAX_PATH)
-                        {
-                            strcpy(s, f->DosName);
-                            if (SalGetFileAttributes(path) == 0xffffffff) // still error -> revert to the long name
-                            {
-                                if ((s - path) + f->NameLen < SAL_MAX_PATH)
-                                    strcpy(s, f->Name);
-                            }
-                        }
-                    }
-                }
-                name = !unicodeDiskFileName.empty() ? (char*)unicodeDiskFileName.c_str() : path;
+                if (unicodeDiskFileName.empty())
+                    return;
+                name = (char*)unicodeDiskFileName.c_str();
                 addToHistory = TRUE;
             }
             else
@@ -1978,12 +1905,9 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
     lockOwner = FALSE;
 
     // obtain the full DOS name
-    CPathBuffer dosName(SAL_MAX_PATH);
-    if (GetShortPathName(name, dosName.Data(), dosName.Capacity()) == 0)
-    {
-        TRACE_E("GetShortPathName() failed");
-        dosName.Data()[0] = 0;
-    }
+    std::string shortName = Salamander::FileActionPaths::ShortPath(name);
+    CPathBuffer dosName((int)shortName.size() + 1);
+    memcpy(dosName.Data(), shortName.c_str(), shortName.size() + 1);
 
     // find the file name and check if it has an extension - needed for masks
     const char* namePart = strrchr(name, '\\');
@@ -2082,12 +2006,12 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
         {
         case VIEWER_EXTERNAL:
         {
-            CPathBuffer expCommand(SAL_MAX_PATH);
-            CPathBuffer expArguments(SAL_MAX_PATH);
-            CPathBuffer expInitDir(SAL_MAX_PATH);
-            if (ExpandCommand(parent, viewer->Command, expCommand.Data(), expCommand.Capacity(), FALSE) &&
-                ExpandArguments(parent, name, dosName.Data(), viewer->Arguments, expArguments.Data(), expArguments.Capacity(), NULL) &&
-                ExpandInitDir(parent, name, dosName.Data(), viewer->InitDir, expInitDir.Data(), expInitDir.Capacity(), FALSE))
+            CPathBuffer expCommand(3 * SAL_MAX_PATH);
+            CPathBuffer expArguments(3 * SAL_MAX_PATH);
+            CPathBuffer expInitDir(3 * SAL_MAX_PATH);
+            if (ExpandCommand(parent, Salamander::FileActionPaths::Normalize(viewer->Command).c_str(), expCommand.Data(), expCommand.Capacity(), FALSE) &&
+                ExpandArguments(parent, name, dosName.Data(), Salamander::FileActionPaths::Normalize(viewer->Arguments).c_str(), expArguments.Data(), expArguments.Capacity(), NULL) &&
+                ExpandInitDir(parent, name, dosName.Data(), Salamander::FileActionPaths::Normalize(viewer->InitDir).c_str(), expInitDir.Data(), expInitDir.Capacity(), FALSE))
             {
                 if (SystemPolicies.GetMyRunRestricted() &&
                     !SystemPolicies.GetMyCanRun(expCommand.Data()))
@@ -2116,7 +2040,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                               STARTF_USESHOWWINDOW;
                 si.wShowWindow = SW_SHOWNORMAL;
 
-                CPathBuffer cmdLine(2 * SAL_MAX_PATH);
+                CPathBuffer cmdLine(6 * SAL_MAX_PATH);
                 lstrcpyn(cmdLine.Data(), expCommand.Data(), cmdLine.Capacity());
                 AddDoubleQuotesIfNeeded(cmdLine.Data(), cmdLine.Capacity()); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
                 int len = (int)strlen(cmdLine.Data());
@@ -2251,7 +2175,6 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     }
 
     // verify that the file is on an accessible path
-    char path[SAL_MAX_PATH + 10];
     if (name == NULL)
     {
         if (CheckPath(TRUE) != ERROR_SUCCESS)
@@ -2262,9 +2185,8 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
         char* backSlash = strrchr(name, '\\');
         if (backSlash != NULL)
         {
-            memcpy(path, name, backSlash - name);
-            path[backSlash - name] = 0;
-            if (CheckPath(TRUE, path) != ERROR_SUCCESS)
+            std::string path(name, backSlash - name);
+            if (CheckPath(TRUE, path.c_str()) != ERROR_SUCCESS)
                 return;
         }
     }
@@ -2281,46 +2203,11 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             CFileData* f = &Files->At(i - Dirs->Count);
             if (Is(ptDisk))
             {
-                std::wstring wideName = GetPathW() != NULL && GetPathW()[0] != 0 ? std::wstring(GetPathW()) : FileActionTextToWide(GetPath());
-                SalPathAppendW(wideName, f->UseWideName() ? f->NameW : FileActionTextToWide(f->Name).c_str());
+                const std::wstring wideName = GetItemFullPathW(*f);
                 unicodeDiskFileName = SalWideToMultiBytePath(wideName.c_str(), CP_UTF8);
-
-                lstrcpyn(path, GetPath(), SAL_MAX_PATH);
-                if (GetPath()[strlen(GetPath()) - 1] != '\\')
-                    strcat(path, "\\");
-                char* s = path + strlen(path);
-                if ((s - path) + f->NameLen >= SAL_MAX_PATH)
-                {
-                    if (f->DosName != NULL && strlen(f->DosName) + (s - path) < SAL_MAX_PATH)
-                        strcpy(s, f->DosName);
-                    else
-                    {
-                        SalMessageBox(HWindow, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE),
-                                      MB_OK | MB_ICONEXCLAMATION);
-                        return;
-                    }
-                }
-                else
-                    strcpy(s, f->Name);
-                // try whether the file name is valid, otherwise try its DOS name as well
-                // (handles files accessible only through Unicode or DOS names)
-                if (f->DosName != NULL && SalGetFileAttributes(path) == 0xffffffff)
-                {
-                    DWORD err = GetLastError();
-                    if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
-                    {
-                        if (strlen(f->DosName) + (s - path) < SAL_MAX_PATH)
-                        {
-                            strcpy(s, f->DosName);
-                            if (SalGetFileAttributes(path) == 0xffffffff) // still error -> revert to the long name
-                            {
-                                if ((s - path) + f->NameLen < SAL_MAX_PATH)
-                                    strcpy(s, f->Name);
-                            }
-                        }
-                    }
-                }
-                name = !unicodeDiskFileName.empty() ? (char*)unicodeDiskFileName.c_str() : path;
+                if (unicodeDiskFileName.empty())
+                    return;
+                name = (char*)unicodeDiskFileName.c_str();
                 addToHistory = TRUE;
             }
         }
@@ -2331,12 +2218,9 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     }
 
     // obtain the full DOS name
-    CPathBuffer dosName(SAL_MAX_PATH);
-    if (GetShortPathName(name, dosName.Data(), dosName.Capacity()) == 0)
-    {
-        TRACE_I("GetShortPathName() failed.");
-        dosName.Data()[0] = 0;
-    }
+    std::string shortName = Salamander::FileActionPaths::ShortPath(name);
+    CPathBuffer dosName((int)shortName.size() + 1);
+    memcpy(dosName.Data(), shortName.c_str(), shortName.size() + 1);
 
     // find the file name and check if it has an extension - needed for masks
     char* namePart = strrchr(name, '\\');
@@ -2411,12 +2295,12 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
         if (addToHistory)
             MainWindow->FileHistory->AddFile(fhitEdit, editor->HandlerID, name); // add file to history
 
-        CPathBuffer expCommand(SAL_MAX_PATH);
-        CPathBuffer expArguments(SAL_MAX_PATH);
-        CPathBuffer expInitDir(SAL_MAX_PATH);
-        if (ExpandCommand(HWindow, editor->Command, expCommand.Data(), expCommand.Capacity(), FALSE) &&
-            ExpandArguments(HWindow, name, dosName.Data(), editor->Arguments, expArguments.Data(), expArguments.Capacity(), NULL) &&
-            ExpandInitDir(HWindow, name, dosName.Data(), editor->InitDir, expInitDir.Data(), expInitDir.Capacity(), FALSE))
+        CPathBuffer expCommand(3 * SAL_MAX_PATH);
+        CPathBuffer expArguments(3 * SAL_MAX_PATH);
+        CPathBuffer expInitDir(3 * SAL_MAX_PATH);
+        if (ExpandCommand(HWindow, Salamander::FileActionPaths::Normalize(editor->Command).c_str(), expCommand.Data(), expCommand.Capacity(), FALSE) &&
+            ExpandArguments(HWindow, name, dosName.Data(), Salamander::FileActionPaths::Normalize(editor->Arguments).c_str(), expArguments.Data(), expArguments.Capacity(), NULL) &&
+            ExpandInitDir(HWindow, name, dosName.Data(), Salamander::FileActionPaths::Normalize(editor->InitDir).c_str(), expInitDir.Data(), expInitDir.Capacity(), FALSE))
         {
             if (SystemPolicies.GetMyRunRestricted() &&
                 !SystemPolicies.GetMyCanRun(expCommand.Data()))
@@ -2445,7 +2329,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
                           STARTF_USESHOWWINDOW;
             si.wShowWindow = SW_SHOWNORMAL;
 
-            CPathBuffer cmdLine(2 * SAL_MAX_PATH);
+            CPathBuffer cmdLine(6 * SAL_MAX_PATH);
             lstrcpyn(cmdLine.Data(), expCommand.Data(), cmdLine.Capacity());
             AddDoubleQuotesIfNeeded(cmdLine.Data(), cmdLine.Capacity()); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
             int len = (int)strlen(cmdLine.Data());
@@ -3435,7 +3319,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     if (f == NULL || newNameW.empty() || newNameW.find_first_of(L"\\/:<>|\"") != std::wstring::npos)
         return;
 
-    std::wstring basePath = GetPathW() != NULL && GetPathW()[0] != 0 ? std::wstring(GetPathW()) : SalMultiByteToWidePath(GetPath());
+    const std::wstring oldFullPath = GetItemFullPathW(*f);
+    std::wstring basePath = GetItemDirectoryW(*f);
     if (basePath.empty())
         return;
 
@@ -3448,9 +3333,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
         return;
     }
 
-    std::wstring srcPath = basePath;
+    std::wstring srcPath = oldFullPath;
     std::wstring tgtPath = basePath;
-    SalPathAppendW(srcPath, oldNameW.c_str());
     SalPathAppendW(tgtPath, newNameW.c_str());
     if (srcPath.length() >= 32767 || tgtPath.length() >= 32767)
     {
@@ -3472,6 +3356,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
         std::string nextFocus = SalWideToMultiBytePath(newNameW.c_str(), GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
         lstrcpyn(NextFocusName, nextFocus.c_str(), MAX_PATH);
         UpdateFileDataNameAfterRename(f, newNameW, isDir);
+        VisibleItemsArray.InvalidateArr();
+        VisibleItemsArraySurround.InvalidateArr();
         *tryAgain = FALSE;
     }
     else
@@ -3485,8 +3371,10 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
             {
                 std::string nextFocus = SalWideToMultiBytePath(newNameW.c_str(), GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
                 lstrcpyn(NextFocusName, nextFocus.c_str(), MAX_PATH);
-                UpdateFileDataNameAfterRename(f, newNameW, isDir);
-                *tryAgain = FALSE;
+                        UpdateFileDataNameAfterRename(f, newNameW, isDir);
+                        VisibleItemsArray.InvalidateArr();
+                VisibleItemsArraySurround.InvalidateArr();
+                        *tryAgain = FALSE;
             }
 
             DWORD inAttr = dosNameConflict ? INVALID_FILE_ATTRIBUTES : GetFileAttributesW(srcPath.c_str());
@@ -3531,8 +3419,10 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
                             err = ERROR_SUCCESS;
                             std::string nextFocus = SalWideToMultiBytePath(newNameW.c_str(), GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
                             lstrcpyn(NextFocusName, nextFocus.c_str(), MAX_PATH);
-                            UpdateFileDataNameAfterRename(f, newNameW, isDir);
-                            *tryAgain = FALSE;
+                                                UpdateFileDataNameAfterRename(f, newNameW, isDir);
+                                                VisibleItemsArray.InvalidateArr();
+                            VisibleItemsArraySurround.InvalidateArr();
+                                                *tryAgain = FALSE;
                         }
                         break;
                     }
@@ -3558,6 +3448,11 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
             SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERRORRENAMINGFILE),
                           MB_OK | MB_ICONEXCLAMATION);
         }
+    }
+    if (*mayChange)
+    {
+        const std::string directory = SalWideToMultiBytePath(basePath.c_str(), CP_UTF8);
+        MainWindow->PostChangeOnPathNotification(directory.c_str(), isDir);
     }
 }
 
@@ -3853,8 +3748,8 @@ void CFilesWindow::RenameFile(int specialIndex)
         while (1)
         {
             // if no item is selected, select the one under focus and store its name
-            char temporarySelected[MAX_PATH];
-            SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            SelectFocusedItemAndGetName(temporarySelected);
 
             // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
             // the same code appears here four times
@@ -3915,8 +3810,8 @@ void CFilesWindow::RenameFile(int specialIndex)
             BOOL cancel = FALSE;
 
             // if no item is selected, select the one under focus and store its name
-            char temporarySelected[MAX_PATH];
-            SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            SelectFocusedItemAndGetName(temporarySelected);
 
             BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 1, HWindow, *f, isDir, newName, cancel);
 
@@ -3931,7 +3826,7 @@ void CFilesWindow::RenameFile(int specialIndex)
                     {
                         // open the standard dialog
                         // if no item is selected, select the one under focus and store its name
-                        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+                        SelectFocusedItemAndGetName(temporarySelected);
 
                         // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
                         // the same code appears here four times
@@ -4179,8 +4074,8 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
         BOOL cancel = FALSE;
 
         // if no item is selected, select the one under focus and store its name
-        char temporarySelected[MAX_PATH];
-        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+        CPanelTemporarySelection temporarySelected;
+        SelectFocusedItemAndGetName(temporarySelected);
 
         BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 1, HWindow, *f, isDir, newName, cancel);
 
