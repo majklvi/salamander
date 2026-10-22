@@ -400,8 +400,7 @@ try {
             Arguments = @(
                 '-B',
                 (Join-Path $repositoryRoot 'src\tests\archive_menu_selection_tests.py'),
-                '--configuration', $Configuration,
-                '--scope', 'ZIP'
+                '--configuration', $Configuration
             )
         },
         @{
