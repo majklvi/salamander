@@ -309,6 +309,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\shared\spl_diskselection.h" />
     <ClInclude Include="..\..\shared\auxtools.h">
     </ClInclude>
     <ClInclude Include="..\..\shared\dbg.h">
