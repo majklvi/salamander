@@ -13,6 +13,7 @@
 #include "worker.h"
 #include "pack.h"
 #include "mapi.h"
+#include "common/widepath.h"
 
 
 static std::wstring ConfirmDeleteTextToWideWithCodePage(const char* text, UINT codePage, DWORD flags)
@@ -663,10 +664,14 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     {
                         CFileData* dir = (count == 0) ? f : ((indexes[0] < Dirs->Count) ? &Dirs->At(indexes[0]) : &Files->At(indexes[0] - Dirs->Count));
 
+                        const std::wstring sourceDirectoryW = GetItemDirectoryW(*dir);
+                        const std::string sourceDirectory = SalWideToMultiBytePath(sourceDirectoryW.c_str(), CP_UTF8);
+                        const std::wstring fullSource = GetItemFullPathW(*dir);
+                        const std::string sourceBaseName = SalWideToMultiBytePath(SalPathFindFileNameW(fullSource.c_str()), CP_UTF8);
                         if (SalSplitWindowsPath(HWindow, LoadStr(type == atCopy ? IDS_COPY : IDS_MOVE),
                                                 LoadStr(type == atCopy ? IDS_ERRORCOPY : IDS_ERRORMOVE),
                                                 count, path, secondPart, pathIsDir, backslashAtEnd || mustBePath,
-                                                dir->Name, GetPath(), mask))
+                                                sourceBaseName.c_str(), sourceDirectory.c_str(), mask))
                         {
                             if (nextFocus[0] != 0 && secondPart[0] == 0)
                                 copyToExistingDir = TRUE;

@@ -662,14 +662,18 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     }
 
     CActionType type = (copy ? atCopy : atMove);
-    char sourcePath[2 * MAX_PATH];     // + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
-    char lastSourcePath[2 * MAX_PATH]; // + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer sourcePathStorage(4 * SAL_MAX_PATH);
+    CPathBuffer lastSourcePathStorage(4 * SAL_MAX_PATH);
+    char* sourcePath = sourcePathStorage.Data();
+    char* lastSourcePath = lastSourcePathStorage.Data();
     lastSourcePath[0] = 0;
     BOOL sourceSupADS = FALSE;
-    char targetPath[2 * MAX_PATH + 200]; // +200 is a reserve (Windows create paths longer than MAX_PATH)
-    char mapNameBuf[2 * MAX_PATH];       // + MAX_PATH  is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer targetPathStorage(4 * SAL_MAX_PATH);
+    CPathBuffer mapNameStorage(4 * SAL_MAX_PATH);
+    char* targetPath = targetPathStorage.Data();
+    char* mapNameBuf = mapNameStorage.Data();
     strcpy(targetPath, targetDir);
-    SalPathAddBackslash(targetPath, 2 * MAX_PATH);
+    SalPathAddBackslash(targetPath, targetPathStorage.Capacity());
     BOOL targetIsFAT32 /*, targetSupEFS*/;
     BOOL targetSupADS = IsPathOnVolumeSupADS(targetPath, &targetIsFAT32);
     script->TargetPathSupADS = targetSupADS;
@@ -693,8 +697,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     int i;
     for (i = 0; i < data->Count; i++)
     {
-        char* fileName = data->At(i)->FileName;
+        const std::string sourceUtf8 = data->At(i)->FileNameW != NULL ?
+            SalWideToMultiBytePath(data->At(i)->FileNameW, CP_UTF8) : std::string(data->At(i)->FileName);
+        char* fileName = const_cast<char*>(sourceUtf8.c_str());
         char* mapName = data->At(i)->MapName;
+        std::string unicodeCopyName;
         const wchar_t* fileNameW = data->At(i)->FileNameW;
         const wchar_t* fileBaseNameW = fileNameW != NULL ? SalPathFindLastComponentW(fileNameW) : NULL;
 
@@ -725,8 +732,36 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(lastSourcePath, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST);
                     lastSourcePath[s - fileName] = 0;
                 }
+                if (IsTheSamePath(sourcePath, targetPath) && makeCopyOfName && strlen(s + 1) >= MAX_PATH)
+                {
+                    // The legacy "Copy of" formatter counts bytes and can split a
+                    // Unicode basename. Generate only this long-name case in UTF-16.
+                    const std::wstring original = fileBaseNameW != NULL ? fileBaseNameW : SalMultiByteToWidePathUtf8OrAcp(s + 1);
+                    const size_t dot = (attrs & FILE_ATTRIBUTE_DIRECTORY) ? std::wstring::npos : original.find_last_of(L'.');
+                    const std::wstring extension = dot != std::wstring::npos && dot != 0 ? original.substr(dot) : L"";
+                    const std::wstring stem = extension.empty() ? original : original.substr(0, dot);
+                    const std::wstring copyText = SalMultiByteToWidePath(LoadStr(IDS_NEWNAME_COPY), CP_ACP);
+                    for (unsigned int attempt = 1;; ++attempt)
+                    {
+                        const std::wstring suffix = L" - " + copyText + (attempt > 1 ? L" (" + std::to_wstring(attempt) + L")" : L"");
+                        if (suffix.size() + extension.size() >= 255) return FALSE;
+                        std::wstring candidate = stem.substr(0, 255 - suffix.size() - extension.size());
+                        if (!candidate.empty() && candidate.back() >= 0xd800 && candidate.back() <= 0xdbff) candidate.pop_back();
+                        candidate += suffix + extension;
+                        std::wstring fullCandidate = SalMultiByteToWidePathUtf8OrAcp(targetPath);
+                        SalPathAppendW(fullCandidate, candidate.c_str());
+                        unicodeCopyName = SalWideToMultiBytePath(candidate.c_str(), CP_UTF8);
+                        if (!ContainsString(usedNames, unicodeCopyName.c_str()) &&
+                            GetFileAttributesW(SalPathAddExtendedPrefixW(fullCandidate.c_str()).c_str()) == INVALID_FILE_ATTRIBUTES)
+                        {
+                            AddStringToNames(usedNames, unicodeCopyName.c_str());
+                            mapName = const_cast<char*>(unicodeCopyName.c_str());
+                            break;
+                        }
+                    }
+                }
                 if (IsTheSamePath(sourcePath, targetPath) && // "Copy of..." is done only if paths match
-                    makeCopyOfName)                          // check if we will need a "Copy of..." name
+                    makeCopyOfName && unicodeCopyName.empty())                          // check if we will need a "Copy of..." name
                 {
                     strcpy(targetName, s + 1); // copy the proposed full target name into targetPath
                     BOOL isKnown;
@@ -1346,7 +1381,8 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
 
     GetAsyncKeyState(VK_ESCAPE); // initialize GetAsyncKeyState - see help
 
-    char sourcePath[2 * MAX_PATH + 10]; // +extra space for mask ("\\*"), + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
+    CPathBuffer sourcePathStorage(4 * SAL_MAX_PATH);
+    char* sourcePath = sourcePathStorage.Data();
     strcpy(sourcePath, GetPath());
 
     BOOL sourceSupADS = FALSE;
@@ -2620,6 +2656,9 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
             if (type == atMove && !script->ShowStatus)
                 script->ShowStatus = TRUE; // move with the encrypted attribute set is done via copy, so we need to show status
         }
+        const std::string ownedFileName = fileNameW != NULL && *fileNameW != 0 ?
+            SalWideToMultiBytePath(fileNameW, CP_UTF8) : std::string(fileName);
+        fileName = const_cast<char*>(ownedFileName.c_str());
         op.Attr = sourceFileAttr;
         BOOL skip;
         if ((op.SourceName = BuildName(sourcePath, fileName, fileDOSName, &skip,
@@ -2664,7 +2703,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             free(op.SourceName);
             return (msgRes == DIALOG_YES /* Skip */ || msgRes == DIALOG_NO /* Skip All */);
         }
-        char finalName[2 * MAX_PATH + 200]; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
+        CPathBuffer finalName(4 * SAL_MAX_PATH);
         if (mapName == NULL)
         {
             // Petr: a bit of a hack: the *.* mask doesn't create a copy of the source name, which is a problem when copying
@@ -2672,7 +2711,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             // by changing the mask to NULL = a simple textual copy of the name
             char* opMask = mask != NULL && strcmp(mask, "*.*") == 0 ? NULL : mask;
             if ((op.TargetName = BuildName(targetPath,
-                                           MaskName(finalName, 2 * MAX_PATH + 200, fileName, opMask),
+                                           MaskName(finalName.Data(), finalName.Capacity(), fileName, opMask),
                                            NULL, &skip, &ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
             {
                 free(op.SourceName);
