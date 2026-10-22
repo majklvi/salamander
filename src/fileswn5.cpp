@@ -1179,12 +1179,12 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
     BeginStopRefresh(); // snooper takes a break
 
     // if no item is selected, select the one under focus and store its name
-    char temporarySelected[MAX_PATH];
-    temporarySelected[0] = 0;
+    CPanelTemporarySelection temporarySelected;
+    temporarySelected.Clear();
     if ((!setCompress || Configuration.CnfrmNTFSPress) &&
         (!setEncryption || Configuration.CnfrmNTFSCrypt))
     {
-        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+        SelectFocusedItemAndGetName(temporarySelected);
     }
 
     if (Is(ptDisk))
@@ -3319,7 +3319,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
     if (f == NULL || newNameW.empty() || newNameW.find_first_of(L"\\/:<>|\"") != std::wstring::npos)
         return;
 
-    std::wstring basePath = GetPathW() != NULL && GetPathW()[0] != 0 ? std::wstring(GetPathW()) : SalMultiByteToWidePath(GetPath());
+    const std::wstring oldFullPath = GetItemFullPathW(*f);
+    std::wstring basePath = GetItemDirectoryW(*f);
     if (basePath.empty())
         return;
 
@@ -3332,9 +3333,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
         return;
     }
 
-    std::wstring srcPath = basePath;
+    std::wstring srcPath = oldFullPath;
     std::wstring tgtPath = basePath;
-    SalPathAppendW(srcPath, oldNameW.c_str());
     SalPathAppendW(tgtPath, newNameW.c_str());
     if (srcPath.length() >= 32767 || tgtPath.length() >= 32767)
     {
@@ -3356,6 +3356,8 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
         std::string nextFocus = SalWideToMultiBytePath(newNameW.c_str(), GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
         lstrcpyn(NextFocusName, nextFocus.c_str(), MAX_PATH);
         UpdateFileDataNameAfterRename(f, newNameW, isDir);
+        VisibleItemsArray.InvalidateArr();
+        VisibleItemsArraySurround.InvalidateArr();
         *tryAgain = FALSE;
     }
     else
@@ -3369,8 +3371,10 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
             {
                 std::string nextFocus = SalWideToMultiBytePath(newNameW.c_str(), GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
                 lstrcpyn(NextFocusName, nextFocus.c_str(), MAX_PATH);
-                UpdateFileDataNameAfterRename(f, newNameW, isDir);
-                *tryAgain = FALSE;
+                        UpdateFileDataNameAfterRename(f, newNameW, isDir);
+                        VisibleItemsArray.InvalidateArr();
+                VisibleItemsArraySurround.InvalidateArr();
+                        *tryAgain = FALSE;
             }
 
             DWORD inAttr = dosNameConflict ? INVALID_FILE_ATTRIBUTES : GetFileAttributesW(srcPath.c_str());
@@ -3415,8 +3419,10 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
                             err = ERROR_SUCCESS;
                             std::string nextFocus = SalWideToMultiBytePath(newNameW.c_str(), GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
                             lstrcpyn(NextFocusName, nextFocus.c_str(), MAX_PATH);
-                            UpdateFileDataNameAfterRename(f, newNameW, isDir);
-                            *tryAgain = FALSE;
+                                                UpdateFileDataNameAfterRename(f, newNameW, isDir);
+                                                VisibleItemsArray.InvalidateArr();
+                            VisibleItemsArraySurround.InvalidateArr();
+                                                *tryAgain = FALSE;
                         }
                         break;
                     }
@@ -3442,6 +3448,11 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
             SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERRORRENAMINGFILE),
                           MB_OK | MB_ICONEXCLAMATION);
         }
+    }
+    if (*mayChange)
+    {
+        const std::string directory = SalWideToMultiBytePath(basePath.c_str(), CP_UTF8);
+        MainWindow->PostChangeOnPathNotification(directory.c_str(), isDir);
     }
 }
 
@@ -3737,8 +3748,8 @@ void CFilesWindow::RenameFile(int specialIndex)
         while (1)
         {
             // if no item is selected, select the one under focus and store its name
-            char temporarySelected[MAX_PATH];
-            SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            SelectFocusedItemAndGetName(temporarySelected);
 
             // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
             // the same code appears here four times
@@ -3799,8 +3810,8 @@ void CFilesWindow::RenameFile(int specialIndex)
             BOOL cancel = FALSE;
 
             // if no item is selected, select the one under focus and store its name
-            char temporarySelected[MAX_PATH];
-            SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            SelectFocusedItemAndGetName(temporarySelected);
 
             BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 1, HWindow, *f, isDir, newName, cancel);
 
@@ -3815,7 +3826,7 @@ void CFilesWindow::RenameFile(int specialIndex)
                     {
                         // open the standard dialog
                         // if no item is selected, select the one under focus and store its name
-                        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+                        SelectFocusedItemAndGetName(temporarySelected);
 
                         // Since Windows Vista, Microsoft introduced a demanded feature: quick rename selects only the name without the dot and extension
                         // the same code appears here four times
@@ -4063,8 +4074,8 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
         BOOL cancel = FALSE;
 
         // if no item is selected, select the one under focus and store its name
-        char temporarySelected[MAX_PATH];
-        SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+        CPanelTemporarySelection temporarySelected;
+        SelectFocusedItemAndGetName(temporarySelected);
 
         BOOL ret = GetPluginFS()->QuickRename(GetPluginFS()->GetPluginFSName(), 1, HWindow, *f, isDir, newName, cancel);
 

@@ -9,6 +9,7 @@ struct CExplorerSortAsyncData;
 struct CExplorerPropertyCache;
 
 #include "plugins.h"
+#include "panel_temporary_selection.h"
 #include <string>
 #include <vector>
 
@@ -1734,8 +1735,8 @@ public:
 
     int GetSelCount(); // returns the number of selected items
 
-    void SelectFocusedItemAndGetName(char* name, int nameMax);
-    void UnselectItemWithName(const char* name);
+    void SelectFocusedItemAndGetName(CPanelTemporarySelection& selection);
+    void UnselectItemWithName(const CPanelTemporarySelection& selection);
 
     // returns PANEL_LEFT or PANEL_RIGHT depending on which side this panel is on
     int GetPanelCode();

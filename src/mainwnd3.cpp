@@ -7406,8 +7406,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            char temporarySelected[MAX_PATH];
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
             activePanel->EmailFiles();
 
@@ -7455,8 +7455,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            char temporarySelected[MAX_PATH];
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
             BOOL changeTargetRequested;
             do
@@ -7621,8 +7621,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 activePanel->StoreSelection(); // save selection for Restore Selection command
 
                 // if no item is selected, choose the one under the focus and store its name
-                char temporarySelected[MAX_PATH];
-                activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+                CPanelTemporarySelection temporarySelected;
+                activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
                 activePanel->Convert();
 

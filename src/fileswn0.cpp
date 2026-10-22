@@ -909,9 +909,9 @@ BOOL CFilesWindow::SelectionContainsFile()
     return FALSE;
 }
 
-void CFilesWindow::SelectFocusedItemAndGetName(char* name, int nameSize)
+void CFilesWindow::SelectFocusedItemAndGetName(CPanelTemporarySelection& selection)
 {
-    name[0] = 0;
+    selection.Clear();
     if (GetSelCount() == 0)
     {
         int deselectIndex = GetCaretIndex();
@@ -920,15 +920,8 @@ void CFilesWindow::SelectFocusedItemAndGetName(char* name, int nameSize)
             BOOL isDir = deselectIndex < Dirs->Count;
             CFileData* f = isDir ? &Dirs->At(deselectIndex) : &Files->At(deselectIndex - Dirs->Count);
 
-            int len = (int)strlen(f->Name);
-            if (len >= nameSize)
-            {
-                TRACE_E("len > nameMax");
-                len = nameSize - 1;
-            }
-
-            memcpy(name, f->Name, len);
-            name[len] = 0;
+            selection.Name = f->Name;
+            if (Is(ptDisk)) selection.BranchIdentity = GetItemIdentityW(*f);
 
             SetSel(TRUE, deselectIndex);
             PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);
@@ -937,8 +930,26 @@ void CFilesWindow::SelectFocusedItemAndGetName(char* name, int nameSize)
     }
 }
 
-void CFilesWindow::UnselectItemWithName(const char* name)
+void CFilesWindow::UnselectItemWithName(const CPanelTemporarySelection& selection)
 {
+    if (!selection.BranchIdentity.empty())
+    {
+        const int index = FindBranchTemporarySelection(selection, Dirs->Count + Files->Count,
+            [&](int i) {
+                const CFileData& file = i < Dirs->Count ? Dirs->At(i) : Files->At(i - Dirs->Count);
+                // Only a still-selected row needs path resolution. Large
+                // Branch listings otherwise allocate a path for every item.
+                return file.Selected ? GetItemIdentityW(file) : std::wstring();
+            });
+        if (index != -1)
+        {
+            SetSel(FALSE, index);
+            PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);
+            RepaintListBox(DRAWFLAG_DIRTY_ONLY | DRAWFLAG_SKIP_VISTEST);
+        }
+        return;
+    }
+    const char* name = selection.Name.c_str();
     if (name[0] != 0)
     {
         int count = Dirs->Count + Files->Count;

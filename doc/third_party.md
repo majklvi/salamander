@@ -109,3 +109,7 @@ making their work available.
 | Base of Tree View panel | Tree View panel | Based on changes proposed by fgodoy. |
 | Localization scripts | Localization tooling portions | Samandarin includes localization tooling adapted from, or substantially informed by, fork [Sally](https://github.com/0xeb/sally) by [Elias Bachaalany (0xeb)](https://github.com/0xeb). Licensed under the GNU Library General Public License. |
 | Command shell template SVG icons | Windows Terminal profile menu icons | SVG artwork adapted from Microsoft product icon shapes for PowerShell, Windows PowerShell, Windows Terminal, Command Prompt, and Visual Studio, and from the SVG Repo Azure Cloud Shell icon. |
+
+### S20a ordinary rename and temporary selection
+
+Header/native fixtures EXACT and scoped host rename/selection hunks ADAPTED from [PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor 47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Samandarin Contributors, GPL-2.0-or-later. Original SPDX notices preserved. Branch integration deferred.
