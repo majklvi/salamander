@@ -5,6 +5,9 @@
 #include "precomp.h"
 #include "branch_view.h"
 #include "fileactionpath.h"
+#define SALAMANDER_BRANCHPROGRAM_CLIENT
+#include "branchprogram.h"
+#undef SALAMANDER_BRANCHPROGRAM_CLIENT
 
 #include <uxtheme.h>
 
@@ -850,6 +853,83 @@ void CFilesWindow::HandsOff(BOOL off)
     }
 }
 
+// Older language modules do not contain these new strings. Keep the strings
+// in resources, with an English resource fallback rather than a missing-ID UI.
+static const char* LoadBranchLaunchStr(int id)
+{
+    LPCWSTR resource = NULL;
+    const int length = LoadStringW(HLanguage, id, (LPWSTR)&resource, 0);
+    return LoadStr(id, length > 0 ? HLanguage : GetModuleHandle(NULL));
+}
+// S27a2: registry state is diagnostic information, never a permission grant.
+enum class BranchLongPathSetting { Disabled, Enabled, NotConfigured, Unknown };
+static BranchLongPathSetting ReadBranchLongPathSetting()
+{
+    DWORD value = 0, bytes = sizeof(value), type = 0;
+    HKEY key = NULL;
+    LSTATUS error = RegOpenKeyExW(HKEY_LOCAL_MACHINE,
+        L"SYSTEM\\CurrentControlSet\\Control\\FileSystem", 0, KEY_QUERY_VALUE | KEY_WOW64_64KEY, &key);
+    if (error == ERROR_SUCCESS)
+    {
+        error = RegQueryValueExW(key, L"LongPathsEnabled", NULL, &type, (BYTE*)&value, &bytes);
+        RegCloseKey(key);
+    }
+    if (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND) return BranchLongPathSetting::NotConfigured;
+    if (error != ERROR_SUCCESS || type != REG_DWORD || bytes != sizeof(value) || value > 1) return BranchLongPathSetting::Unknown;
+    return value == 1 ? BranchLongPathSetting::Enabled : BranchLongPathSetting::Disabled;
+}
+static HRESULT LaunchBranchProgram(HWND owner, const std::wstring& source, const std::wstring& directory)
+{
+    std::vector<wchar_t> module(32768);
+    const DWORD length = GetModuleFileNameW(NULL, module.data(), (DWORD)module.size());
+    if (length == 0 || length >= module.size()) return HRESULT_FROM_WIN32(ERROR_FILENAME_EXCED_RANGE);
+    std::wstring helper(module.data(), length);
+    const size_t slash = helper.find_last_of(L'\\');
+    if (slash == std::wstring::npos) return E_FAIL;
+    helper.resize(slash);
+    helper += L"\\utils\\salopen.exe";
+    const std::wstring cwd = Salamander::FileActionPaths::InitialDirectory(
+        SalWideToMultiBytePath(directory.c_str(), CP_UTF8).c_str());
+    return Salamander::BranchProgram::Launch(owner, source, cwd, helper);
+}
+static void ShowBranchLaunchFailure(HWND owner, const std::wstring& source, HRESULT error, bool program)
+{
+    const std::wstring plain = SalPathRemoveExtendedPrefixW(source.c_str());
+    const bool longPath = plain.size() >= MAX_PATH;
+    std::string text = LoadBranchLaunchStr(program ? IDS_FILELAUNCH_PROGRAM_FAILED : IDS_FILELAUNCH_DOCUMENT_FAILED);
+    text += "\n\n"; text += SalWideToMultiBytePath(source.c_str(), CP_UTF8);
+    char code[20]; sprintf_s(code, "0x%08lX", (unsigned long)error);
+    text += "\n\n"; text += LoadBranchLaunchStr(IDS_FILELAUNCH_ERROR_CODE); text += " "; text += code;
+    if (longPath)
+    {
+        int settingId = IDS_FILELAUNCH_LONGPATH_UNKNOWN;
+        switch (ReadBranchLongPathSetting())
+        {
+        case BranchLongPathSetting::Disabled: settingId = IDS_FILELAUNCH_LONGPATH_OFF; break;
+        case BranchLongPathSetting::Enabled: settingId = IDS_FILELAUNCH_LONGPATH_ON; break;
+        case BranchLongPathSetting::NotConfigured: settingId = IDS_FILELAUNCH_LONGPATH_UNSET; break;
+        default: break;
+        }
+        text += "\n\n"; text += LoadBranchLaunchStr(settingId);
+        text += "\n\n"; text += LoadBranchLaunchStr(IDS_FILELAUNCH_LONGPATH_CAVEAT);
+    }
+    std::string buttons = std::to_string(DIALOG_OK) + "\t" + LoadBranchLaunchStr(
+        longPath ? IDS_FILELAUNCH_LONGPATH_GUIDE_BUTTON : IDS_FILELAUNCH_LAUNCH_CLOSE);
+    if (longPath) buttons += "\t" + std::to_string(DIALOG_CANCEL) + "\t" + LoadBranchLaunchStr(IDS_FILELAUNCH_LAUNCH_CLOSE);
+    MSGBOXEX_PARAMS params = {};
+    params.HParent = owner; params.Caption = LoadBranchLaunchStr(IDS_ERROROPENINGFILE); params.Text = text.c_str();
+    params.Flags = (longPath ? MSGBOXEX_OKCANCEL | MSGBOXEX_DEFBUTTON2 : MSGBOXEX_OK) | MSGBOXEX_ICONEXCLAMATION;
+    params.AliasBtnNames = buttons.c_str();
+    if (SalMessageBoxEx(&params) == DIALOG_OK && longPath)
+    {
+        params.Flags = MSGBOXEX_OK | MSGBOXEX_ICONINFORMATION;
+        params.Caption = LoadBranchLaunchStr(IDS_FILELAUNCH_LONGPATH_GUIDE_TITLE);
+        params.Text = LoadBranchLaunchStr(IDS_FILELAUNCH_LONGPATH_GUIDE);
+        params.AliasBtnNames = NULL;
+        SalMessageBoxEx(&params);
+    }
+}
+
 void CFilesWindow::Execute(int index)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::Execute(%d)", index);
@@ -898,24 +978,32 @@ void CFilesWindow::Execute(int index)
                 }
                 else
                 {
-                    // Win32 extended syntax is for file I/O, not Shell parsing.
-                    const std::wstring shellFile = SalPathRemoveExtendedPrefixW(source.c_str());
-                    if (shellFile.size() >= MAX_PATH)
+                    HRESULT result = E_FAIL;
+                    const bool program = Salamander::BranchProgram::IsProgram(source.c_str());
+                    if (program)
+                        result = LaunchBranchProgram(GetListBoxHWND(), source, directory);
+                    else
                     {
-                        DialogError(HWindow, BUTTONS_OK, sourceUtf8.c_str(), LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERROROPENINGFILE));
-                        EndStopRefresh();
-                        return;
+                        // Documents, links and scripts keep their Windows associations.
+                        // No native retry after a failed or denied Shell operation.
+                        const std::wstring shellFile = SalPathRemoveExtendedPrefixW(source.c_str());
+                        if (shellFile.size() >= MAX_PATH)
+                            result = HRESULT_FROM_WIN32(ERROR_FILENAME_EXCED_RANGE);
+                        else
+                        {
+                            const std::wstring launchDirectory = Salamander::FileActionPaths::InitialDirectory(
+                                SalWideToMultiBytePath(directory.c_str(), CP_UTF8).c_str());
+                            SHELLEXECUTEINFOW execute = {sizeof(execute)};
+                            execute.fMask = SEE_MASK_NOASYNC | SEE_MASK_FLAG_NO_UI;
+                            execute.hwnd = GetListBoxHWND();
+                            execute.lpFile = shellFile.c_str(); execute.lpDirectory = launchDirectory.c_str();
+                            execute.nShow = SW_SHOWNORMAL;
+                            if (ShellExecuteExW(&execute)) result = S_OK;
+                            else result = Salamander::BranchProgram::LastErrorResult();
+                        }
                     }
-                    const std::wstring launchDirectory = Salamander::FileActionPaths::InitialDirectory(
-                        SalWideToMultiBytePath(directory.c_str(), CP_UTF8).c_str());
-                    SHELLEXECUTEINFOW execute = {sizeof(execute)};
-                    execute.fMask = SEE_MASK_NOASYNC;
-                    execute.hwnd = GetListBoxHWND();
-                    execute.lpFile = shellFile.c_str();
-                    execute.lpDirectory = launchDirectory.c_str();
-                    execute.nShow = SW_SHOWNORMAL;
-                    if (ShellExecuteExW(&execute))
-                        MainWindow->FileHistory->AddFile(fhitOpen, 0, sourceUtf8.c_str());
+                    if (SUCCEEDED(result)) MainWindow->FileHistory->AddFile(fhitOpen, 0, sourceUtf8.c_str());
+                    else ShowBranchLaunchFailure(HWindow, source, result, program);
                 }
                 EndStopRefresh();
                 return;

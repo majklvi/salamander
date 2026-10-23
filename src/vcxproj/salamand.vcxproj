@@ -1228,6 +1228,13 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\branchprogram.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="salopen\salopen.vcxproj">
+      <Project>{0606C52C-9DA4-468B-B7A6-5C53A360EA91}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+    </ProjectReference>
     <ProjectReference Include="lang.vcxproj">
       <Project>{7c7059ba-1fce-4c36-b0b3-d095779cf89f}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
