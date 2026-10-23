@@ -1125,6 +1125,20 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     return TRUE;
 }
 
+// S27d3b: clipboard/drop metadata must use the same wide source as the I/O planner.
+static std::string GetDropSourceDirectory(CCopyMoveData* data)
+{
+    if (data == NULL || data->Count <= 0 || data->At(0) == NULL)
+        return std::string();
+    const CCopyMoveRecord* source = data->At(0);
+    std::string path = source->FileNameW != NULL ? SalWideToMultiBytePath(source->FileNameW, CP_UTF8) :
+        (source->FileName != NULL ? SalWideToMultiBytePath(SalMultiByteToWidePathUtf8OrAcp(source->FileName).c_str(), CP_UTF8) : std::string());
+    if (path.empty() || !CutDirectory(&path[0]))
+        return std::string();
+    path.resize(strlen(path.c_str()));
+    return path;
+}
+
 void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data)
 {
     if (IsBranchView()) return; // S26 read-only direct boundary.
@@ -1135,17 +1149,11 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
         FilesActionInProgress = TRUE;
         SetForegroundWindow(MainWindow->HWindow); // must activate immediately after the drop
         BeginStopRefresh();                       // otherwise WM_ACTIVATEAPP arrives but won't activate...
-        char sourceDir[SAL_MAX_PATH];
-        sourceDir[0] = 0;
-        if (data->Count > 0 && data->At(0)->FileName != NULL)
-        {
-            lstrcpyn(sourceDir, data->At(0)->FileName, SAL_MAX_PATH);
-            CutDirectory(sourceDir);
-        }
+        const std::string sourceDir = GetDropSourceDirectory(data);
         char waitSubject[50];
         lstrcpyn(waitSubject, copy ? LoadStr(IDS_COPY) : LoadStr(IDS_MOVE), 50);
         char* waitSubjectCopy = DupStr(waitSubject);
-        char* sourceDirCopy = DupStr(sourceDir);
+        char* sourceDirCopy = DupStr(sourceDir.c_str());
         char* targetPathCopy = DupStr(targetPath);
 #ifdef new
 #undef new
@@ -1168,11 +1176,8 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
         {
             if (!copy && data->Count > 0)
             {
-                char source[MAX_PATH];
-                lstrcpyn(source, data->At(0)->FileName, MAX_PATH);
-                CutDirectory(source);
-                BOOL sameRootPath = HasTheSameRootPath(source, targetPath);
-                script->SameRootButDiffVolume = sameRootPath && !HasTheSameRootPathAndVolume(source, targetPath);
+                BOOL sameRootPath = HasTheSameRootPath(sourceDir.c_str(), targetPath);
+                script->SameRootButDiffVolume = sameRootPath && !HasTheSameRootPathAndVolume(sourceDir.c_str(), targetPath);
                 script->ShowStatus = !sameRootPath || script->SameRootButDiffVolume;
             }
             if (copy)
@@ -1190,8 +1195,8 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
             if (script->CopyMoveTransferMode != CMS_SEQUENTIAL &&
                 script->CopyMoveTransferMode != CMS_STORAGE_AWARE)
                 script->CopyMoveTransferMode = CMS_STORAGE_AWARE;
-            if (sourceDir[0] != 0)
-                script->AddStoragePath(sourceDir, copy ? SACCESS_READ : SACCESS_READWRITE);
+            if (!sourceDir.empty())
+                script->AddStoragePath(sourceDir.c_str(), copy ? SACCESS_READ : SACCESS_READWRITE);
             script->AddStoragePath(targetPath, SACCESS_WRITE);
 
             char caption[50]; // otherwise the LoadStr buffer gets overwritten before being copied to the dialog's local buffer
@@ -1250,20 +1255,10 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
             script->SetWorkPath1(targetPath, TRUE);
             if (!copy) // a move operation modifies the source as well
             {
-                if (data->Count > 0)
-                {
-                    char* name = data->At(0)->FileName;
-                    if (name != NULL)
-                    {
-                        char path[MAX_PATH];
-                        lstrcpyn(path, name, MAX_PATH);
-                        if (CutDirectory(path)) // assume a single source directory (panel operations only, not Find)
-                        {
-                            // change in the source directory and its subdirectories
-                            script->SetWorkPath2(path, TRUE);
-                        }
-                    }
-                }
+                // Legacy notification transport is still bounded (S30); never truncate
+                // the metadata used for volume decisions or operation scheduling.
+                if (!sourceDir.empty())
+                    script->SetWorkPath2(sourceDir.c_str(), TRUE);
             }
 
             if (cancel || !res || !StartProgressDialog(script, caption, NULL, NULL))
