@@ -1596,11 +1596,60 @@ BOOL GetACLUISecurityPageName(char* pageName, int pageNameMax)
     return ret;
 }
 
+// Native Shell menus require one parent folder. When that contract cannot be
+// met, retain the complete Branch selection and offer only host commands.
+static DWORD TrackBranchHostContextMenu(CFilesWindow* panel, const POINT& pt)
+{
+    CMenuPopup popup;
+    popup.SetUsePanelContextMenuFont(TRUE);
+    popup.SetImageList(HGrayToolBarImageList);
+    popup.SetHotImageList(HHotToolBarImageList);
+    const BOOL focusedFile = panel->GetCaretIndex() >= panel->Dirs->Count &&
+                             panel->GetCaretIndex() < panel->Dirs->Count + panel->Files->Count;
+    auto append = [&](UINT command, UINT textID, int image, BOOL enabled) {
+        MENU_ITEM_INFO item = {};
+        item.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_STRING | MENU_MASK_STATE;
+        item.Type = MENU_TYPE_STRING;
+        item.ID = command;
+        item.String = LoadStr(textID);
+        item.State = enabled ? 0 : MENU_STATE_GRAYED;
+        if (image >= 0)
+        {
+            item.Mask |= MENU_MASK_IMAGEINDEX;
+            item.ImageIndex = image;
+        }
+        popup.InsertItem(-1, TRUE, &item);
+    };
+    auto separator = [&]() {
+        MENU_ITEM_INFO item = {};
+        item.Mask = MENU_MASK_TYPE;
+        item.Type = MENU_TYPE_SEPARATOR;
+        popup.InsertItem(-1, TRUE, &item);
+    };
+    // These commands intentionally retain Enter/F3/F4 focus semantics. The
+    // operation and clipboard commands below use the entire existing selection.
+    append(CM_OPEN, IDS_ARCHIVEMENU_OPEN, -1, focusedFile);
+    append(CM_VIEW, IDS_MENU_FILES_VIEW, IDX_TB_VIEW, focusedFile);
+    append(CM_EDIT, IDS_MENU_FILES_EDIT, IDX_TB_EDIT, focusedFile);
+    append(CM_BRANCH_OPENPARENT, IDS_BRANCH_OPENPARENT, IDX_TB_PARENTDIR, focusedFile);
+    separator();
+    append(CM_COPYFILES, IDS_MENU_FILES_COPY, IDX_TB_COPY, TRUE);
+    append(CM_MOVEFILES, IDS_MENU_FILES_MOVE, IDX_TB_MOVE, TRUE);
+    append(CM_DELETEFILES, IDS_MENU_FILES_DELETE, IDX_TB_DELETE, TRUE);
+    separator();
+    append(CM_CLIPCUT, IDS_MENU_EDIT_CUT, IDX_TB_CLIPBOARDCUT, TRUE);
+    append(CM_CLIPCOPY, IDS_MENU_EDIT_COPY, IDX_TB_CLIPBOARDCOPY, TRUE);
+    append(CM_PROPERTIES, IDS_MENU_FILES_PROPERTIES, IDX_TB_PROPERTIES, TRUE);
+    popup.SetDefaultItem(CM_OPEN, FALSE);
+    return popup.Track(MENU_TRACK_RETURNCMD | MENU_TRACK_RIGHTBUTTON,
+                       pt.x, pt.y, panel->GetListBoxHWND(), NULL);
+}
+
 void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                  BOOL posByMouse, BOOL onlyPanelMenu)
 {
-    // S27d3a: selected Properties and clipboard export are verified for Branch Shell dispatch.
-    if (panel->IsBranchView() && ((action != saProperties && action != saCopyToClipboard && action != saCutToClipboard) || !useSelection || onlyPanelMenu)) return;
+    // S27d4: selected Properties, clipboard export and context menu are verified for Branch Shell dispatch.
+    if (panel->IsBranchView() && ((action != saProperties && action != saCopyToClipboard && action != saCutToClipboard && action != saContextMenu) || !useSelection || onlyPanelMenu)) return;
 
     CALL_STACK_MESSAGE5("ShellAction(, %d, %d, %d, %d)", action, useSelection, posByMouse, onlyPanelMenu);
     if (panel->QuickSearchMode)
@@ -1641,6 +1690,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 
     //  MainWindow->ReleaseMenuNew();  // Windows are not built for multiple context menus
 
+    DWORD deferredBranchCommand = 0;
     BeginStopRefresh(); // we do not need any refreshes
 
     int* indexes = NULL;
@@ -2438,7 +2488,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         {
 #endif // _WIN64
                             panel->ContextMenu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
-                                                                     EnumFileNames, &selectionEnumData);
+                                                                     EnumFileNames, &selectionEnumData, TRUE);
 #ifndef _WIN64
                         }
 #endif // _WIN64
@@ -2468,6 +2518,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 BOOL cmdDelete = FALSE;    // is it "our delete"?
                 BOOL cmdMapNetDrv = FALSE; // is this our "Map Network Drive"? (only for a UNC root, let us not complicate life)
                 DWORD cmd = 0;             // command number for the context menu (10000 = "our paste")
+                const UINT branchOpenParentCommand = 10002; // outside both Shell command ranges
+                BOOL openBranchParent = FALSE;
                 char pastePath[MAX_PATH];  // buffer for the path where "our paste" is executed (if it happens)
                 if (panel->ContextMenu != NULL && h != NULL)
                 {
@@ -2650,6 +2702,18 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                         }
                     }
 
+                    if (useSelection && !onlyPanelMenu && panel->IsBranchView() &&
+                        panel->GetCaretIndex() >= panel->Dirs->Count &&
+                        panel->GetCaretIndex() < panel->Dirs->Count + panel->Files->Count)
+                    {
+                        // This is a host action for the focused Branch row, not a
+                        // Shell verb or an action on the Branch root folder.
+                        if (GetMenuItemCount(h) > 0)
+                            AppendMenuW(h, MF_SEPARATOR, 0, NULL);
+                        const std::wstring label = SalMultiByteToWidePath(LoadStr(IDS_BRANCH_OPENPARENT), CP_UTF8);
+                        AppendMenuW(h, MF_STRING | MF_ENABLED, branchOpenParentCommand, label.c_str());
+                    }
+
                     if (GetMenuItemCount(h) > 0) // protection against a completely cut-out menu
                     {
                         // Native TrackPopupMenuEx always uses the system menu
@@ -2664,6 +2728,11 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                     }
                     else
                         cmd = 0;
+                    if (cmd == branchOpenParentCommand)
+                    {
+                        openBranchParent = TRUE;
+                        cmd = 0; // never pass this host command to a Shell handler
+                    }
                     if (cmd != 0)
                     {
                         BOOL handledByCompressedFolderFallback = IsWindows11CompressedFolderCommand(h, cmd) &&
@@ -2865,6 +2934,10 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                         }
                     }
                 }
+                else if (panel->IsBranchView() && useSelection && !onlyPanelMenu)
+                {
+                    deferredBranchCommand = TrackBranchHostContextMenu(panel, pt);
+                }
                 {
                     CALL_STACK_MESSAGE1("ShellAction::context_menu::release");
                     ShellActionAux6(panel);
@@ -2872,7 +2945,9 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                         DestroyMenu(h);
                 }
 
-                if (cmd == 10000) // our own "paste" on pastePath
+                if (openBranchParent)
+                    panel->OpenBranchItemDirectory(); // Shell objects have been released above
+                else if (cmd == 10000) // our own "paste" on pastePath
                 {
                     if (!panel->ClipboardPaste(FALSE, FALSE, pastePath))
                         panel->ClipboardPastePath(); // regular paste failed, we probably just need to change the current path
@@ -2922,6 +2997,15 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
         delete[] (indexes);
 
     EndStopRefresh();
+    if (deferredBranchCommand != 0)
+    {
+        // Run after releasing all Shell objects and refresh suspension. Dispatch
+        // synchronously to the source panel so a queued focus change cannot
+        // redirect the command or substitute another panel's selection.
+        MainWindow->FocusPanel(panel);
+        MainWindow->RefreshCommandStates(); // selection may have changed without changing panels
+        SendMessage(MainWindow->HWindow, WM_COMMAND, deferredBranchCommand, 0);
+    }
 }
 
 const char* ReturnNameFromParam(int, void* param)
