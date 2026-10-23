@@ -9,6 +9,7 @@ making their work available.
 
 | Component | Used for | Attribution and license notes |
 | --- | --- | --- |
+| Branch Rename metadata and temporary-selection integration | Exact per-item rename, cache/focus refresh and safe selection cleanup in experimental Branch View | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Scoped BranchItemRenamed/declaration/success hooks reuse the accepted S20a wide I/O and selection header; local lock/callback and modal identity guards adapt the staged target. Existing native harness extended without removing previous checks. GPL-2.0-or-later; source notices preserved. |
 | REGEXP | Regular expression matching | Copyright (C) 1986 Henry Spencer, University of Toronto. |
 | AES code | Cryptographic routines | Written by Dr Brian Gladman. Copyright (C) 2001 Dr Brian Gladman. |
 | PNGLite | PNG image support | Based on PNGLite by Daniel Karling. Copyright (C) 2007 Daniel Karling. |
