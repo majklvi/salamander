@@ -43,7 +43,7 @@ static std::wstring ConfirmDeleteTextToWide(const char* text)
     return wide;
 }
 
-static void AppendConfirmDeleteExtInfo(std::wstring& text, const wchar_t* path, int count, CFilesArray* dirs, CFilesArray* files)
+static void AppendConfirmDeleteExtInfo(std::wstring& text, const wchar_t* path, int count, CFilesArray* dirs, CFilesArray* files, CFilesWindow* panel)
 {
     if (count <= 1 || !Configuration.CnfrmConfirmDeleteExtInfo)
         return;
@@ -76,7 +76,8 @@ static void AppendConfirmDeleteExtInfo(std::wstring& text, const wchar_t* path, 
         {
             CFileData* file = &files->At(i);
             text += L"\r\n";
-            text += file->UseWideName() ? file->NameW : ConfirmDeleteTextToWide(file->Name);
+            text += panel->IsBranchView() ? panel->GetItemRelativePathW(*file) :
+                    (file->UseWideName() ? std::wstring(file->NameW) : ConfirmDeleteTextToWide(file->Name));
             text += L" (";
             text += fileLabel;
             text += L")";
@@ -256,8 +257,12 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 {
     // S27c1a: only flat copy into an ordinary disk panel is verified.
     if (target != NULL && target->IsBranchView()) return;
-    if (IsBranchView() && ((type != atCopy && type != atMove) || target == NULL || !target->Is(ptDisk) ||
-                           countSizeMode != 0 || copyToSelectedDirs)) return;
+    if (IsBranchView() && (countSizeMode != 0 || copyToSelectedDirs ||
+        (type != atDelete && ((type != atCopy && type != atMove) || target == NULL || !target->Is(ptDisk))))) return;
+    // S27c3: recycle modes are enabled separately in S27c4. Never turn a
+    // requested recycle operation into permanent deletion during transition.
+    if (IsBranchView() && type == atDelete &&
+        ((GetKeyState(VK_SHIFT) & 0x8000) ? Configuration.UseRecycleBin == 0 : Configuration.UseRecycleBin != 0)) return;
 
     if (changeTargetRequested != NULL)
         *changeTargetRequested = FALSE;
@@ -612,8 +617,16 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
             if (type == atDelete && count > 1 && Configuration.CnfrmConfirmDeleteExtInfo)
             {
                 std::wstring messageText = ConfirmDeleteTextToWide(subject);
-                AppendConfirmDeleteExtInfo(messageText, GetPathW(), count, Dirs, Files);
+                AppendConfirmDeleteExtInfo(messageText, GetPathW(), count, Dirs, Files, this);
                 str.SetW(messageText.c_str(), NULL);
+            }
+            else if (type == atDelete && IsBranchView() && f != NULL)
+            {
+                // The display mirror may be shortened and duplicate basenames
+                // may belong to different parents. Confirm the owned relative identity.
+                const std::wstring relative = GetItemRelativePathW(*f);
+                const std::wstring messageText = ConfirmDeleteTextToWide(subject);
+                str.SetW(messageText.c_str(), relative.c_str());
             }
             else
                 str.Set(subject, count > 1 ? NULL : formatedFileName);

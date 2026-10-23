@@ -7448,7 +7448,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             WorkerClearReadOnlyW(nameW, attr); // ensure it can be deleted
 
             err = ERROR_SUCCESS;
-            BOOL useRecycleBin;
+            BOOL useRecycleBin = TRUE; // Unknown configuration must never imply permanent deletion.
             switch (dlgData.UseRecycleBin)
             {
             case 0:

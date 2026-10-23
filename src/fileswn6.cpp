@@ -1457,7 +1457,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
 
     char* useName = (oneFile != NULL ? oneFile->Name : NULL);
     char* useDOSName = (oneFile != NULL ? oneFile->DosName : NULL);
-    if (type == atDelete && selCount <= 1 && oneFile != NULL && oneFile->DosName != NULL)
+    if (!IsBranchView() && type == atDelete && selCount <= 1 && oneFile != NULL && oneFile->DosName != NULL)
     {
         char* s = sourcePath + strlen(sourcePath);
         char* end = s;
@@ -1507,7 +1507,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             std::string branchName;
             if (IsBranchView())
             {
-                if ((type != atCopy && type != atMove) || GetBranchViewFileByCacheKey(GetItemCacheKeyPtr(*oneFile)) != oneFile)
+                if ((type != atCopy && type != atMove && type != atDelete) || GetBranchViewFileByCacheKey(GetItemCacheKeyPtr(*oneFile)) != oneFile)
                 {
                     SetCurrentDirectoryToSystem();
                     return FALSE;
