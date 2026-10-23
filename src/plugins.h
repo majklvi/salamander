@@ -2623,6 +2623,8 @@ public:
     // 'parent' is the parent window for message boxes; if 'ask' is FALSE it saves without asking,
     // returns TRUE if the DLL was unloaded
     BOOL Unload(HWND parent, BOOL ask);
+    // Optional Samandarin native exit hook; readiness does not release resources.
+    BOOL PrepareNativeProcessExit(BOOL finalize);
 
     // checks if the plugin can be removed; 'parent' is the parent message box window,
     // 'index' is this plugin index in Plugins; returns TRUE if the plugin can be removed
