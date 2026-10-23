@@ -3,6 +3,8 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/widepath.h"
+#include "branchclipboard.h"
 #include "audio_metadata_legacy.h"
 
 #include <shlwapi.h>
@@ -2322,6 +2324,30 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
         return FALSE; // do not accept up-directory entries
     if (FocusedIndex < 0 || FocusedIndex >= Files->Count + Dirs->Count)
         return FALSE; // ignore an invalid index
+
+    if (Is(ptDisk))
+    {
+        const CFileData& file = FocusedIndex < Dirs->Count ? Dirs->At(FocusedIndex) : Files->At(FocusedIndex - Dirs->Count);
+        const std::wstring fullPath = GetItemFullPathW(file);
+        if (fullPath.empty()) return FALSE;
+        if (mode == cfnmShort)
+            return CopyTextToClipboardW(SalPathFindFileNameW(fullPath.c_str()));
+        if (mode == cfnmFull)
+            return CopyTextToClipboardW(fullPath.c_str());
+        if (mode == cfnmUNC)
+        {
+            std::wstring unc;
+            if (BranchClipboardUNCPath(fullPath, unc))
+                return CopyTextToClipboardW(unc.c_str());
+            std::wstring message = SalMultiByteToWidePath(LoadStr(IDS_CANNOT_CREATE_UNC_NAME), CP_ACP);
+            const size_t marker = message.find(L"%s");
+            if (marker != std::wstring::npos) message.replace(marker, 2, fullPath);
+            const std::string text = SalWideToMultiBytePath(message.c_str(), CP_UTF8);
+            SalMessageBox(HWindow, text.c_str(), LoadStr(IDS_INFOTITLE), MB_OK | MB_ICONINFORMATION);
+            return FALSE;
+        }
+        return FALSE;
+    }
 
     char buff[2 * MAX_PATH];
     buff[0] = 0;

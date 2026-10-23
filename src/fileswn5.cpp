@@ -1134,19 +1134,13 @@ void CFilesWindow::EditWindowsProperties()
         indexes.push_back(GetCaretIndex());
 
     std::vector<std::wstring> paths;
-    std::wstring panelPath = GetPathW() != NULL && GetPathW()[0] != 0
-                                 ? std::wstring(GetPathW())
-                                 : SalMultiByteToWidePath(GetPath());
     for (size_t i = 0; i < indexes.size(); i++)
     {
         int index = indexes[i];
         if (index < Dirs->Count || index >= Dirs->Count + Files->Count)
             continue;
         CFileData* file = &Files->At(index - Dirs->Count);
-        std::wstring path = panelPath;
-        std::wstring name = file->UseWideName() ? std::wstring(file->NameW) : SalMultiByteToWidePath(file->Name);
-        SalPathAppendW(path, name.c_str());
-        paths.push_back(path);
+        paths.push_back(GetItemFullPathW(*file));
     }
     if (paths.empty())
         return;
@@ -1223,12 +1217,9 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                             BOOL timeObtained = FALSE;
 
                             // retrieve the file times
-                            char fileName[MAX_PATH];
-                            strcpy(fileName, GetPath());
-                            SalPathAppend(fileName, f->Name, MAX_PATH);
-
-                            WIN32_FIND_DATA find;
-                            HANDLE hFind = HANDLES_Q(FindFirstFile(fileName, &find));
+                            std::wstring fileName = SalPathAddExtendedPrefixW(GetItemFullPathW(*f).c_str());
+                            WIN32_FIND_DATAW find;
+                            HANDLE hFind = HANDLES_Q(FindFirstFileW(fileName.c_str(), &find));
                             if (hFind != INVALID_HANDLE_VALUE)
                             {
                                 HANDLES(FindClose(hFind));
