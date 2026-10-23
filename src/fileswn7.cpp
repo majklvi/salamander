@@ -2742,6 +2742,30 @@ void CFilesWindow::AcceptChangeOnPathNotification(const char* path, BOOL includi
     CALL_STACK_MESSAGE3("CFilesWindow::AcceptChangeOnPathNotification(%s, %d)",
                         path, includingSubdirs);
 
+    if (IsBranchView())
+    {
+        std::wstring changed = SalMultiByteToWidePath(path, CP_UTF8);
+        if (changed.empty())
+            changed = SalMultiByteToWidePath(path, CP_ACP);
+        std::wstring root = GetPathW();
+        while (!root.empty() && root.back() == L'\\') root.pop_back();
+        while (!changed.empty() && changed.back() == L'\\') changed.pop_back();
+        const BOOL descendant = changed.size() >= root.size() &&
+            CompareStringOrdinal(changed.c_str(), (int)root.size(), root.c_str(), (int)root.size(), TRUE) == CSTR_EQUAL &&
+            (changed.size() == root.size() || changed[root.size()] == L'\\');
+        const BOOL ancestor = includingSubdirs && root.size() >= changed.size() &&
+            CompareStringOrdinal(root.c_str(), (int)changed.size(), changed.c_str(), (int)changed.size(), TRUE) == CSTR_EQUAL &&
+            (root.size() == changed.size() || root[changed.size()] == L'\\');
+        if (!changed.empty() && (descendant || ancestor))
+        {
+            HANDLES(EnterCriticalSection(&TimeCounterSection));
+            const int stamp = MyTimeCounter++;
+            HANDLES(LeaveCriticalSection(&TimeCounterSection));
+            PostMessage(HWindow, WM_USER_REFRESH_DIR, 0, stamp);
+        }
+        RefreshDiskFreeSpace(TRUE, TRUE);
+        return;
+    }
     BOOL refresh = FALSE;
     if ((Is(ptDisk) || Is(ptZIPArchive)) && (!AutomaticRefresh || GetNetworkDrive()))
     {
