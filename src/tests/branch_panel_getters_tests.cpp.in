@@ -1,0 +1,445 @@
+// SPDX-FileCopyrightText: 2026 Samandarin Contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+// The three production getters, Entry, Entry::FullPath, Join and conversion
+// function are extracted verbatim. Only unrelated panel state is replaced.
+#define NOMINMAX
+#include <windows.h>
+#include <shellapi.h>
+#include "@@FILEACTION_HEADER@@"
+#include "@@PROGRAM_HEADER@@"
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+#include <functional>
+
+std::wstring SalMultiByteToWidePath(const char*, UINT codePage = CP_ACP);
+@@CONVERSION@@
+@@ORDINARY_JOIN@@
+namespace Salamander { namespace BranchView {
+@@ENTRY@@
+@@JOIN@@
+@@ENTRY_FULL_PATH@@
+} }
+struct CFileData
+{
+    const char* Name = nullptr;
+    const wchar_t* NameW = nullptr;
+    BOOL UseWideName() const { return NameW != nullptr; }
+};
+struct CBranchViewState
+{
+    bool Enabled = true;
+    std::mutex ItemsMutex;
+    std::unordered_map<const char*, Salamander::BranchView::Entry> Items;
+    std::unordered_map<std::string, const CFileData*> CacheFiles;
+};
+struct TestRows {
+    std::vector<CFileData> Values;
+    int Count = 0;
+    CFileData& At(int i) { return Values.at(i); }
+};
+struct TestMasks {
+    BOOL Ready = TRUE, Match = TRUE;
+    BOOL PrepareMasks(int& error) { error = 0; return Ready; }
+    BOOL AgreeMasks(const char*, const char*) { return Match; }
+};
+const int VIEWER_EXTERNAL = 0, VIEWER_INTERNAL = 1;
+struct CViewerMasksItem { TestMasks* Masks; int ViewerType; };
+struct CViewerMasks {
+    std::vector<CViewerMasksItem*> Values;
+    int Count = 0;
+    CViewerMasksItem* At(int i) { return Values.at(i); }
+};
+struct TestHistory {
+    int Count = 0;
+    std::string Path;
+    void AddFile(int,int,const char* path) { ++Count; Path=path; }
+};
+struct TestPacker { BOOL Archive=FALSE; BOOL PackIsArchive(const char*) {return Archive;} } PackerFormatConfig;
+const int fhitOpen=1, BUTTONS_OK=1, IDS_TOOLONGNAME=1, IDS_ERROROPENINGFILE=2;
+static int DialogCalls=0, ShellCalls=0;
+static BOOL ShellSuccess=TRUE;
+static std::wstring ShellFile, ShellDirectory;
+static std::function<void()> OnShell;
+static BOOL RecordShell(SHELLEXECUTEINFOW* info) {
+    ++ShellCalls; ShellFile=info->lpFile; ShellDirectory=info->lpDirectory;
+    if(OnShell)OnShell();
+    return ShellSuccess;
+}
+static int ProgramCalls=0;
+static HRESULT ProgramResult=S_OK;
+static std::wstring ProgramSource, ProgramDirectory;
+static HRESULT LaunchBranchProgram(HWND, const std::wstring& source, const std::wstring& directory) {
+    ++ProgramCalls;ProgramSource=source;ProgramDirectory=directory;
+    if(OnShell)OnShell();return ProgramResult;
+}
+static void ShowBranchLaunchFailure(HWND, const std::wstring&, HRESULT, bool) {++DialogCalls;}
+#define ShellExecuteExW RecordShell
+struct TestMainWindow {
+    TestHistory History;
+    TestHistory* FileHistory=&History;
+    CViewerMasks* ViewerMasks = nullptr;
+    CViewerMasks* AltViewerMasks = nullptr;
+} TestMain;
+static TestMainWindow* MainWindow = &TestMain;
+static DWORD ParentAttributes = FILE_ATTRIBUTE_DIRECTORY;
+static std::wstring CheckedParent;
+static DWORD RecordAttributes(const wchar_t* path) {
+    CheckedParent = path;
+    return ParentAttributes;
+}
+#define GetFileAttributesW RecordAttributes
+
+struct CFilesWindow
+{
+    CBranchViewState* BranchView = nullptr;
+    std::wstring WideRoot = L"C:\\root";
+    std::string AnsiRoot = "C:\\root";
+    bool NullWideRoot = false;
+    const wchar_t* GetPathW() const { return NullWideRoot ? nullptr : WideRoot.c_str(); }
+    const char* GetPath() const { return AnsiRoot.c_str(); }
+    std::wstring GetItemDirectoryW(const CFileData&) const;
+    std::wstring GetItemFullPathW(const CFileData&) const;
+    std::wstring GetItemRelativePathW(const CFileData&) const;
+    TestRows DirRows, FileRows;
+    TestRows* Dirs = &DirRows;
+    TestRows* Files = &FileRows;
+    HWND HWindow = nullptr;
+    int Caret = 0, NavigationCalls = 0, FocusCalls = 0, FocusedIndex = -1, EndRefreshCalls=0, ArchiveCalls=0;
+    std::string OpenedArchive;
+    BOOL NavigationSuccess = TRUE, ViewGatePassed = FALSE;
+    std::function<void()> OnNavigate;
+    std::wstring OpenedDirectory;
+    std::string FocusName;
+    BOOL IsBranchView() const { return BranchView != nullptr && BranchView->Enabled; }
+    int GetCaretIndex() const { return Caret; }
+    HWND GetListBoxHWND() const { return HWindow; }
+    const char* GetItemCacheKeyPtr(const CFileData&) const;
+    const CFileData* GetBranchViewFileByCacheKey(const char*) const;
+    BOOL OpenBranchItemDirectory();
+    void SetCaretIndex(int index, BOOL) { ++FocusCalls; FocusedIndex = index; Caret = index; }
+    BOOL ChangePathToDiskW(HWND, const wchar_t* path) {
+        ++NavigationCalls; OpenedDirectory = path;
+        if (NavigationSuccess) { BranchView->Enabled = false; if (OnNavigate) OnNavigate(); }
+        return NavigationSuccess;
+    }
+    void EndStopRefresh() {++EndRefreshCalls;}
+    void ChangePathToArchive(const char* path,const char*,int,const char*,BOOL,BOOL*) {++ArchiveCalls;OpenedArchive=path;}
+    void ExecuteBranch(CFileData* file);
+    void ViewPolicy(const char* name, BOOL altView, DWORD handlerID);
+
+};
+@@GETTERS@@
+@@CACHE@@
+@@NAVIGATION@@
+void CFilesWindow::ExecuteBranch(CFileData* file) {
+@@EXECUTE@@
+}
+#undef GetFileAttributesW
+#define HANDLES_Q(call) (call)
+@@ARCHIVE_READ@@
+#undef HANDLES_Q
+void CFilesWindow::ViewPolicy(const char* name, BOOL altView, DWORD handlerID) {
+    ViewGatePassed = FALSE;
+@@VIEW_POLICY@@
+    ViewGatePassed = TRUE;
+}
+
+static int Checks = 0, Failures = 0;
+static void Check(bool success, const char* description)
+{
+    ++Checks;
+    if (!success) { ++Failures; std::printf("FAIL: %s\n", description); }
+}
+static void Paths(CFilesWindow& panel, const CFileData& file,
+                  const std::wstring& directory, const std::wstring& full,
+                  const std::wstring& relative, const char* description)
+{
+    Check(panel.GetItemDirectoryW(file) == directory, (std::string(description) + " directory").c_str());
+    Check(panel.GetItemFullPathW(file) == full, (std::string(description) + " full").c_str());
+    Check(panel.GetItemRelativePathW(file) == relative, (std::string(description) + " relative").c_str());
+}
+static void Add(CBranchViewState& state, const CFileData& file,
+                const std::wstring& directory, const std::wstring& actualName,
+                const std::wstring& relative)
+{
+    Salamander::BranchView::Entry entry = {};
+    entry.Directory = directory;
+    entry.RelativePath = relative;
+    if (wcscpy_s(entry.Data.cFileName, actualName.c_str()) != 0) std::abort();
+    entry.CacheKey = SalWideToMultiBytePath(entry.FullPath().c_str(), CP_UTF8);
+    state.Items.emplace(file.Name, std::move(entry));
+}
+static int Utf8Length(const std::wstring& path)
+{
+    return WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, path.c_str(), -1,
+                               nullptr, 0, nullptr, nullptr) - 1;
+}
+static void NavigationTests()
+{
+    CBranchViewState state;
+    CFilesWindow panel; panel.BranchView = &state;
+    std::string name1 = "same.txt", name2 = "same.txt";
+    panel.FileRows.Values = {{name1.c_str(), L"same.txt"}, {name2.c_str(), L"same.txt"}};
+    panel.FileRows.Count = 2;
+    const std::wstring longParent = L"C:\\" + std::wstring(100, L'a') + L"\\" + std::wstring(100, L'b') + L"\\" + std::wstring(100, L'c') + L"\\東京";
+    Add(state, panel.Files->At(0), L"C:\\ascii", L"same.txt", L"ascii\\same.txt");
+    Add(state, panel.Files->At(1), longParent, L"same.txt", L"東京\\same.txt");
+    for (int i = 0; i < 2; ++i) {
+        const auto& file = panel.Files->At(i);
+        state.CacheFiles[panel.GetItemCacheKeyPtr(file)] = &file;
+    }
+    for (int i = 0; i < 2; ++i) {
+        state.Enabled = true; panel.Caret = i;
+        const auto& file = panel.Files->At(i);
+        const auto expectedDirectory = panel.GetItemDirectoryW(file);
+        Check(panel.OpenBranchItemDirectory() != FALSE, "actual Open Parent succeeds for exact duplicate identity");
+        Check(panel.OpenedDirectory == expectedDirectory && panel.FocusedIndex == 0 && panel.FocusCalls > 0, "parent and focus remain exact with long Unicode ancestor");
+        Check(!state.Enabled, "successful navigation reaches ordinary panel callback");
+        state.Enabled = true; panel.Caret = i; panel.NavigationSuccess = FALSE;
+        Check(panel.OpenBranchItemDirectory() == FALSE && state.Enabled, "non-destructive navigation callback failure is propagated");
+        panel.NavigationSuccess = TRUE;
+        const int navigationBefore = panel.NavigationCalls;
+        ParentAttributes = INVALID_FILE_ATTRIBUTES;
+        Check(!panel.OpenBranchItemDirectory() && state.Enabled && panel.NavigationCalls == navigationBefore, "vanished parent is rejected before destructive navigation callback");
+        ParentAttributes = FILE_ATTRIBUTE_NORMAL;
+        Check(!panel.OpenBranchItemDirectory() && state.Enabled && panel.NavigationCalls == navigationBefore, "a file cannot substitute for the source directory");
+        ParentAttributes = FILE_ATTRIBUTE_DIRECTORY;
+        const auto checked = expectedDirectory.size() >= MAX_PATH ? L"\\\\?\\" + expectedDirectory : expectedDirectory;
+        Check(CheckedParent == checked, "preflight uses exact wide directory with extended prefix for long paths");
+    }
+    state.Enabled = true; panel.Caret = 1;
+    state.CacheFiles.clear(); const int navigationBefore = panel.NavigationCalls;
+    Check(!panel.OpenBranchItemDirectory() && panel.NavigationCalls == navigationBefore, "missing current cache-row mapping cannot navigate to guessed parent");
+    for (int index : {-1, 2}) {panel.Caret = index; Check(!panel.OpenBranchItemDirectory(), "invalid focus cannot navigate");}
+    const std::wstring expectedWideFocus(100, L'東');
+    std::wstring replacedWideFocus = expectedWideFocus;
+    std::string oldLegacy = "old-lossy-name";
+    panel.FileRows.Values = {{oldLegacy.c_str(), replacedWideFocus.c_str()}};
+    panel.FileRows.Count = 1; panel.Caret = 0; state.Items.clear();
+    Add(state, panel.Files->At(0), longParent, replacedWideFocus, replacedWideFocus);
+    state.CacheFiles[panel.GetItemCacheKeyPtr(panel.Files->At(0))] = &panel.Files->At(0);
+    panel.OnNavigate = [&]() {
+        state.Items.clear(); state.CacheFiles.clear();
+        replacedWideFocus.assign(100, L'X');
+        panel.FileRows.Values = {{"ordinary-other.txt", nullptr}, {"new-lossy-name", expectedWideFocus.c_str()}};
+        panel.FileRows.Count = 2;
+    };
+    Check(panel.OpenBranchItemDirectory() != FALSE, "actual parent navigation tolerates replacement of all original rows and metadata");
+    Check(panel.FocusedIndex == 1 && !state.Enabled, "owned wide basename beyond MAX_PATH UTF8 bytes focuses the exact replacement row");
+    panel.OnNavigate = nullptr;
+    state.Enabled = true;
+    TestMasks match, noMatch; noMatch.Match = FALSE;
+    CViewerMasksItem internal = {&match, VIEWER_INTERNAL}, external = {&match, VIEWER_EXTERNAL}, plugin = {&match, -1}, skippedPlugin = {&noMatch, -1};
+    CViewerMasks normal, alternate; MainWindow->ViewerMasks = &normal; MainWindow->AltViewerMasks = &alternate;
+    normal.Count = 1; alternate.Count = 1; alternate.Values = {&external};
+    for (auto* viewer : {&internal, &external, &plugin}) {
+        normal.Values = {viewer}; panel.ViewPolicy("C:\\東京\\same.txt", FALSE, 0xFFFFFFFF);
+        Check((panel.ViewGatePassed != FALSE) == (viewer != &plugin), "first matching mask allows only core/configured external viewer");
+    }
+    normal.Values = {&plugin, &internal}; normal.Count = 2;
+    panel.ViewPolicy("C:\\same.txt", FALSE, 0xFFFFFFFF);
+    Check(!panel.ViewGatePassed, "unverified matching plugin cannot fall through to launch");
+    normal.Values = {&skippedPlugin, &internal};
+    panel.ViewPolicy("C:\\same.txt", FALSE, 0xFFFFFFFF);
+    Check(panel.ViewGatePassed != FALSE, "nonmatching plugin mask does not block the selected core viewer");
+    panel.ViewPolicy("C:\\same.txt", TRUE, 0xFFFFFFFF);
+    Check(panel.ViewGatePassed != FALSE, "alternate configured external viewer is allowed");
+    panel.ViewPolicy("C:\\same.txt", FALSE, 123);
+    Check(!panel.ViewGatePassed, "unvalidated explicit handler selection stays blocked");
+    panel.ViewPolicy("relative.txt", FALSE, 0xFFFFFFFF);
+    Check(!panel.ViewGatePassed, "non-full viewer path is rejected");
+    state.Enabled = false; normal.Values = {&plugin}; normal.Count = 1;
+    panel.ViewPolicy("C:\\same.txt", FALSE, 123);
+    Check(panel.ViewGatePassed != FALSE, "ordinary panel keeps its previous viewer dispatch policy");
+}
+
+static void EnterTests()
+{
+    const std::vector<std::wstring> parents = {L"\\\\?\\C:\\ascii",L"C:\\"+std::wstring(100,L'東'),L"C:\\"+std::wstring(100,L'a')+L"\\"+std::wstring(100,L'b')+L"\\"+std::wstring(100,L'c')};
+    for(const auto& parent : parents) {
+        CBranchViewState state; CFilesWindow panel;panel.BranchView=&state;
+        std::string legacy="same.zip";panel.FileRows.Values={{legacy.c_str(),L"same.zip"}};panel.FileRows.Count=1;
+        auto* file=&panel.Files->At(0);Add(state,*file,parent,L"same.zip",L"same.zip");
+        state.CacheFiles[panel.GetItemCacheKeyPtr(*file)]=file;
+        const auto full=panel.GetItemFullPathW(*file);
+        PackerFormatConfig.Archive=TRUE;
+        panel.ExecuteBranch(file);
+        Check(panel.ArchiveCalls==1 && panel.OpenedArchive==SalWideToMultiBytePath(full.c_str(),CP_UTF8),"actual archive Enter dispatch keeps exact full identity");
+        Check(panel.EndRefreshCalls==1,"archive Enter balances refresh once");
+        PackerFormatConfig.Archive=FALSE;const int calls=ShellCalls, errors=DialogCalls, history=MainWindow->History.Count;
+        ShellSuccess=TRUE;panel.ExecuteBranch(file);
+        const auto plain=SalPathRemoveExtendedPrefixW(full.c_str());
+        if(plain.size()>=MAX_PATH) {
+            Check(ShellCalls==calls && DialogCalls==errors+1 && MainWindow->History.Count==history,"unsupported long Shell input reports failure without policy bypass or history");
+        } else {
+            Check(ShellCalls==calls+1 && ShellFile==plain,"Shell receives complete UTF16 identity without Win32 extended syntax");
+            Check(ShellDirectory==Salamander::FileActionPaths::InitialDirectory(SalWideToMultiBytePath(parent.c_str(),CP_UTF8).c_str()),"Shell gets the selected item's actual parent");
+            Check(MainWindow->History.Count==history+1 && MainWindow->History.Path==SalWideToMultiBytePath(full.c_str(),CP_UTF8),"successful Shell records original full UTF8 identity");
+            ShellSuccess=FALSE;const int previous=MainWindow->History.Count;panel.ExecuteBranch(file);
+            Check(MainWindow->History.Count==previous,"failed Shell does not record successful-open history");
+            ShellSuccess=TRUE;OnShell=[&](){state.Items.clear();state.CacheFiles.clear();};panel.ExecuteBranch(file);OnShell=nullptr;
+            Check(MainWindow->History.Path==SalWideToMultiBytePath(full.c_str(),CP_UTF8),"owned Shell/history arguments survive metadata destruction during launch");
+        }
+        const int shellBefore=ShellCalls, archiveBefore=panel.ArchiveCalls, endBefore=panel.EndRefreshCalls;
+        state.CacheFiles.clear();panel.ExecuteBranch(file);
+        Check(ShellCalls==shellBefore && panel.ArchiveCalls==archiveBefore && panel.EndRefreshCalls==endBefore+1,"missing cache identity fails closed and balances refresh");
+    }
+}
+static void ProgramDispatchTests()
+{
+    CBranchViewState state; CFilesWindow panel;panel.BranchView=&state;
+    std::string legacy="run.exe";panel.FileRows.Values={{legacy.c_str(),L"run.exe"}};panel.FileRows.Count=1;
+    auto* file=&panel.Files->At(0);const std::wstring parent=L"\\\\?\\C:\\"+std::wstring(280,L'a');
+    Add(state,*file,parent,L"run.exe",L"run.exe");state.CacheFiles[panel.GetItemCacheKeyPtr(*file)]=file;
+    const auto full=panel.GetItemFullPathW(*file);PackerFormatConfig.Archive=FALSE;
+    const int shell=ShellCalls, calls=ProgramCalls, history=MainWindow->History.Count;
+    ProgramResult=S_OK;panel.ExecuteBranch(file);
+    Check(ProgramCalls==calls+1 && ShellCalls==shell,"exe selects program broker before any Shell attempt");
+    Check(ProgramSource==full && ProgramDirectory==parent,"program broker receives complete owned wide source and parent");
+    Check(MainWindow->History.Count==history+1,"successful broker records successful-open history");
+    ProgramResult=E_ACCESSDENIED;const int errors=DialogCalls;panel.ExecuteBranch(file);
+    Check(DialogCalls==errors+1 && MainWindow->History.Count==history+1 && ShellCalls==shell,"denied broker reports failure with no Shell retry or history");
+    ProgramResult=S_OK;OnShell=[&](){state.Items.clear();state.CacheFiles.clear();};panel.ExecuteBranch(file);OnShell=nullptr;
+    Check(MainWindow->History.Path==SalWideToMultiBytePath(full.c_str(),CP_UTF8),"program source/history remains owned after reentrant metadata removal");
+}
+static void ArchiveReadTests(const wchar_t* scratch)
+{
+    const std::wstring root = std::wstring(scratch) + L"\\archive-read";
+    std::vector<std::wstring> dirs, created;
+    auto make = [&](const std::wstring& path) {
+        Check(CreateDirectoryW(SalPathAddExtendedPrefixW(path.c_str()).c_str(), nullptr) != FALSE, "create owned archive test directory");
+        dirs.push_back(path);
+    };
+    make(root);
+    const std::wstring unicode = root + L"\\český-東京-😀";
+    const std::wstring bytes = root + L"\\" + std::wstring(100, L'東');
+    make(unicode); make(bytes);
+    std::wstring deep = unicode;
+    for (int i=0; i<4; ++i) { deep += L"\\" + std::wstring(65, L'a') + std::to_wstring(i); make(deep); }
+    const std::vector<std::wstring> paths = {root+L"\\same.zip",root+L"\\žluťoučký-東京.zip",unicode+L"\\same.zip",bytes+L"\\same.zip",deep+L"\\same.zip"};
+    for(size_t i=0; i<paths.size(); ++i) {
+        const auto extended = SalPathAddExtendedPrefixW(paths[i].c_str());
+        const std::string marker = "archive-identity-" + std::to_string(i);
+        HANDLE output = CreateFileW(extended.c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
+        Check(output != INVALID_HANDLE_VALUE,"create distinct owned archive source");
+        if(output == INVALID_HANDLE_VALUE) continue;
+        DWORD written=0; Check(WriteFile(output,marker.data(),(DWORD)marker.size(),&written,nullptr) && written==marker.size(),"write exact owned archive marker"); CloseHandle(output); created.push_back(extended);
+        for(DWORD flags : {DWORD(FILE_ATTRIBUTE_NORMAL),DWORD(0)}) {
+            const std::string utf8 = SalWideToMultiBytePath(paths[i].c_str(),CP_UTF8);
+            HANDLE input = OpenArchiveFileForRead(utf8.c_str(),flags);
+            Check(input != INVALID_HANDLE_VALUE,"actual host metadata read opens complete UTF8 archive identity");
+            if(input == INVALID_HANDLE_VALUE)continue;
+            LARGE_INTEGER size={}; FILETIME date={}; char data[64]={}; DWORD read=0;
+            Check(GetFileSizeEx(input,&size) && size.QuadPart==(LONGLONG)marker.size() && GetFileTime(input,nullptr,nullptr,&date),"actual metadata size/time succeeds with original sharing and flags");
+            Check(ReadFile(input,data,sizeof(data),&read,nullptr) && std::string(data,read)==marker,"metadata handle belongs to the exact duplicate source");
+            CloseHandle(input);
+        }
+    }
+    Check(OpenArchiveFileForRead(SalWideToMultiBytePath((deep+L"\\missing.zip").c_str(),CP_UTF8).c_str(),0)==INVALID_HANDLE_VALUE,"missing long archive fails without root fallback");
+    Check(OpenArchiveFileForRead(nullptr,0)==INVALID_HANDLE_VALUE,"null archive does not fall back to panel root");
+    Check(OpenArchiveFileForRead("",0)==INVALID_HANDLE_VALUE,"empty archive does not fall back to panel root");
+    for(const auto& path:created)Check(DeleteFileW(path.c_str())!=FALSE,"remove only owned archive source");
+    for(auto i=dirs.rbegin();i!=dirs.rend();++i)Check(RemoveDirectoryW(SalPathAddExtendedPrefixW(i->c_str()).c_str())!=FALSE,"remove only owned archive fixture directories");
+}
+int wmain(int argc, wchar_t** argv)
+{
+    if(argc!=2)return 2;
+    CFilesWindow panel;
+    CFileData ordinary = {"same.png", L"same.png"};
+    Paths(panel, ordinary, L"C:\\root", L"C:\\root\\same.png", L"same.png", "ordinary panel");
+    panel.WideRoot = L"C:\\žluťoučký\\東京";
+    CFileData unicode = {"lossy-name.png", L"český-東京-\U0001F642.png"};
+    Paths(panel, unicode, panel.WideRoot, panel.WideRoot + L"\\český-東京-\U0001F642.png",
+          L"český-東京-\U0001F642.png", "ordinary wide name and root");
+    panel.NullWideRoot = true;
+    Paths(panel, ordinary, L"C:\\root", L"C:\\root\\same.png", L"same.png", "ordinary null wide root");
+    panel.NullWideRoot = false;
+    panel.WideRoot.clear();
+    CFileData narrow = {"plain.txt", nullptr};
+    Paths(panel, narrow, L"C:\\root", L"C:\\root\\plain.txt", L"plain.txt", "ordinary empty wide root");
+    panel.WideRoot = L"C:\\root";
+
+    CBranchViewState branch;
+    panel.BranchView = &branch;
+    // Identical display text at three distinct addresses is intentional.
+    std::string firstName = "same.png", secondName = "same.png", thirdName = "same.png";
+    CFileData first = {firstName.c_str(), L"same.png"};
+    CFileData second = {secondName.c_str(), L"same.png"};
+    CFileData third = {thirdName.c_str(), L"same.png"};
+    Add(branch, first, L"C:\\root\\ascii", L"same.png", L"ascii\\same.png");
+    Add(branch, second, L"C:\\root\\žluťoučký\\東京", L"same.png", L"žluťoučký\\東京\\same.png");
+    Add(branch, third, L"C:\\root\\third", L"same.png", L"third\\same.png");
+    Paths(panel, first, L"C:\\root\\ascii", L"C:\\root\\ascii\\same.png", L"ascii\\same.png", "duplicate first");
+    Paths(panel, second, L"C:\\root\\žluťoučký\\東京", L"C:\\root\\žluťoučký\\東京\\same.png",
+          L"žluťoučký\\東京\\same.png", "duplicate second");
+    Paths(panel, third, L"C:\\root\\third", L"C:\\root\\third\\same.png", L"third\\same.png", "duplicate third");
+    CFileData reordered = second; // Shallow panel sorting preserves the Name allocation.
+    Paths(panel, reordered, L"C:\\root\\žluťoučký\\東京", L"C:\\root\\žluťoučký\\東京\\same.png",
+          L"žluťoučký\\東京\\same.png", "shallow reordered row");
+
+    std::wstring wideName(100, L'東'); wideName += L"-\U0001F642.png";
+    std::string truncatedMirror = "truncated-name.png";
+    CFileData longUtf8 = {truncatedMirror.c_str(), wideName.c_str()};
+    std::wstring relative = L"žluťoučký\\東京\\" + wideName;
+    std::wstring directory = L"C:\\root\\žluťoučký\\東京";
+    Add(branch, longUtf8, directory, wideName, relative);
+    Check(Utf8Length(directory + L"\\" + wideName) > MAX_PATH &&
+          (directory + L"\\" + wideName).size() < MAX_PATH, "UTF8-only long fixture");
+    Paths(panel, longUtf8, directory, directory + L"\\" + wideName, relative, "UTF8 long exact metadata");
+
+    std::wstring longDirectory = L"C:\\root";
+    std::wstring longRelative;
+    for (int i = 0; i < 20; ++i) { longDirectory += L"\\žluťoučký-東京-directory"; longRelative += L"žluťoučký-東京-directory\\"; }
+    std::string longMirror = "same.png";
+    CFileData longWide = {longMirror.c_str(), L"same.png"};
+    Add(branch, longWide, longDirectory, L"same.png", longRelative + L"same.png");
+    Check(longDirectory.size() > MAX_PATH, "UTF16 long fixture");
+    Paths(panel, longWide, longDirectory, longDirectory + L"\\same.png", longRelative + L"same.png",
+          "Win32 long exact metadata");
+
+    std::string uncMirror = "unc.png";
+    CFileData unc = {uncMirror.c_str(), L"東京.png"};
+    Add(branch, unc, L"\\\\server\\share\\東京", L"東京.png", L"東京\\東京.png");
+    Paths(panel, unc, L"\\\\server\\share\\東京", L"\\\\server\\share\\東京\\東京.png",
+          L"東京\\東京.png", "UNC exact metadata");
+
+    CFileData missing = {"unmapped.png", L"not-the-root-file.png"};
+    Paths(panel, missing, L"", L"", L"", "missing active metadata");
+    std::string recycledMirror = "same.png";
+    CFileData recycled = {recycledMirror.c_str(), L"same.png"};
+    Paths(panel, recycled, L"", L"", L"", "same text new Name pointer cannot steal metadata");
+    branch.Items.erase(second.Name);
+    Paths(panel, second, L"", L"", L"", "removed row cannot reconstruct root path");
+    CFileData malformed = {nullptr, L"otherwise-valid.png"};
+    Paths(panel, malformed, L"", L"", L"", "null identity");
+    CFileData empty = {"", L""};
+    Paths(panel, empty, L"", L"", L"", "empty identity");
+    CFileData up = {"..", L".."};
+    Paths(panel, up, L"C:\\root", L"C:\\root\\..", L"..", "synthetic parent navigation");
+
+    // Disabling keeps metadata until the old listing is released.
+    branch.Enabled = false;
+    Paths(panel, first, L"C:\\root\\ascii", L"C:\\root\\ascii\\same.png", L"ascii\\same.png",
+          "disabled retained Branch row");
+    Paths(panel, missing, L"C:\\root", L"C:\\root\\not-the-root-file.png", L"not-the-root-file.png",
+          "disabled ordinary fallback");
+    Paths(panel, up, L"C:\\root", L"C:\\root\\..", L"..", "disabled parent navigation");
+    branch.Items.clear();
+    Paths(panel, ordinary, L"C:\\root", L"C:\\root\\same.png", L"same.png", "disabled cleared listing");
+    branch.Enabled = true;
+    Paths(panel, ordinary, L"", L"", L"", "new active Branch has no ordinary row fallback");
+    Paths(panel, up, L"C:\\root", L"C:\\root\\..", L"..", "first-scan empty listing parent navigation");
+
+    NavigationTests();
+    ArchiveReadTests(argv[1]);
+    EnterTests();
+    ProgramDispatchTests();
+    std::printf("Branch panel getters/navigation: %d checks, %d failures\n", Checks, Failures);
+    return Failures ? 1 : 0;
+}

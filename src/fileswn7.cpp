@@ -22,6 +22,9 @@
 
 CPanelTmpEnumData::CPanelTmpEnumData()
 {
+    ExactFileSelection = FALSE;
+    SourcePanel = NULL;
+    ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
     Indexes = NULL;
     CurrentIndex = 0;
     IndexesCount = 0;
@@ -566,9 +569,7 @@ static bool DiskDirBuildEnumeration(HWND parent, int enumFiles,
         if (name.empty() || name == L"..")
             continue;
 
-        std::wstring fullPath = panelPath;
-        if (!SalPathAppendW(fullPath, name.c_str()))
-            return false;
+        std::wstring fullPath = data->Panel->GetItemFullPathW(*file);
         if (DiskDirSamePath(fullPath, data->OutputPath))
             continue;
 
@@ -731,6 +732,8 @@ static BOOL UnpackArchiveToArchiveViaTemp(CFilesWindow* source, CPanelTmpEnumDat
 void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const char* tgtPath,
                                     BOOL* changeTargetRequested)
 {
+    if (IsBranchView() || target != NULL && target->IsBranchView()) return; // S26 read-only direct boundary.
+
     if (changeTargetRequested != NULL)
         *changeTargetRequested = FALSE;
     CALL_STACK_MESSAGE3("CFilesWindow::UnpackZIPArchive(, %d, %s)", deleteOp, tgtPath);
@@ -1651,6 +1654,80 @@ const char* WINAPI PanelEnumDiskSelection(HWND parent, int enumFiles, const char
         return NULL;
     }
 
+    if (data->SourcePanel != NULL && data->ExactFileSelection)
+    {
+        if (data->CurrentIndex >= data->IndexesCount)
+            return NULL;
+        const int selectionIndex = data->CurrentIndex++;
+        const int index = data->Indexes[selectionIndex];
+        if (index < data->Dirs->Count || index >= data->Dirs->Count + data->Files->Count)
+        {
+            if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+            return NULL;
+        }
+        const CFileData& file = data->Files->At(index - data->Dirs->Count);
+        CQuadWord fileSize = file.Size;
+        try
+        {
+            const std::wstring relativePath = data->SourcePanel->GetItemRelativePathW(file);
+            data->BranchEnumName = SalWideToMultiBytePath(relativePath.c_str(), CP_UTF8);
+            if (relativePath.empty() || data->BranchEnumName.empty())
+            {
+                if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+                SetLastError(ERROR_INVALID_DATA);
+                return NULL;
+            }
+            if (enumFiles == 3 && (file.Attr & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            {
+                if (data->BranchEnumLinkSizeValid.size() != static_cast<size_t>(data->IndexesCount))
+                {
+                    data->BranchEnumLinkSizes.resize(data->IndexesCount);
+                    data->BranchEnumLinkSizeValid.assign(data->IndexesCount, FALSE);
+                }
+                if (data->BranchEnumLinkSizeValid[selectionIndex])
+                    fileSize = data->BranchEnumLinkSizes[selectionIndex];
+                else
+                {
+                    const std::wstring fullPath = data->SourcePanel->GetItemFullPathW(file);
+                    const std::string encodedPath = SalWideToMultiBytePath(fullPath.c_str(), CP_UTF8);
+                    if (fullPath.empty() || encodedPath.empty())
+                    {
+                        if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+                        SetLastError(ERROR_INVALID_DATA);
+                        return NULL;
+                    }
+                    BOOL cancel = FALSE;
+                    CQuadWord targetSize;
+                    if (GetLinkTgtFileSize(parent, encodedPath.c_str(), NULL, &targetSize,
+                                          &cancel, &data->ErrGetFileSizeOfLnkTgtIgnAll))
+                        fileSize = targetSize;
+                    else if (cancel)
+                    {
+                        if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+                        return NULL;
+                    }
+                    // A move packer may enumerate again after deleting its
+                    // sources. Retain the resolved (or ignored) size on reset,
+                    // just as ordinary enumeration retains DiskDirectoryTree.
+                    data->BranchEnumLinkSizes[selectionIndex] = fileSize;
+                    data->BranchEnumLinkSizeValid[selectionIndex] = TRUE;
+                }
+            }
+        }
+        catch (const std::bad_alloc&)
+        {
+            if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+            SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            return NULL;
+        }
+        if (dosName != NULL) *dosName = NULL;
+        if (isDir != NULL) *isDir = FALSE;
+        if (size != NULL) *size = fileSize;
+        if (attr != NULL) *attr = file.Attr;
+        if (lastWrite != NULL) *lastWrite = file.LastWrite;
+        return data->BranchEnumName.c_str();
+    }
+
     if (enumFiles > 0)
     {
         if (data->DiskDirectoryTree == NULL)
@@ -1906,6 +1983,8 @@ static BOOL UnpackArchiveToArchiveViaTemp(CFilesWindow* source, CPanelTmpEnumDat
 
 void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* pluginName, int delFilesAfterPacking)
 {
+    if (IsBranchView() || target != NULL && target->IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+
     CALL_STACK_MESSAGE4("CFilesWindow::Pack(, %d, %s, %d)", pluginIndex, pluginName, delFilesAfterPacking);
     if (Files->Count + Dirs->Count == 0)
         return;
@@ -2012,6 +2091,10 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     data.ZIPPath = GetZIPPath();
     data.Dirs = Dirs;
     data.Files = Files;
+    data.SourcePanel = this;
+    data.ExactFileSelection = Is(ptDisk);
+    for (int item = 0; item < data.IndexesCount && data.ExactFileSelection; ++item)
+        if (data.Indexes[item] < Dirs->Count) data.ExactFileSelection = FALSE;
     data.ArchiveDir = GetArchiveDir();
     lstrcpyn(data.WorkPath, GetPath(), _countof(data.WorkPath));
     data.EnumLastDir = NULL;
@@ -2111,9 +2194,9 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     }
 
     // if no item is selected, choose the focused item and store its name
-    char temporarySelected[SAL_MAX_PATH];
-    temporarySelected[0] = 0;
-    SelectFocusedItemAndGetName(temporarySelected, _countof(temporarySelected));
+    CPanelTemporarySelection temporarySelected;
+    temporarySelected.Clear();
+    SelectFocusedItemAndGetName(temporarySelected);
 
     if (delFilesAfterPacking == 1)
         PackerConfig.Move = TRUE;
@@ -2290,6 +2373,8 @@ _PACK_AGAIN:
 
 void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* pluginName, const char* unpackMask)
 {
+    if (IsBranchView() || target != NULL && target->IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+
     CALL_STACK_MESSAGE4("CFilesWindow::Unpack(, %d, %s, %s)", pluginIndex, pluginName, unpackMask);
 
     // restore DefaultDir
