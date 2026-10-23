@@ -141,6 +141,8 @@ MENU_TEMPLATE_ITEM MouseDropMenu2[] =
 BOOL DoCopyMove(BOOL copy, char* targetDir, CCopyMoveData* data, void* param)
 {
     CFilesWindow* panel = (CFilesWindow*)param;
+    if (panel->IsBranchView()) { DestroyCopyMoveData(data); return FALSE; }
+
 
     CTmpDropData* tmp = new CTmpDropData;
     if (tmp != NULL)
@@ -259,6 +261,8 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
     CFilesWindow* panel = (CFilesWindow*)param;
     isTgtFile = FALSE; // drop target is not a file yet -> we can still handle the operation ourselves
     tgtType = idtttWindows;
+    if (panel->IsBranchView()) { if (effect != NULL) *effect = DROPEFFECT_NONE; return NULL; } // S26 read-only drop target.
+
     RECT r;
     GetWindowRect(panel->GetListBoxHWND(), &r);
     int index = panel->GetIndex(pt.x - r.left, pt.y - r.top);
@@ -618,6 +622,8 @@ const char* GetCurrentDirClipboard(POINTL& pt, void* param, DWORD* effect, BOOL 
     CFilesWindow* panel = (CFilesWindow*)param;
     isTgtFile = FALSE;
     tgtType = idtttWindows;
+    if (panel->IsBranchView()) { if (effect != NULL) *effect = DROPEFFECT_NONE; return NULL; } // S26 read-only drop target.
+
     if (panel->Is(ptZIPArchive) || panel->Is(ptPluginFS)) // not into archives or FS yet
     {
         //    if (panel->Is(ptZIPArchive)) tgtType = idtttArchive;
@@ -1576,6 +1582,8 @@ BOOL GetACLUISecurityPageName(char* pageName, int pageNameMax)
 void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                  BOOL posByMouse, BOOL onlyPanelMenu)
 {
+    if (panel->IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+
     CALL_STACK_MESSAGE5("ShellAction(, %d, %d, %d, %d)", action, useSelection, posByMouse, onlyPanelMenu);
     if (panel->QuickSearchMode)
         panel->EndQuickSearch();

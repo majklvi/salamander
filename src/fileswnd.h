@@ -177,6 +177,9 @@ class CStatusWindow;
 class CFilesArray;
 struct CFileData;
 class CIconCache;
+class CBranchViewState;
+struct CBranchViewRestoreState;
+namespace Salamander { namespace BranchView { struct Progress; } }
 class CSalamanderDirectory;
 struct IContextMenu2;
 class CPathHistory;
@@ -864,12 +867,33 @@ public:
     CPanelSide PanelSide;
     ULONGLONG PanelTabId;
 
-    // Ordinary disk-row paths; Name/NameW remain basenames. Adapted from the
-    // pinned PR #769 getters without Branch View state or retained row pointers.
+    CBranchViewState* BranchView; // core-owned disk collection, NULL for ordinary panels
+
+    BOOL IsBranchView() const;
+    BOOL IsBranchViewScanning() const;
+    ULONGLONG GetBranchViewGeneration() const;
     std::wstring GetItemFullPathW(const CFileData& file) const;
     std::wstring GetItemDirectoryW(const CFileData& file) const;
     std::wstring GetItemIdentityW(const CFileData& file) const;
     std::wstring GetItemRelativePathW(const CFileData& file) const;
+    std::string GetItemCacheKey(const CFileData& file) const;
+    const char* GetItemCacheKeyPtr(const CFileData& file) const;
+    const CFileData* GetBranchViewFileByCacheKey(const char* key) const;
+    CBranchViewRestoreState CaptureBranchViewState();
+    void RestoreBranchViewState(const CBranchViewRestoreState& state);
+    void ToggleBranchView();
+    void RefreshBranchView(BOOL automatic = FALSE);
+    void PollBranchView();
+    void CancelBranchViewScan();
+    void ShutdownBranchView();
+    void LeaveBranchView();
+    void GetBranchViewProgress(Salamander::BranchView::Progress& progress) const;
+    std::wstring GetBranchViewStatusW() const;
+    std::string GetBranchViewStatusText() const;
+    int GetBranchViewPathColumnWidth() const;
+    void SetBranchViewPathColumnWidth(int width);
+    void PruneBranchViewMetadata();
+    void ReindexBranchViewFiles();
 
     bool CustomTabColorValid;
     COLORREF CustomTabColor;

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "branch_view.h"
 
 #include <uxtheme.h>
 
@@ -850,6 +851,8 @@ void CFilesWindow::HandsOff(BOOL off)
 
 void CFilesWindow::Execute(int index)
 {
+    if (IsBranchView() && index >= Dirs->Count) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+
     CALL_STACK_MESSAGE2("CFilesWindow::Execute(%d)", index);
     MainWindow->CancelPanelsUI(); // cancel QuickSearch and QuickEdit
     if (index < 0 || index >= Dirs->Count + Files->Count)
@@ -1334,8 +1337,28 @@ void CFilesWindow::ChangeCustomSortType(DWORD customData, BOOL reverse, BOOL for
     if (focusIndex >= 0 && focusIndex < Dirs->Count + Files->Count)
         d1 = (focusIndex < Dirs->Count) ? Dirs->At(focusIndex) : Files->At(focusIndex - Dirs->Count);
 
-    SortDirectory();
-    RefreshListBox(-1, -1, FocusedIndex, FALSE, FALSE);
+    const BOOL branchListing = IsBranchView();
+    const BOOL suspendIcons = branchListing && (UseSystemIcons || UseThumbnails);
+    if (suspendIcons)
+        SleepIconCacheThread();
+    SortDirectory(); // also rebuilds the Branch cache-key -> row index
+    if (branchListing && d1.Name != NULL)
+    {
+        // Name allocations survive sorting and distinguish identical basenames.
+        // Do not leave the focus on the former row number after Path sorting.
+        for (int i = 0; i < Dirs->Count + Files->Count; ++i)
+        {
+            const CFileData& file = i < Dirs->Count ? Dirs->At(i) : Files->At(i - Dirs->Count);
+            if (file.Name == d1.Name)
+            {
+                focusIndex = i;
+                break;
+            }
+        }
+    }
+    if (suspendIcons)
+        WakeupIconCacheThread();
+    RefreshListBox(-1, -1, branchListing ? focusIndex : FocusedIndex, FALSE, FALSE);
 }
 
 void CFilesWindow::ChangeSortType(CSortType newType, BOOL reverse, BOOL force)
@@ -2494,6 +2517,7 @@ void CFilesWindow::UpdateTreeView(BOOL active)
 void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOOL newPathIsTheSame,
                                     BOOL isRefresh, BOOL canChangeSourceUID)
 {
+    if (!cancel && (!newPathIsTheSame || !isRefresh)) LeaveBranchView();
     CALL_STACK_MESSAGE6("CFilesWindow::CloseCurrentPath(, %d, %d, %d, %d, %d)",
                         cancel, detachFS, newPathIsTheSame, isRefresh, canChangeSourceUID);
 

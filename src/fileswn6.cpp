@@ -95,6 +95,27 @@ void CFilesWindow::Activate(BOOL shares)
     CALL_STACK_MESSAGE_NONE
     //  TRACE_I("CFilesWindow::Activate");
     LastInactiveRefreshStart = LastInactiveRefreshEnd; // activation cancels information about the last refresh in the inactive window
+    if (IsBranchView())
+    {
+        // S26 uses explicit refresh; future recursive notifications are S30. Merely
+        // activating the window must not probe a slow root, reread free space,
+        // or start another full scan. A deferred real notification still uses
+        // the automatic scheduler, which preserves Stop Scan until manual refresh.
+        if (InactiveRefreshTimerSet)
+        {
+            KillTimer(HWindow, IDT_INACTIVEREFRESH);
+            InactiveRefreshTimerSet = FALSE;
+            PostMessage(HWindow, WM_USER_INACTREFRESH_DIR, FALSE, InactRefreshLParam);
+        }
+        if (InactWinOptimizedReading)
+        {
+            // No listing/cache data changes here. Resume the reader by signal
+            // instead of waiting for a shell icon/thumbnail provider to finish.
+            InactWinOptimizedReading = FALSE;
+            WakeupIconCacheThread();
+        }
+        return;
+    }
     BOOL needToRefreshIcons = InactWinOptimizedReading;
     if (Is(ptDisk) || Is(ptZIPArchive)) // disks and archives
     {
@@ -1106,6 +1127,8 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
 
 void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data)
 {
+    if (IsBranchView()) return; // S26 read-only direct boundary.
+
     CALL_STACK_MESSAGE3("CFilesWindow::DropCopyMove(%d, %s, )", copy, targetPath);
     if (!FilesActionInProgress)
     {

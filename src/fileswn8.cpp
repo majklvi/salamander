@@ -254,6 +254,8 @@ void PluginFSConvertPathToExternal(char* path)
 void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int countSizeMode,
                                BOOL copyToSelectedDirs, BOOL* changeTargetRequested)
 {
+    if (IsBranchView() || target != NULL && target->IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+
     if (changeTargetRequested != NULL)
         *changeTargetRequested = FALSE;
     CALL_STACK_MESSAGE4("CFilesWindow::FilesAction(%d, , %d, %d)", type, countSizeMode,

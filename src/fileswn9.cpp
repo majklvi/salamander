@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "common/widepath.h"
+#include "branch_view.h"
 #include "branchclipboard.h"
 #include "audio_metadata_legacy.h"
 
@@ -155,6 +156,8 @@ BOOL SafeInvokeCommand(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici)
 
 BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pastePath)
 {
+    if (IsBranchView()) return FALSE; // S26 experiment: unverified operation is blocked at direct dispatch.
+
     CALL_STACK_MESSAGE4("CFilesWindow::ClipboardPaste(%d, %d, %s)", onlyLinks, onlyTest, pastePath);
     IDataObject* dataObj;
     BOOL files = FALSE;       // check whether the clipboard data are files at all
@@ -1544,6 +1547,11 @@ void CFilesWindow::GetPanelItemToolTip(DWORD id, char* text, int textSize)
     char displayName[256];
     FormatPanelTipName(f, displayName, _countof(displayName));
     AppendTipLine(text, textSize, IDS_PANELTIP_NAME, displayName);
+    if (IsBranchView())
+    {
+        const std::string parent = SalWideToMultiBytePath(GetItemDirectoryW(*f).c_str(), CP_UTF8);
+        AppendTipLine(text, textSize, IDS_BRANCH_PATH_LABEL, parent.c_str());
+    }
 
     // File-system plug-ins already provide the most useful item summary for
     // the information line.  Reuse it in the panel tooltip as well, so the
@@ -1569,8 +1577,8 @@ void CFilesWindow::GetPanelItemToolTip(DWORD id, char* text, int textSize)
     BOOL categoryAppended = FALSE;
     if (!isDir && Is(ptDisk) && category != ptcUnknown)
     {
-        std::wstring pathW;
-        if (BuildPanelFilePathW(GetPathW(), GetPath(), f, pathW))
+        std::wstring pathW = GetItemFullPathW(*f);
+        if (!pathW.empty())
             categoryAppended = AppendCategoryProperties(text, textSize, pathW.c_str(), category,
                                                        IsLegacyOggFile(f));
     }
@@ -2461,6 +2469,21 @@ void AddStrToStr(char* dstStr, int dstBufSize, const char* srcStr)
 
 // prepare a template for the 'Columns' variable
 
+static void WINAPI InternalGetBranchPath()
+{
+    TransferLen = 0;
+    if (TransferPanelWindow == NULL || TransferFileData == NULL || TransferIsDir == 2)
+        return;
+    const std::string path = SalWideToMultiBytePath(
+        TransferPanelWindow->GetItemDirectoryW(*TransferFileData).c_str(), CP_UTF8);
+    size_t length = (std::min)(path.size(), (size_t)TRANSFER_BUFFER_MAX - 1);
+    while (length < path.size() && length > 0 && ((unsigned char)path[length] & 0xc0) == 0x80)
+        --length;
+    memcpy(TransferBuffer, path.data(), length);
+    TransferBuffer[length] = 0;
+    TransferLen = (int)length;
+}
+
 BOOL CFilesWindow::BuildColumnsTemplate()
 {
     CALL_STACK_MESSAGE1("CFilesWindow::BuildColumnsTemplate()");
@@ -2577,6 +2600,27 @@ BOOL CFilesWindow::BuildColumnsTemplate()
         }
     }
 
+    if (IsBranchView())
+    {
+        CColumn pathColumn = {};
+        lstrcpyn(pathColumn.Name, LoadStr(IDS_BRANCH_PATH), COLUMN_NAME_MAX);
+        lstrcpyn(pathColumn.Description, LoadStr(IDS_BRANCH_PATH_DESC), COLUMN_DESCRIPTION_MAX);
+        pathColumn.ID = COLUMN_ID_CUSTOM;
+        pathColumn.CustomData = BRANCH_VIEW_PATH_COLUMN;
+        pathColumn.GetText = InternalGetBranchPath;
+        pathColumn.SupportSorting = 1;
+        pathColumn.LeftAlignment = 1;
+        pathColumn.FixedWidth = 1;
+        pathColumn.Width = GetBranchViewPathColumnWidth();
+        // Keep the real parent visible beside Name, including duplicate names.
+        const int pathIndex = ColumnsTemplate.Count > 1 && ColumnsTemplate[1].ID == COLUMN_ID_EXTENSION ? 2 : 1;
+        ColumnsTemplate.Insert(pathIndex, pathColumn);
+        if (!ColumnsTemplate.IsGood())
+        {
+            ColumnsTemplate.ResetState();
+            return FALSE;
+        }
+    }
     return TRUE;
 }
 
@@ -2684,7 +2728,11 @@ void CFilesWindow::OnHeaderLineColWidthChanged()
             colIndex = 8;
             break;
         }
-        if (column->ID == COLUMN_ID_CUSTOM &&
+        if (column->ID == COLUMN_ID_CUSTOM && column->CustomData == BRANCH_VIEW_PATH_COLUMN)
+        {
+            SetBranchViewPathColumnWidth(column->Width);
+        }
+        else if (column->ID == COLUMN_ID_CUSTOM &&
             column->GetText == InternalGetExplorerColumn &&
             column->CustomData < EXPLORER_COLUMNS_COUNT)
         {

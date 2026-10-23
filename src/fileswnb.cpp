@@ -425,6 +425,11 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_TIMER:
     {
+        if (wParam == IDT_BRANCHVIEW_POLL)
+        {
+            PollBranchView();
+            return 0;
+        }
         if (wParam == IDT_SM_END_NOTIFY)
         {
             KillTimer(HWindow, IDT_SM_END_NOTIFY);
@@ -508,7 +513,9 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_ICONREADING_BEGIN:
     {
-        if (UseThumbnails && DirectoryLine != NULL)
+        // Branch View reports scanner progress in its status text. Background
+        // thumbnail enrichment must not make a completed listing look like a rescan.
+        if (!IsBranchView() && UseThumbnails && DirectoryLine != NULL)
         {
             IconReadingThrobberID = DirectoryLine->ChangeThrobberID();
             DirectoryLine->SetThrobber(TRUE, 150);
@@ -724,7 +731,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (uMsg == WM_USER_REFRESH_DIR || uMsg == WM_USER_REFRESH_DIR_EX_DELAYED ||
                             uMsg == WM_USER_ICONREADING_END || uMsg == WM_USER_INACTREFRESH_DIR)
                         {
-                            setWait = ShouldShowWaitCursorForRefresh() &&
+                            // Branch refresh only schedules asynchronous work here.
+                            setWait = !IsBranchView() && ShouldShowWaitCursorForRefresh() &&
                                       GetCursor() != LoadCursor(NULL, IDC_WAIT); // ceka uz ?
                             if (setWait)
                                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -742,7 +750,14 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         LastRefreshTime = MyTimeCounter++;
                         HANDLES(LeaveCriticalSection(&TimeCounterSection));
 
-                        RefreshDirectory(probablyUselessRefresh, FALSE, isInactiveRefresh);
+                        if (IsBranchView())
+                        {
+                            // Snooper/deferred notifications use bounded background
+                            // scheduling. An explicit refresh resumes Stop Scan.
+                            const BOOL automatic = uMsg != WM_USER_REFRESH_DIR || wParam != 0;
+                            RefreshBranchView(automatic);
+                        }
+                        else RefreshDirectory(probablyUselessRefresh, FALSE, isInactiveRefresh);
 
                         if (isInactiveRefresh)
                         {
@@ -890,7 +905,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (data != NULL)
         {
             FocusFirstNewItem = TRUE;
-            DropCopyMove(data->Copy, data->TargetPath, data->Data);
+            if (!IsBranchView()) DropCopyMove(data->Copy, data->TargetPath, data->Data);
             DestroyCopyMoveData(data->Data);
             delete data;
         }
@@ -903,7 +918,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (data != NULL)
         {
             FocusFirstNewItem = TRUE;
-            DragDropToArcOrFS(data);
+            if (!IsBranchView()) DragDropToArcOrFS(data);
             delete data->Data;
             delete data;
         }
@@ -1178,6 +1193,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_DESTROY:
     {
+        StopExplorerSortAsync(); // disconnect completion before this HWND can be reused
         //---  zruseni tohoto panelu z pole zdroju pro enumeraci souboru ve viewerech
         EnumFileNamesRemoveSourceUID(HWindow);
 

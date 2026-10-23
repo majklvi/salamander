@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "common/widepath.h"
+#include "branch_view.h"
 
 void ReleaseDPIAwareWindowIcons(HWND hWindow);
 
@@ -932,7 +933,10 @@ std::wstring CMainWindow::GetPanelTabDisplayText(CFilesWindow* panel) const
         if (info != NULL)
             index = info->OriginalIndex;
     }
-    return BuildTabDisplayText(panel, index);
+    std::wstring text = BuildTabDisplayText(panel, index);
+    if (panel->IsBranchView())
+        text += L" [" + SalMultiByteToWidePath(LoadStr(IDS_BRANCH_VIEW), CP_UTF8) + L"]";
+    return text;
 }
 
 void CMainWindow::UpdatePanelTabTitle(CFilesWindow* panel)
@@ -4265,6 +4269,70 @@ void CMainWindow::OnConfiguration(int mode, int param)
     EndStopRefresh(); // snooper starts again now
 }
 
+// S26 transition gate: commands not exercised for a collection remain unavailable.
+static bool BranchReadOnlyCommandAllowed(UINT command)
+{
+    switch (command)
+    {
+    case CM_BRANCHVIEW:
+    case CM_LEFT_BRANCHVIEW:
+    case CM_RIGHT_BRANCHVIEW:
+    case CM_BRANCH_STOP:
+    case CM_ACTIVEREFRESH:
+    case CM_LEFTREFRESH:
+    case CM_RIGHTREFRESH:
+    case CM_ACTIVESELECT:
+    case CM_ACTIVESELECTALL:
+    case CM_ACTIVEUNSELECT:
+    case CM_ACTIVEUNSELECTALL:
+    case CM_ACTIVEINVERTSEL:
+    case CM_ACTIVEINVERTSELALL:
+    case CM_SELECTBYFOCUSEDNAME:
+    case CM_UNSELECTBYFOCUSEDNAME:
+    case CM_SELECTBYFOCUSEDEXT:
+    case CM_UNSELECTBYFOCUSEDEXT:
+    case CM_RESELECT:
+    case CM_CLIPCOPYFULLNAME:
+    case CM_CLIPCOPYNAME:
+    case CM_CLIPCOPYFULLPATH:
+    case CM_CLIPCOPYUNCNAME:
+    case CM_ACTIVEPARENTDIR:
+    case CM_LPARENTDIR:
+    case CM_RPARENTDIR:
+    case CM_CLOSETAB:
+    case CM_LEFT_CLOSETAB:
+    case CM_RIGHT_CLOSETAB:
+    case CM_NEXTTAB:
+    case CM_PREVTAB:
+    case CM_LEFT_NEXTTAB:
+    case CM_LEFT_PREVTAB:
+    case CM_RIGHT_NEXTTAB:
+    case CM_RIGHT_PREVTAB:
+    case CM_EXIT:
+    case CM_LEFTNAME:
+    case CM_LEFTEXT:
+    case CM_LEFTTIME:
+    case CM_LEFTSIZE:
+    case CM_LEFTATTR:
+    case CM_LEFTTYPE:
+    case CM_RIGHTNAME:
+    case CM_RIGHTEXT:
+    case CM_RIGHTTIME:
+    case CM_RIGHTSIZE:
+    case CM_RIGHTATTR:
+    case CM_RIGHTTYPE:
+    case CM_ACTIVENAME:
+    case CM_ACTIVEEXT:
+    case CM_ACTIVETIME:
+    case CM_ACTIVESIZE:
+    case CM_ACTIVEATTR:
+    case CM_ACTIVETYPE:
+        return true;
+    default:
+        return false;
+    }
+}
+
 LRESULT
 CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -5632,6 +5700,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
     case WM_COMMAND:
     {
+        CFilesWindow* branchCommandPanel = GetActivePanel();
+        if (branchCommandPanel != NULL && branchCommandPanel->IsBranchView() &&
+            !BranchReadOnlyCommandAllowed(LOWORD(wParam))) return 0;
         if (HelpMode && (HWND)lParam == NULL && LOWORD(wParam) != CM_HELP_CONTEXT)
         {
             DWORD id = LOWORD(wParam);
@@ -7063,6 +7134,23 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             RightPanel->ChangeFilter();
             return 0;
         }
+
+        case CM_BRANCHVIEW:
+        case CM_LEFT_BRANCHVIEW:
+        case CM_RIGHT_BRANCHVIEW:
+        {
+            CFilesWindow* panel = LOWORD(wParam) == CM_LEFT_BRANCHVIEW ? LeftPanel :
+                                  LOWORD(wParam) == CM_RIGHT_BRANCHVIEW ? RightPanel : activePanel;
+            if (panel != NULL && panel->Is(ptDisk) &&
+                (panel->IsBranchView() || Salamander::BranchView::ExperimentEnabled()))
+                panel->ToggleBranchView();
+            return 0;
+        }
+
+        case CM_BRANCH_STOP:
+            if (activePanel != NULL)
+                activePanel->CancelBranchViewScan();
+            return 0;
 
         case CM_CHANGEFILTER:
             activePanel->ChangeFilter();
@@ -9293,6 +9381,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         case CML_RIGHT:
         {
             BOOL left = popupID == CML_LEFT;
+            CFilesWindow* branchPanel = left ? LeftPanel : RightPanel;
+            popup->CheckItem(left ? CM_LEFT_BRANCHVIEW : CM_RIGHT_BRANCHVIEW, FALSE, branchPanel->IsBranchView());
+            popup->EnableItem(left ? CM_LEFT_BRANCHVIEW : CM_RIGHT_BRANCHVIEW, FALSE,
+                branchPanel->Is(ptDisk) && (branchPanel->IsBranchView() || Salamander::BranchView::ExperimentEnabled()));
+
 
             popup->CheckItem(left ? CM_LCHANGEFILTER : CM_RCHANGEFILTER, FALSE,
                              (left ? LeftPanel : RightPanel)->FilterEnabled);
@@ -9390,6 +9483,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CML_FILES:
         {
+            CFilesWindow* branchPanel = GetActivePanel();
+            popup->EnableItem(CM_BRANCH_STOP, FALSE, branchPanel != NULL && branchPanel->IsBranchViewScanning());
+
             break;
         }
 

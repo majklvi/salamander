@@ -1828,6 +1828,7 @@ DWORD CfgSkillLevelToMenu(BYTE cfgSkillLevel);
 #define IDT_UPDATETASKLIST 951
 #define IDT_FINISHSTARTUPREVEAL 952
 #define IDT_RESTOREWINDOWPLACEMENT 953
+#define IDT_BRANCHVIEW_POLL 954 // poll asynchronous Branch View scan batches
 
 // POZOR: skoro vsechny funkce v teto sekci pri chybe zobrazuji hlaseni o LOAD / SAVE
 //        konfigurace, coz z nich dela nevhodne pro bezny pristup do Registry,
