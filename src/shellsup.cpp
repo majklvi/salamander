@@ -1648,8 +1648,8 @@ static DWORD TrackBranchHostContextMenu(CFilesWindow* panel, const POINT& pt)
 void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                  BOOL posByMouse, BOOL onlyPanelMenu)
 {
-    // S27d4: selected Properties, clipboard export and context menu are verified for Branch Shell dispatch.
-    if (panel->IsBranchView() && ((action != saProperties && action != saCopyToClipboard && action != saCutToClipboard && action != saContextMenu) || !useSelection || onlyPanelMenu)) return;
+    // S27d5a: selected Shell operations are verified; receiving into Branch remains separately gated.
+    if (panel->IsBranchView() && ((action != saProperties && action != saCopyToClipboard && action != saCutToClipboard && action != saContextMenu && action != saLeftDragFiles && action != saRightDragFiles) || !useSelection || onlyPanelMenu)) return;
 
     CALL_STACK_MESSAGE5("ShellAction(, %d, %d, %d, %d)", action, useSelection, posByMouse, onlyPanelMenu);
     if (panel->QuickSearchMode)
@@ -2328,7 +2328,15 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             IDataObject* dataObject = CreatePanelShellData(MainWindow->HWindow, panel->GetPath(),
                                                         (count == 0) ? 1 : count,
                                                         EnumFileNames, &data);
-            CImpIDropSource* dropSource = new CImpIDropSource(FALSE);
+#ifdef new
+#undef new
+#define RESTORE_BRANCH_DRAG_SOURCE_DEBUG_NEW_MACRO
+#endif
+            CImpIDropSource* dropSource = new (std::nothrow) CImpIDropSource(FALSE);
+#ifdef RESTORE_BRANCH_DRAG_SOURCE_DEBUG_NEW_MACRO
+#define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
+#undef RESTORE_BRANCH_DRAG_SOURCE_DEBUG_NEW_MACRO
+#endif
 
             if (dataObject != NULL && dropSource != NULL)
             {
