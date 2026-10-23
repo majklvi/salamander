@@ -1673,8 +1673,6 @@ void CFilesWindow::FindFile()
 void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumFileNamesSourceUID,
                             int enumFileNamesLastFileIndex)
 {
-    if (IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
-
     CALL_STACK_MESSAGE6("CFilesWindow::ViewFile(%s, %d, %u, %d, %d)", name, altView, handlerID,
                         enumFileNamesSourceUID, enumFileNamesLastFileIndex);
     // verify that the file is on an accessible path
@@ -1709,6 +1707,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
         if (i >= Dirs->Count && i < Dirs->Count + Files->Count)
         {
             CFileData* f = &Files->At(i - Dirs->Count);
+            if (IsBranchView() && GetBranchViewFileByCacheKey(GetItemCacheKeyPtr(*f)) != f) return;
             if (Is(ptDisk))
             {
                 if (enumFileNamesLastFileIndex == -1)
@@ -1873,6 +1872,31 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
         {
             return;
         }
+    }
+
+    // S27a transition: plugin viewers require their own panel-to-result acceptance.
+    // Resolve the first configured mask without invoking any plugin callback.
+    if (IsBranchView())
+    {
+        if (handlerID != 0xFFFFFFFF) return;
+        const char* base = strrchr(name, '\\');
+        if (base == NULL) return;
+        ++base;
+        const char* extension = strrchr(base, '.');
+        extension = extension != NULL ? extension + 1 : base + strlen(base);
+        CViewerMasks* masks = altView ? MainWindow->AltViewerMasks : MainWindow->ViewerMasks;
+        BOOL allowed = FALSE;
+        for (int i = 0; i < masks->Count; ++i)
+        {
+            int error;
+            CViewerMasksItem* viewer = masks->At(i);
+            if (viewer->Masks->PrepareMasks(error) && viewer->Masks->AgreeMasks(base, extension))
+            {
+                allowed = viewer->ViewerType == VIEWER_INTERNAL || viewer->ViewerType == VIEWER_EXTERNAL;
+                break;
+            }
+        }
+        if (!allowed) return;
     }
 
     HANDLE lock = NULL;
@@ -2164,8 +2188,6 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
 
 void CFilesWindow::EditFile(char* name, DWORD handlerID)
 {
-    if (IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
-
     CALL_STACK_MESSAGE3("CFilesWindow::EditFile(%s, %u)", name, handlerID);
     if (!Is(ptDisk) && name == NULL)
     {
@@ -2200,6 +2222,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
         if (i >= Dirs->Count && i < Dirs->Count + Files->Count)
         {
             CFileData* f = &Files->At(i - Dirs->Count);
+            if (IsBranchView() && GetBranchViewFileByCacheKey(GetItemCacheKeyPtr(*f)) != f) return;
             if (Is(ptDisk))
             {
                 const std::wstring wideName = GetItemFullPathW(*f);
