@@ -1538,7 +1538,7 @@ public:
                          char* mask, int selCount, int* selection,
                          CFileData* oneFile, CAttrsData* attrsData,
                          CChangeCaseData* chCaseData, BOOL onlySize,
-                         CCriteriaData* filterCriteria);
+                         CCriteriaData* filterCriteria, BOOL keepBranchPaths = FALSE);
     BOOL BuildScriptDir(COperations* script, CActionType type, char* sourcePath,
                         BOOL sourcePathSupADS, char* targetPath, CTargetPathState targetPathState,
                         BOOL targetPathSupADS, BOOL targetPathIsFAT32, char* mask, char* dirName,

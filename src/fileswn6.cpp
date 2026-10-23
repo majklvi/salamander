@@ -1288,7 +1288,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                                    char* targetPath, char* mask, int selCount,
                                    int* selection, CFileData* oneFile,
                                    CAttrsData* attrsData, CChangeCaseData* chCaseData,
-                                   BOOL onlySize, CCriteriaData* filterCriteria)
+                                   BOOL onlySize, CCriteriaData* filterCriteria, BOOL keepBranchPaths)
 {
     CALL_STACK_MESSAGE5("CFilesWindow::BuildScriptMain(, %d, %s, %s, %d, , , , , ,)",
                         type, targetPath, mask, selCount);
@@ -1613,14 +1613,88 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
             {
                 if (filterCriteria == NULL || filterCriteria->AgreeMasksAndAdvanced(oneFile))
                 {
-                    if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, targetPath,
-                                         targetPathState, targetSupADS, targetIsFAT32, mask,
+                    std::string branchTarget;
+                    std::vector<int> branchCreatedDirectories;
+                    const CQuadWord branchSizeBefore = script->TotalFileSize;
+                    char* itemTargetPath = targetPath;
+                    if (IsBranchView() && keepBranchPaths && (type == atCopy || type == atMove))
+                    {
+                        std::wstring relative = GetItemRelativePathW(*oneFile);
+                        std::wstring sourceDirectory = GetPathW();
+                        std::wstring targetDirectory = SalMultiByteToWidePathUtf8OrAcp(targetPath);
+                        size_t begin = 0;
+                        size_t slash;
+                        while ((slash = relative.find(L'\\', begin)) != std::wstring::npos)
+                        {
+                            const std::wstring component = relative.substr(begin, slash - begin);
+                            if (component.empty() || component == L"." || component == L"..")
+                            {
+                                SetCurrentDirectoryToSystem();
+                                return FALSE;
+                            }
+                            SalPathAppendW(sourceDirectory, component.c_str());
+                            SalPathAppendW(targetDirectory, component.c_str());
+                            const std::wstring targetApi = SalPathAddExtendedPrefixW(targetDirectory.c_str());
+                            if (GetFileAttributesW(targetApi.c_str()) == INVALID_FILE_ATTRIBUTES)
+                            {
+                                COperation create;
+                                create.Opcode = ocCreateDir;
+                                create.Size = CREATE_DIR_SIZE;
+                                create.Attr = FILE_ATTRIBUTE_DIRECTORY;
+                                create.SourceName = DupStr(SalWideToMultiBytePath(sourceDirectory.c_str(), CP_UTF8).c_str());
+                                create.TargetName = DupStr(SalWideToMultiBytePath(targetDirectory.c_str(), CP_UTF8).c_str());
+                                create.SetSourceNameW(SalPathAddExtendedPrefixW(sourceDirectory.c_str()).c_str());
+                                create.SetTargetNameW(targetApi.c_str());
+                                if (create.SourceName == NULL || create.TargetName == NULL)
+                                {
+                                    free(create.SourceName);
+                                    free(create.TargetName);
+                                    SetCurrentDirectoryToSystem();
+                                    return FALSE;
+                                }
+                                int createIndex = script->Add(create);
+                                if (!script->IsGood())
+                                {
+                                    script->ResetState();
+                                    free(create.SourceName);
+                                    free(create.TargetName);
+                                    SetCurrentDirectoryToSystem();
+                                    return FALSE;
+                                }
+                                branchCreatedDirectories.push_back(createIndex);
+                            }
+                            begin = slash + 1;
+                        }
+                        branchTarget = SalWideToMultiBytePath(targetDirectory.c_str(), CP_UTF8);
+                        itemTargetPath = (char*)branchTarget.c_str();
+                    }
+                    if (!BuildScriptFile(script, type, sourcePath, sourceSupADS, itemTargetPath,
+                                         keepBranchPaths ? GetTargetPathState(tpsUnknown, itemTargetPath) : targetPathState,
+                                         targetSupADS, targetIsFAT32, mask,
                                          useName, useDOSName, oneFile->Size, attrsData, NULL,
                                          oneFile->Attr, chCaseData, onlySize, NULL,
                                          srcAndTgtPathsFlags, oneFile->UseWideName() ? oneFile->NameW : NULL))
                     {
                         SetCurrentDirectoryToSystem();
                         return FALSE;
+                    }
+                    // Every created ancestor encloses this file so Skip never proceeds into a missing parent.
+                    for (std::vector<int>::reverse_iterator directory = branchCreatedDirectories.rbegin();
+                         directory != branchCreatedDirectories.rend(); ++directory)
+                    {
+                        COperation label;
+                        label.Opcode = ocLabelForSkipOfCreateDir;
+                        label.Attr = *directory;
+                        const CQuadWord size = script->TotalFileSize - branchSizeBefore;
+                        label.SourceName = (char*)(DWORD_PTR)size.LoDWord;
+                        label.TargetName = (char*)(DWORD_PTR)size.HiDWord;
+                        script->Add(label);
+                        if (!script->IsGood())
+                        {
+                            script->ResetState();
+                            SetCurrentDirectoryToSystem();
+                            return FALSE;
+                        }
                     }
                 }
             }

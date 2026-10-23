@@ -640,6 +640,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         if (CopyMoveOptions.Get() != NULL) // if they exist, pull the defaults
             criteria = *CopyMoveOptions.Get();
         CCriteriaData* criteriaPtr = NULL; // pointer to 'criteria'; if NULL, they are ignored
+        BOOL keepBranchPaths = FALSE;
         BOOL copyToExistingDir = FALSE;
         char nextFocus[MAX_PATH + 200]; // + 200 is a reserve (Windows can create paths longer than MAX_PATH)
         nextFocus[0] = 0;
@@ -665,7 +666,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                                Configuration.CopyHistory, COPY_HISTORY_SIZE,
                                                &criteria, havePermissions, supportsADS, &transferMode,
                                                &conflictMode, &operationSchedulingOverride, copyToSelectedDirs ? &selectedTargetPaths : NULL,
-                                               changeTargetRequested != NULL && !copyToSelectedDirs)
+                                               changeTargetRequested != NULL && !copyToSelectedDirs,
+                                               IsBranchView() ? &keepBranchPaths : NULL)
                           .Execute();
                 if (res == ID_CHANGE_SELECTED_TARGET_TAB)
                 {
@@ -1276,7 +1278,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             lstrcpyn(mutableTargetPath, targetPath->c_str(), SAL_MAX_PATH);
                             if (!BuildScriptMain(script, type, mutableTargetPath, mask, count, indexes,
                                                  f, NULL, &changeCaseData,
-                                                 countSizeMode != 0, criteriaPtr))
+                                                 countSizeMode != 0, criteriaPtr, keepBranchPaths))
                             {
                                 res2 = FALSE;
                                 break;
@@ -1293,7 +1295,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     {
                         res2 = BuildScriptMain(script, type, auxTargetPath, mask, count, indexes,
                                                f, NULL, &changeCaseData, countSizeMode != 0,
-                                               criteriaPtr);
+                                               criteriaPtr, keepBranchPaths);
                     }
                     // if there's nothing to do, don't show the progress dialog
                     BOOL emptyScript = script->Count == 0 && type != atCountSize;
