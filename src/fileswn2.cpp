@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "branch_view.h"
+#include "fileactionpath.h"
 
 #include <uxtheme.h>
 
@@ -851,8 +852,6 @@ void CFilesWindow::HandsOff(BOOL off)
 
 void CFilesWindow::Execute(int index)
 {
-    if (IsBranchView() && index >= Dirs->Count) return; // S26 experiment: unverified operation is blocked at direct dispatch.
-
     CALL_STACK_MESSAGE2("CFilesWindow::Execute(%d)", index);
     MainWindow->CancelPanelsUI(); // cancel QuickSearch and QuickEdit
     if (index < 0 || index >= Dirs->Count + Files->Count)
@@ -877,6 +876,50 @@ void CFilesWindow::Execute(int index)
             }
 
             CFileData* file = &Files->At(index - Dirs->Count);
+            if (IsBranchView())
+            {
+                if (GetBranchViewFileByCacheKey(GetItemCacheKeyPtr(*file)) != file)
+                {
+                    EndStopRefresh();
+                    return;
+                }
+                const std::wstring source = GetItemFullPathW(*file);
+                const std::wstring directory = GetItemDirectoryW(*file);
+                const std::string sourceUtf8 = SalWideToMultiBytePath(source.c_str(), CP_UTF8);
+                if (source.empty() || directory.empty())
+                {
+                    EndStopRefresh();
+                    return;
+                }
+                if (PackerFormatConfig.PackIsArchive(file->Name))
+                {
+                    BOOL noChange;
+                    ChangePathToArchive(sourceUtf8.c_str(), "", -1, NULL, FALSE, &noChange);
+                }
+                else
+                {
+                    // Win32 extended syntax is for file I/O, not Shell parsing.
+                    const std::wstring shellFile = SalPathRemoveExtendedPrefixW(source.c_str());
+                    if (shellFile.size() >= MAX_PATH)
+                    {
+                        DialogError(HWindow, BUTTONS_OK, sourceUtf8.c_str(), LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERROROPENINGFILE));
+                        EndStopRefresh();
+                        return;
+                    }
+                    const std::wstring launchDirectory = Salamander::FileActionPaths::InitialDirectory(
+                        SalWideToMultiBytePath(directory.c_str(), CP_UTF8).c_str());
+                    SHELLEXECUTEINFOW execute = {sizeof(execute)};
+                    execute.fMask = SEE_MASK_NOASYNC;
+                    execute.hwnd = GetListBoxHWND();
+                    execute.lpFile = shellFile.c_str();
+                    execute.lpDirectory = launchDirectory.c_str();
+                    execute.nShow = SW_SHOWNORMAL;
+                    if (ShellExecuteExW(&execute))
+                        MainWindow->FileHistory->AddFile(fhitOpen, 0, sourceUtf8.c_str());
+                }
+                EndStopRefresh();
+                return;
+            }
             char* fileName = file->Name;
             char fullPath[SAL_MAX_PATH];
             char netFSName[SAL_MAX_PATH];
@@ -3184,6 +3227,16 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     return ret;
 }
 
+// Archive identity enters here as UTF8 from wide disk/Branch paths. Keep the
+// metadata preflight on the same wide file that the archive engine will open.
+static HANDLE OpenArchiveFileForRead(const char* archive, DWORD flagsAndAttributes)
+{
+    const std::wstring wide = SalMultiByteToWidePath(archive, IsValidPathUtf8Text(archive) ? CP_UTF8 : CP_ACP);
+    const std::wstring extended = SalPathAddExtendedPrefixW(wide.c_str());
+    return HANDLES_Q(CreateFileW(extended.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                NULL, OPEN_EXISTING, flagsAndAttributes, NULL));
+}
+
 BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archivePath,
                                        int suggestedTopIndex, const char* suggestedFocusName,
                                        BOOL forceUpdate, BOOL* noChange, BOOL refreshListBox,
@@ -3323,8 +3376,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             {
                 // retrieve file info (does it exist?, size, date & time)
                 DWORD err2 = NO_ERROR;
-                HANDLE file = HANDLES_Q(CreateFile(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                   NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
+                HANDLE file = OpenArchiveFileForRead(archive, FILE_ATTRIBUTE_NORMAL);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     GetFileTime(file, NULL, NULL, &archiveDate);
@@ -3450,8 +3502,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             DWORD err;
             if ((err = CheckPath(!isRefresh)) == ERROR_SUCCESS) // no need to restore network connections here ...
             {
-                HANDLE file = HANDLES_Q(CreateFile(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                                   NULL, OPEN_EXISTING, 0, NULL));
+                HANDLE file = OpenArchiveFileForRead(archive, 0);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     SalGetFileSize(file, archiveSize, err);
