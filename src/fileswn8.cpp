@@ -254,7 +254,10 @@ void PluginFSConvertPathToExternal(char* path)
 void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int countSizeMode,
                                BOOL copyToSelectedDirs, BOOL* changeTargetRequested)
 {
-    if (IsBranchView() || target != NULL && target->IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+    // S27c1a: only flat copy into an ordinary disk panel is verified.
+    if (target != NULL && target->IsBranchView()) return;
+    if (IsBranchView() && (type != atCopy || target == NULL || !target->Is(ptDisk) ||
+                           countSizeMode != 0 || copyToSelectedDirs)) return;
 
     if (changeTargetRequested != NULL)
         *changeTargetRequested = FALSE;
@@ -709,6 +712,12 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                               type == atCopy ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
                               count <= 1 ? nextFocus : NULL, NULL, SAL_MAX_PATH))
                 {
+                    if (IsBranchView() && pathType != PATH_TYPE_WINDOWS)
+                    {
+                        SalMessageBox(HWindow, GetErrorText(ERROR_NOT_SUPPORTED), LoadStr(IDS_ERRORCOPY),
+                                      MB_OK | MB_ICONEXCLAMATION);
+                        continue; // Do not enter unverified archive/plugin copy callbacks.
+                    }
                     // use 'if' instead of a 'switch' to ensure that 'break' and 'continue' work correctly
                     if (pathType == PATH_TYPE_WINDOWS) // Windows path (drive + UNC)
                     {

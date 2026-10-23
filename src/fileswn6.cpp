@@ -1504,6 +1504,37 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                 useName = oneFile->Name;
                 useDOSName = oneFile->DosName;
             }
+            std::string branchName;
+            if (IsBranchView())
+            {
+                if (type != atCopy || GetBranchViewFileByCacheKey(GetItemCacheKeyPtr(*oneFile)) != oneFile)
+                {
+                    SetCurrentDirectoryToSystem();
+                    return FALSE;
+                }
+                const std::wstring directory = GetItemDirectoryW(*oneFile);
+                const std::string parent = SalWideToMultiBytePath(directory.c_str(), CP_UTF8);
+                if (parent.empty() || !sourcePathStorage.Ensure((int)parent.size() + 16))
+                {
+                    SetCurrentDirectoryToSystem();
+                    return FALSE;
+                }
+                sourcePath = sourcePathStorage.Data();
+                memcpy(sourcePath, parent.c_str(), parent.size() + 1);
+                const std::wstring fullPath = GetItemFullPathW(*oneFile);
+                branchName = SalWideToMultiBytePath(SalPathFindFileNameW(fullPath.c_str()), CP_UTF8);
+                useName = (char*)branchName.c_str();
+                useDOSName = NULL;
+                if (type == atCopy || type == atMove)
+                {
+                    sourceSupADS = (filterCriteria == NULL || !filterCriteria->IgnoreADS) &&
+                                   IsPathOnVolumeSupADS(sourcePath, NULL);
+                    srcAndTgtPathsFlags &= ~(OPFL_SRCPATH_IS_NET | OPFL_SRCPATH_IS_FAST);
+                    srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(sourcePath, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST);
+                    script->SourcePathIsNetwork |= (srcAndTgtPathsFlags & OPFL_SRCPATH_IS_NET) != 0;
+                    script->AddStoragePath(sourcePath, SACCESS_READ);
+                }
+            }
             i++;
             // oneFile points to the selected or caret item in the filebox
             if (oneFile->Attr & FILE_ATTRIBUTE_DIRECTORY) // jde o ptDisk
