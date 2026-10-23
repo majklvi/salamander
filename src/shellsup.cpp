@@ -17,6 +17,8 @@ extern "C"
 #include "shexreg.h"
 }
 #include "salshlib.h"
+#include "common/widepath.h"
+#include "branchshell.h"
 #include "tasklist.h"
 //#include "drivelst.h"
 
@@ -139,6 +141,8 @@ MENU_TEMPLATE_ITEM MouseDropMenu2[] =
 BOOL DoCopyMove(BOOL copy, char* targetDir, CCopyMoveData* data, void* param)
 {
     CFilesWindow* panel = (CFilesWindow*)param;
+    if (panel->IsBranchView()) { DestroyCopyMoveData(data); return FALSE; }
+
 
     CTmpDropData* tmp = new CTmpDropData;
     if (tmp != NULL)
@@ -257,6 +261,8 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
     CFilesWindow* panel = (CFilesWindow*)param;
     isTgtFile = FALSE; // drop target is not a file yet -> we can still handle the operation ourselves
     tgtType = idtttWindows;
+    if (panel->IsBranchView()) { if (effect != NULL) *effect = DROPEFFECT_NONE; return NULL; } // S26 read-only drop target.
+
     RECT r;
     GetWindowRect(panel->GetListBoxHWND(), &r);
     int index = panel->GetIndex(pt.x - r.left, pt.y - r.top);
@@ -616,6 +622,8 @@ const char* GetCurrentDirClipboard(POINTL& pt, void* param, DWORD* effect, BOOL 
     CFilesWindow* panel = (CFilesWindow*)param;
     isTgtFile = FALSE;
     tgtType = idtttWindows;
+    if (panel->IsBranchView()) { if (effect != NULL) *effect = DROPEFFECT_NONE; return NULL; } // S26 read-only drop target.
+
     if (panel->Is(ptZIPArchive) || panel->Is(ptPluginFS)) // not into archives or FS yet
     {
         //    if (panel->Is(ptZIPArchive)) tgtType = idtttArchive;
@@ -1052,6 +1060,58 @@ const char* EnumFileNames(int index, void* param)
     }
     else
         return NULL;
+}
+
+static std::vector<std::wstring> GetPanelShellPaths(int count, CTmpEnumData* data)
+{
+    std::vector<std::wstring> paths;
+    for (int i = 0; i < count; ++i)
+    {
+        const int index = data->Indexes[i];
+        if (index < 0 || index >= data->Panel->Dirs->Count + data->Panel->Files->Count)
+        {
+            paths.clear();
+            return paths;
+        }
+        const CFileData& file = index < data->Panel->Dirs->Count ? data->Panel->Dirs->At(index) :
+                               data->Panel->Files->At(index - data->Panel->Dirs->Count);
+        paths.push_back(data->Panel->GetItemFullPathW(file));
+    }
+    return paths;
+}
+
+static IContextMenu2* CreatePanelShellMenu(HWND owner, const char* root, int count,
+                                          CEnumFileNamesFunction next, void* param, BOOL quiet = FALSE)
+{
+    CTmpEnumData* data = (CTmpEnumData*)param;
+    if (!data->Panel->Is(ptDisk))
+        return CreateIContextMenu2(owner, root, count, next, param);
+    IContextMenu2* menu = CreateIContextMenu2ForPaths(owner, GetPanelShellPaths(count, data));
+    if (menu == NULL && !quiet)
+        SalMessageBox(owner, GetErrorText(GetLastError()), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+    return menu;
+}
+
+static std::wstring GetPanelShellDirectoryW(const CTmpEnumData& data)
+{
+    if (!data.Panel->Is(ptDisk)) return std::wstring();
+    const int index = data.Indexes[0];
+    if (index < 0 || index >= data.Panel->Dirs->Count + data.Panel->Files->Count) return std::wstring();
+    const CFileData& file = index < data.Panel->Dirs->Count ? data.Panel->Dirs->At(index) :
+                           data.Panel->Files->At(index - data.Panel->Dirs->Count);
+    return data.Panel->GetItemDirectoryW(file);
+}
+
+static IDataObject* CreatePanelShellData(HWND owner, const char* root, int count,
+                                        CEnumFileNamesFunction next, void* param)
+{
+    CTmpEnumData* data = (CTmpEnumData*)param;
+    if (!data->Panel->Is(ptDisk))
+        return CreateIDataObject(owner, root, count, next, param);
+    IDataObject* object = CreateIDataObjectForPaths(owner, GetPanelShellPaths(count, data));
+    if (object == NULL)
+        SalMessageBox(owner, GetErrorText(GetLastError()), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+    return object;
 }
 
 const char* EnumOneFileName(int index, void* param)
@@ -1522,6 +1582,8 @@ BOOL GetACLUISecurityPageName(char* pageName, int pageNameMax)
 void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                  BOOL posByMouse, BOOL onlyPanelMenu)
 {
+    if (panel->IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+
     CALL_STACK_MESSAGE5("ShellAction(, %d, %d, %d, %d)", action, useSelection, posByMouse, onlyPanelMenu);
     if (panel->QuickSearchMode)
         panel->EndQuickSearch();
@@ -1977,7 +2039,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 CTmpEnumData data;
                 data.Indexes = (count == 0) ? &index : indexes;
                 data.Panel = panel;
-                IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(),
+                IContextMenu2* menu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
                                                           (count == 0) ? 1 : count,
                                                           EnumFileNames, &data);
                 if (menu != NULL)
@@ -1998,6 +2060,19 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                             lstrcpy(pageName, "Security"); // if the name could not be retrieved, use the English "Security" and accept that localized versions will quietly not work
                     }
                     ici.lpDirectory = panel->GetPath();
+                    const std::wstring branchDirectory = GetPanelShellDirectoryW(data);
+                    std::wstring pageNameW;
+                    if (!branchDirectory.empty())
+                    {
+                        ici.fMask |= CMIC_MASK_UNICODE;
+                        ici.lpVerbW = L"properties";
+                        ici.lpDirectoryW = branchDirectory.c_str();
+                        if (action == saPermissions)
+                        {
+                            pageNameW = SalMultiByteToWidePath(pageName);
+                            ici.lpParametersW = pageNameW.c_str();
+                        }
+                    }
                     ici.nShow = SW_SHOWNORMAL;
                     GetLeftTopCornert(&ici.ptInvoke, posByMouse, useSelection, panel);
 
@@ -2029,24 +2104,47 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 CTmpEnumData data;
                 data.Indexes = (count == 0) ? &index : indexes;
                 data.Panel = panel;
-                IContextMenu2* menu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
-                                                          EnumFileNames, &data);
-                if (menu != NULL)
+                BOOL clipboardReady = FALSE;
+                if (panel->Is(ptDisk))
                 {
-                    CShellExecuteWnd shellExecuteWnd;
-                    CMINVOKECOMMANDINFO ici;
-                    ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
-                    ici.fMask = 0;
-                    ici.lpVerb = (action == saCopyToClipboard) ? "copy" : "cut";
-                    ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: ShellAction::copy_cut_clipboard verb=%s", ici.lpVerb);
-                    ici.lpParameters = NULL;
-                    ici.lpDirectory = panel->GetPath();
-                    ici.nShow = SW_SHOWNORMAL;
-                    ici.dwHotKey = 0;
-                    ici.hIcon = 0;
+                    IDataObject* object = CreatePanelShellData(MainWindow->HWindow, panel->GetPath(),
+                        (count == 0) ? 1 : count, EnumFileNames, &data);
+                    if (object != NULL)
+                    {
+                        HRESULT result = SetShellDataDropEffect(object,
+                            action == saCopyToClipboard ? DROPEFFECT_COPY | DROPEFFECT_LINK : DROPEFFECT_MOVE);
+                        if (SUCCEEDED(result)) result = OleSetClipboard(object);
+                        clipboardReady = SUCCEEDED(result);
+                        object->Release(); // OLE owns its reference after successful publication.
+                        if (!clipboardReady)
+                            SalMessageBox(panel->HWindow, GetErrorText(HRESULT_FACILITY(result) == FACILITY_WIN32 ? HRESULT_CODE(result) : ERROR_GEN_FAILURE),
+                                          LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                    }
+                }
+                else
+                {
+                    IContextMenu2* menu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
+                        (count == 0) ? 1 : count, EnumFileNames, &data);
+                    if (menu != NULL)
+                    {
+                        CShellExecuteWnd shellExecuteWnd;
+                        CMINVOKECOMMANDINFO ici;
+                        ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
+                        ici.fMask = 0;
+                        ici.lpVerb = (action == saCopyToClipboard) ? "copy" : "cut";
+                        ici.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: ShellAction::copy_cut_clipboard verb=%s", ici.lpVerb);
+                        ici.lpParameters = NULL;
+                        ici.lpDirectory = panel->GetPath();
+                        ici.nShow = SW_SHOWNORMAL;
+                        ici.dwHotKey = 0;
+                        ici.hIcon = 0;
 
-                    AuxInvokeAndRelease(menu, &ici);
-
+                        AuxInvokeAndRelease(menu, &ici);
+                        clipboardReady = TRUE;
+                    }
+                }
+                if (clipboardReady)
+                {
                     // clipboard change, verify it...
                     IdleRefreshStates = TRUE;  // force a check of the state variables on the next Idle
                     IdleCheckClipboard = TRUE; // also let it check the clipboard
@@ -2090,7 +2188,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                     for (k = 0; k < total; k++)
                                     {
                                         CFileData* f2 = &anotherPanel->Dirs->At(k);
-                                        if (StrICmp(f->Name, f2->Name) == 0)
+                                        if (panel->GetItemIdentityW(*f) == anotherPanel->GetItemIdentityW(*f2))
                                         {
                                             f2->CutToClip = 1;
                                             f2->Dirty = 1;
@@ -2105,7 +2203,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                     for (k = 0; k < total; k++)
                                     {
                                         CFileData* f2 = &anotherPanel->Files->At(k);
-                                        if (StrICmp(f->Name, f2->Name) == 0)
+                                        if (panel->GetItemIdentityW(*f) == anotherPanel->GetItemIdentityW(*f2))
                                         {
                                             f2->CutToClip = 1;
                                             f2->Dirty = 1;
@@ -2145,7 +2243,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             CTmpEnumData data;
             data.Indexes = (count == 0) ? &index : indexes;
             data.Panel = panel;
-            IDataObject* dataObject = CreateIDataObject(MainWindow->HWindow, panel->GetPath(),
+            IDataObject* dataObject = CreatePanelShellData(MainWindow->HWindow, panel->GetPath(),
                                                         (count == 0) ? 1 : count,
                                                         EnumFileNames, &data);
             CImpIDropSource* dropSource = new CImpIDropSource(FALSE);
@@ -2307,7 +2405,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         else
                         {
 #endif // _WIN64
-                            panel->ContextMenu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
+                            panel->ContextMenu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(), (count == 0) ? 1 : count,
                                                                      EnumFileNames, &selectionEnumData);
 #ifndef _WIN64
                         }
@@ -2357,7 +2455,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                             h = CreatePopupMenu();
                             if (h != NULL)
                             {
-                                panel->ContextMenu = CreateIContextMenu2(MainWindow->HWindow, panel->GetPath(),
+                                panel->ContextMenu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
                                                                          (count == 0) ? 1 : count, EnumFileNames,
                                                                          &selectionEnumData);
                                 if (panel->ContextMenu != NULL)
@@ -2634,6 +2732,10 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 }
 
                                 CALL_STACK_MESSAGE1("ShellAction::context_menu::exec1");
+                                CTmpEnumData directoryData;
+                                directoryData.Panel = panel;
+                                directoryData.Indexes = count == 0 ? &index : indexes;
+                                const std::wstring branchDirectory = useSelection ? GetPanelShellDirectoryW(directoryData) : std::wstring();
                                 if (!useSelection || count == 0 && index < panel->Dirs->Count ||
                                     count == 1 && indexes[0] < panel->Dirs->Count)
                                 {
@@ -2641,7 +2743,8 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 }
                                 else
                                 {
-                                    SetCurrentDirectory(panel->GetPath()); // for files whose names contain spaces: to make Open With work even for Microsoft Paint (under W2K it failed – reported "d:\documents.bmp was not found" for the file "D:\Documents and Settings\petr\My Documents\example.bmp")
+                                    if (!branchDirectory.empty()) SetCurrentDirectoryW(SalPathAddExtendedPrefixW(branchDirectory.c_str()).c_str());
+                                    else SetCurrentDirectory(panel->GetPath()); // for files whose names contain spaces: to make Open With work even for Microsoft Paint (under W2K it failed – reported "d:\documents.bmp was not found" for the file "D:\Documents and Settings\petr\My Documents\example.bmp")
                                 }
 
                                 DWORD disks = GetLogicalDrives();
@@ -2660,6 +2763,12 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 else
                                     ici.lpVerb = MAKEINTRESOURCE(cmd - 5000);
                                 ici.lpDirectory = panel->GetPath();
+                                if (!branchDirectory.empty())
+                                {
+                                    ici.fMask |= CMIC_MASK_UNICODE;
+                                    ici.lpDirectoryW = branchDirectory.c_str();
+                                    ici.lpVerbW = MAKEINTRESOURCEW(cmd < 5000 ? cmd : cmd - 5000);
+                                }
                                 ici.nShow = SW_SHOWNORMAL;
                                 ici.ptInvoke = pt;
 

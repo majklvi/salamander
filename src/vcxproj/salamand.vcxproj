@@ -513,6 +513,9 @@
     </ClCompile>
     <ClCompile Include="..\filesmap.cpp">
     </ClCompile>
+    <ClCompile Include="..\branch_view.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\fileswn0.cpp">
     </ClCompile>
     <ClCompile Include="..\fileswn1.cpp">
@@ -952,6 +955,16 @@
     <ClInclude Include="..\color.h">
     </ClInclude>
     <ClInclude Include="..\common\widepath.h" />
+    <ClInclude Include="..\fileactionpath.h" />
+    <ClInclude Include="..\viewerpath.h" />
+    <ClInclude Include="..\workerpath.h" />
+    <ClInclude Include="..\panel_temporary_selection.h" />
+    <ClInclude Include="..\operationrecycle.h" />
+    <ClInclude Include="..\branchshell.h" />
+    <ClInclude Include="..\branchclipboard.h" />
+    <ClInclude Include="..\branch_view.h" />
+    <ClInclude Include="..\explorerpropertywork.h" />
+    <ClInclude Include="..\branch_view_text.h" />
     <ClInclude Include="..\common\allochan.h">
     </ClInclude>
     <ClInclude Include="..\common\array.h">
@@ -1054,6 +1067,7 @@
     </ClInclude>
     <ClInclude Include="..\plugins\shared\spl_fs.h">
     </ClInclude>
+    <ClInclude Include="..\plugins\shared\spl_diskselection.h" />
     <ClInclude Include="..\plugins\shared\spl_gen.h">
     </ClInclude>
     <ClInclude Include="..\plugins\shared\spl_gui.h">
