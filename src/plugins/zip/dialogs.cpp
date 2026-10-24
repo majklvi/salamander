@@ -2227,7 +2227,7 @@ INT_PTR WINAPI CreateSFXDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 INT_PTR CCreateSFXDialog::Proceed()
 {
     CALL_STACK_MESSAGE1("CCreateSFXDialog::Proceed()");
-    return DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_CREATESFX),
+    return DialogBoxParamW(HLanguage, MAKEINTRESOURCEW(IDD_CREATESFX),
                           Parent, CreateSFXDlgProc, (LPARAM)this);
 }
 
@@ -2294,10 +2294,20 @@ CCreateSFXDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CCreateSFXDialog::OnInit(WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE3("CCreateSFXDialog::OnInit(0x%IX, 0x%IX)", wParam, lParam);
-    SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)ZipName);
-    SendDlgItemMessage(Dlg, IDC_ARCHIVE, EM_SETLIMITTEXT, MAX_PATH - 1, 0);
-    SendDlgItemMessage(Dlg, IDC_NEWARCHIVE, WM_SETTEXT, 0, (LPARAM)ExeName);
-    SendDlgItemMessage(Dlg, IDC_NEWARCHIVE, EM_SETLIMITTEXT, MAX_PATH - 1, 0);
+    try
+    {
+        const std::wstring source = SalamanderDiskSelection::WideFromPath(ZipName);
+        const std::wstring target = SalamanderDiskSelection::WideFromPath(ExeName);
+        SendDlgItemMessageW(Dlg, IDC_ARCHIVE, EM_SETLIMITTEXT, ZipNameCapacity - 1, 0);
+        SendDlgItemMessageW(Dlg, IDC_NEWARCHIVE, EM_SETLIMITTEXT, ExeNameCapacity - 1, 0);
+        SetDlgItemTextW(Dlg, IDC_ARCHIVE, source.c_str());
+        SetDlgItemTextW(Dlg, IDC_NEWARCHIVE, target.c_str());
+    }
+    catch (const std::bad_alloc&)
+    {
+        EndDialog(Dlg, IDCANCEL);
+        return FALSE;
+    }
 
     if (!PackObject)
     {
@@ -2311,21 +2321,56 @@ BOOL CCreateSFXDialog::OnInit(WPARAM wParam, LPARAM lParam)
     return TRUE;
 }
 
+static bool ReadSfxDialogPath(HWND dialog, int control, size_t capacity, std::string& path)
+{
+    const int length = GetWindowTextLengthW(GetDlgItem(dialog, control));
+    if (length <= 0)
+    {
+        SetLastError(ERROR_INVALID_NAME);
+        return false;
+    }
+    if (static_cast<size_t>(length) >= capacity)
+    {
+        SetLastError(ERROR_FILENAME_EXCED_RANGE);
+        return false;
+    }
+    std::wstring wide(static_cast<size_t>(length) + 1, L'\0');
+    if (GetDlgItemTextW(dialog, control, &wide[0], length + 1) != static_cast<UINT>(length))
+        return false;
+    path = SalamanderDiskSelection::Utf8FromWide(wide.c_str());
+    if (path.empty() || path.size() >= capacity)
+    {
+        SetLastError(path.empty() ? ERROR_NO_UNICODE_TRANSLATION : ERROR_FILENAME_EXCED_RANGE);
+        return false;
+    }
+    return true;
+}
+
 BOOL CCreateSFXDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CCreateSFXDialog::OnOK(0x%X, 0x%X, )", wNotifyCode, wID);
-    if (GetDlgItemText(Dlg, IDC_ARCHIVE, ZipName, MAX_PATH - 1) <= 0)
+    int error = 0;
+    try
     {
-        SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_NOARCHIVETYPED), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
-        return TRUE;
+        std::string source, target;
+        if (!ReadSfxDialogPath(Dlg, IDC_ARCHIVE, ZipNameCapacity, source))
+            error = GetLastError() == ERROR_FILENAME_EXCED_RANGE ? IDS_TOOLONGNAME : IDS_NOARCHIVETYPED;
+        else if (!ReadSfxDialogPath(Dlg, IDC_NEWARCHIVE, ExeNameCapacity, target))
+            error = GetLastError() == ERROR_FILENAME_EXCED_RANGE ? IDS_TOOLONGNAME : PackObject ? IDS_NOEXETYPED : IDS_NOARCHIVETYPED;
+        else
+        {
+            // Commit both exact paths only after both UTF8 capacities are checked.
+            memcpy(ZipName, source.c_str(), source.size() + 1);
+            memcpy(ExeName, target.c_str(), target.size() + 1);
+            EndDialog(Dlg, IDOK);
+            return TRUE;
+        }
     }
-    if (GetDlgItemText(Dlg, IDC_NEWARCHIVE, ExeName, MAX_PATH - 1) <= 0)
+    catch (const std::bad_alloc&)
     {
-        SalamanderGeneral->SalMessageBox(Dlg, LoadStr(PackObject ? IDS_NOEXETYPED : IDS_NOARCHIVETYPED), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
-        return TRUE;
+        error = IDS_LOWMEM;
     }
-
-    EndDialog(Dlg, IDOK);
+    SalamanderGeneral->SalMessageBox(Dlg, LoadStr(error), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
     return TRUE;
 }
 
