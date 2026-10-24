@@ -489,7 +489,7 @@ BOOL SafeDeleteFile(const char* fileName, BOOL& silent)
     do
     {
         mbRet = DIALOG_OK;
-        if (!::DeleteFile(fileName) && !silent)
+        if (!::DeleteFileW(GetSalamanderLongPath(GetSalamanderUnicodeString(fileName)).Ptr()) && !silent)
         {
             DWORD err = ::GetLastError();
             mbRet = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL,
@@ -1355,7 +1355,8 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
                 if (fi->CanDelete && !fi->IsDir)
                 {
                     // delete the file
-                    CSysString name2 = GetAnsiString(fi->FullPath);
+                    const std::string name2Utf8 = SalamanderDiskSelection::Utf8FromWide(fi->FullPath.Ptr());
+                    const char* name2 = name2Utf8.c_str();
 
                     // drop the read-only attribute if needed
                     SalamanderGeneral->ClearReadOnlyAttr(name2);
