@@ -1440,6 +1440,18 @@ BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileNam
                     SalEnumSelection nextName, void* param)
 {
     CALL_STACK_MESSAGE4("PackUncompress(, , %s, , %s, %s, ,)", archiveFileName, targetDir, archiveRoot);
+    // The listing's private interface and per-entry data belong to its plugin.
+    // Configuration may change after the archive was opened (including during
+    // startup); never pass that listing to a newly configured unpacker.
+    if (panel != NULL && panel->Is(ptZIPArchive) &&
+        panel->PluginData.Contains(pluginData) &&
+        StrICmp(panel->GetZIPArchive(), archiveFileName) == 0)
+    {
+        CPluginData* owner = panel->GetPluginDataForPluginIface();
+        if (owner == NULL || !owner->SupportPanelView)
+            return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_ARCNAME_UNSUP);
+        return owner->UnpackArchive(panel, archiveFileName, pluginData, targetDir, archiveRoot, nextName, param);
+    }
     // find the correct one according to the table
     int format = PackerFormatConfig.PackIsArchive(archiveFileName);
     if (format == 0)
