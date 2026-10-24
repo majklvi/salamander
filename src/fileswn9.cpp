@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "branchdroptarget.h"
 #include "common/widepath.h"
 #include "branch_view.h"
 #include "branchclipboard.h"
@@ -156,7 +157,10 @@ BOOL SafeInvokeCommand(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici)
 
 BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pastePath)
 {
-    if (IsBranchView()) return FALSE; // S26 experiment: unverified operation is blocked at direct dispatch.
+    const std::string branchRoot = IsBranchView() ? SalWideToMultiBytePath(GetPathW(), CP_UTF8) : std::string();
+    if (IsBranchView() && (branchRoot.empty() || branchRoot.size() >= sizeof(DropPath) ||
+        onlyLinks || (pastePath != NULL && !Salamander::BranchView::IsRootDropTarget(GetPathW(), pastePath))))
+        return FALSE; // S27d5b: only real-root copy/move, never focused row or arbitrary target.
 
     CALL_STACK_MESSAGE4("CFilesWindow::ClipboardPaste(%d, %d, %s)", onlyLinks, onlyTest, pastePath);
     IDataObject* dataObj;
@@ -166,6 +170,11 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
                               //          (onlyTest ? "test " : "") << (pastePath != NULL ? pastePath : "(null)"));
     if (OleGetClipboard(&dataObj) == S_OK && dataObj != NULL)
     {
+        if (IsBranchView() && IsFakeDataObject(dataObj, NULL, NULL, 0))
+        {
+            dataObj->Release();
+            return FALSE;
+        }
         if (!onlyLinks && !onlyTest && IsFakeDataObject(dataObj, NULL, NULL, 0) && SalShExtSharedMemView != NULL)
         { // Salamander "fake" data object on the clipboard -> paste files/directories from the archive
             BOOL pasteFromOurData = FALSE;
@@ -250,6 +259,11 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
             enumFormat->Release();
         }
 
+        if (IsBranchView() && !ownRutine)
+        {
+            dataObj->Release();
+            return FALSE; // Require native HDROP ingestion; no arbitrary Shell paste verb.
+        }
         BOOL ourClipDataObject = FALSE;
         DWORD effect = 0;
         if (ownRutine) // if there's a chance for our own handling, check if it's copy or move
@@ -293,7 +307,9 @@ BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pas
 
         if (ownRutine) // execute our own routine - copy or move
         {
-            if (pastePath != NULL)
+            if (IsBranchView())
+                memcpy(DropPath, branchRoot.c_str(), branchRoot.size() + 1);
+            else if (pastePath != NULL)
                 lstrcpyn(DropPath, pastePath, SAL_MAX_PATH);
             else
                 lstrcpyn(DropPath, GetPath(), SAL_MAX_PATH);

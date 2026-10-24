@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "branchdroptarget.h"
 
 #include "menu.h"
 #include "cfgdlg.h"
@@ -141,17 +142,33 @@ MENU_TEMPLATE_ITEM MouseDropMenu2[] =
 BOOL DoCopyMove(BOOL copy, char* targetDir, CCopyMoveData* data, void* param)
 {
     CFilesWindow* panel = (CFilesWindow*)param;
-    if (panel->IsBranchView()) { DestroyCopyMoveData(data); return FALSE; }
+    if (targetDir == NULL || strlen(targetDir) >= SAL_MAX_PATH || data == NULL || data->Count <= 0 ||
+        (panel->IsBranchView() && !Salamander::BranchView::IsRootDropTarget(panel->GetPathW(), targetDir)))
+    {
+        DestroyCopyMoveData(data);
+        return FALSE;
+    }
 
 
-    CTmpDropData* tmp = new CTmpDropData;
+#ifdef new
+#undef new
+#define RESTORE_BRANCH_DROP_DATA_DEBUG_NEW_MACRO
+#endif
+    CTmpDropData* tmp = new (std::nothrow) CTmpDropData;
+#ifdef RESTORE_BRANCH_DROP_DATA_DEBUG_NEW_MACRO
+#define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
+#undef RESTORE_BRANCH_DROP_DATA_DEBUG_NEW_MACRO
+#endif
     if (tmp != NULL)
     {
         tmp->Copy = copy;
         lstrcpyn(tmp->TargetPath, targetDir, SAL_MAX_PATH);
         tmp->Data = data;
-        PostMessage(panel->HWindow, WM_USER_DROPCOPYMOVE, (WPARAM)tmp, 0);
-        return TRUE;
+        if (PostMessage(panel->HWindow, WM_USER_DROPCOPYMOVE, (WPARAM)tmp, 0))
+            return TRUE;
+        DestroyCopyMoveData(data);
+        delete tmp;
+        return FALSE;
     }
     else
     {
@@ -261,11 +278,32 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
     CFilesWindow* panel = (CFilesWindow*)param;
     isTgtFile = FALSE; // drop target is not a file yet -> we can still handle the operation ourselves
     tgtType = idtttWindows;
-    if (panel->IsBranchView()) { if (effect != NULL) *effect = DROPEFFECT_NONE; return NULL; } // S26 read-only drop target.
 
     RECT r;
     GetWindowRect(panel->GetListBoxHWND(), &r);
     int index = panel->GetIndex(pt.x - r.left, pt.y - r.top);
+    if (panel->IsBranchView())
+    {
+        // Only the blank background denotes the real collection root. A flattened
+        // file row, updir, or a virtual/external source is never a destination.
+        panel->SetDropTarget(-1);
+        if (effect != NULL) *effect &= DROPEFFECT_COPY | DROPEFFECT_MOVE;
+        if ((index >= 0 && index < panel->Dirs->Count + panel->Files->Count) ||
+            DropSourcePanel == NULL || DropSourcePanel == panel ||
+            !DropSourcePanel->Is(ptDisk) || srcType != 0 || effect == NULL || *effect == DROPEFFECT_NONE)
+        {
+            if (effect != NULL) *effect = DROPEFFECT_NONE;
+            return NULL;
+        }
+        const std::string root = SalWideToMultiBytePath(panel->GetPathW(), CP_UTF8);
+        if (root.empty() || root.size() >= sizeof(panel->DropPath))
+        {
+            *effect = DROPEFFECT_NONE;
+            return NULL;
+        }
+        memcpy(panel->DropPath, root.c_str(), root.size() + 1);
+        return panel->DropPath;
+    }
     if (panel->Is(ptZIPArchive) || panel->Is(ptPluginFS))
     {
         if (panel->Is(ptZIPArchive))
@@ -622,7 +660,17 @@ const char* GetCurrentDirClipboard(POINTL& pt, void* param, DWORD* effect, BOOL 
     CFilesWindow* panel = (CFilesWindow*)param;
     isTgtFile = FALSE;
     tgtType = idtttWindows;
-    if (panel->IsBranchView()) { if (effect != NULL) *effect = DROPEFFECT_NONE; return NULL; } // S26 read-only drop target.
+    if (panel->IsBranchView())
+    {
+        panel->SetDropTarget(-1);
+        if (effect != NULL) *effect &= DROPEFFECT_COPY | DROPEFFECT_MOVE;
+        if (effect == NULL || *effect == DROPEFFECT_NONE || !Salamander::BranchView::IsRootDropTarget(panel->GetPathW(), panel->DropPath))
+        {
+            if (effect != NULL) *effect = DROPEFFECT_NONE;
+            return NULL;
+        }
+        return panel->DropPath;
+    }
 
     if (panel->Is(ptZIPArchive) || panel->Is(ptPluginFS)) // not into archives or FS yet
     {
