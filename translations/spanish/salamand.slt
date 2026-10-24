@@ -1135,7 +1135,7 @@ SLGINCOMPLETE,""
 1157,175,238,39,8,1,"elementos."
 
 [DIALOG 1105]
-299,243,1,"Paneles"
+299,263,1,"Paneles"
 599,1,3,118,12,1,"&Usar paneles con pestañas"
 596,1,16,242,12,1,"&Ocultar ficheros y directorios con atributos Oculto o Sistema (Ctrl+H)"
 302,1,28,215,12,1,"Inclui&r directorios para operaciones de selección/deselección"
@@ -1161,6 +1161,7 @@ SLGINCOMPLETE,""
 391,10,203,182,12,1,"Ordenar por &tiempo: elementos más nuevos arriba"
 395,10,215,191,12,1,"Ordenar por t&iempo: clasificar directorios por nombre"
 392,10,227,279,12,1,"Tr&atar directorios como si tuvieran extensiones (verlas también en columna Ext)"
+14528,1,247,295,12,1,"Usar rutas relativas en la columna Path de Branch View"
 
 [DIALOG 1106]
 299,104,1,"Pestañas"

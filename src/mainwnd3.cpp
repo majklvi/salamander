@@ -4138,6 +4138,7 @@ void CMainWindow::OnConfiguration(int mode, int param)
     BOOL oldStatusArea = Configuration.StatusArea;
     BOOL oldPanelCaption = Configuration.ShowPanelCaption;
     BOOL oldPanelZoom = Configuration.ShowPanelZoom;
+    BOOL oldBranchViewRelativePaths = Configuration.BranchViewRelativePaths;
     BOOL oldTreeViewVisible = Configuration.TreeViewVisible;
     double visibleLeftRatio = GetVisibleLeftPanelRatio();
 
@@ -4243,6 +4244,13 @@ void CMainWindow::OnConfiguration(int mode, int param)
         // icon in progress windows
         ProgressDlgArray.PostIconChange();
 
+        if (oldBranchViewRelativePaths != Configuration.BranchViewRelativePaths)
+        {
+            // Branch automatic refresh is deferred; a display-only preference still needs repainting.
+            InvalidateRect(LeftPanel->GetListBoxHWND(), NULL, FALSE);
+            InvalidateRect(RightPanel->GetListBoxHWND(), NULL, FALSE);
+        }
+
         // tell both panels they need to refresh
         LeftPanel->RefreshForConfig();
         RightPanel->RefreshForConfig();
@@ -4287,6 +4295,7 @@ static bool BranchReadOnlyCommandAllowed(UINT command)
     case CM_BRANCHVIEW:
     case CM_LEFT_BRANCHVIEW:
     case CM_RIGHT_BRANCHVIEW:
+    case CM_CONFIGURATION: // S28a: normal guarded Configuration dialog also owns Branch display preferences.
     case CM_COPYFILES:
     case CM_MOVEFILES:
     case CM_DELETEFILES:

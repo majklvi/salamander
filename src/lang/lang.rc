@@ -2204,7 +2204,7 @@ BEGIN
     LTEXT           "items.",IDC_STATIC_8,175,238,22,8
 END
 
-IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 243
+IDD_CFGPAGE_PANELS DIALOGEX 64, 22, 299, 263
 STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Panels"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -2247,6 +2247,8 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,215,141,12
     CONTROL         "Treat dire&ctories as if have extensions (also show extensions in Ext column)",IDC_SORTDIRSBYEXT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,227,265,12
+    CONTROL         "Use relative paths in the Branch View Path column",IDC_BRANCH_RELATIVE_PATHS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,247,295,12
 END
 
 IDD_CFGPAGE_TABS DIALOGEX 64, 22, 299, 104

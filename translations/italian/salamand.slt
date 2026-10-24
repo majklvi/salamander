@@ -1135,7 +1135,7 @@ SLGINCOMPLETE,""
 1157,175,238,33,8,1,"elementi."
 
 [DIALOG 1105]
-299,243,1,"Pannelli"
+299,263,1,"Pannelli"
 599,1,3,118,12,1,"&Usa pannelli a schede"
 596,1,16,237,12,1,"&Nascondi file e cartelle con attributo nascosto o di sistema (Ctrl+H)"
 302,1,28,194,12,1,"In&cludi cartelle per operazioni di selezione/deselezione"
@@ -1161,6 +1161,7 @@ SLGINCOMPLETE,""
 391,10,203,183,12,1,"Sor&t per ordine di data: elementi più recenti in alto"
 395,10,215,158,12,1,"Ordina per &Ora: ordina le cartelle per nome"
 392,10,227,289,12,1,"Tratta le dire&ctory come se avessero estensioni (mostra anche le estensioni nella colonna Ext)"
+14528,1,247,295,12,1,"Usa percorsi relativi nella colonna Path di Branch View"
 
 [DIALOG 1106]
 299,104,1,"Schede"

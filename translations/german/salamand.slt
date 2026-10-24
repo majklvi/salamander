@@ -1135,7 +1135,7 @@ SLGINCOMPLETE,""
 1157,175,238,36,8,1,"Elemente."
 
 [DIALOG 1105]
-299,243,1,"Dateifenster"
+299,263,1,"Dateifenster"
 599,1,3,125,12,1,"&Bedienfelder mit Tabs verwenden"
 596,1,16,279,12,1,"Dateien/Verzeichnisse mit &Versteckt- oder System-Attribut ausblenden (Strg+H)"
 302,1,28,198,12,1,"Verzeich&nisse bei Auswahl-Operationen mit einbeziehen"
@@ -1161,6 +1161,7 @@ SLGINCOMPLETE,""
 391,10,203,191,12,1,"Bei Sor&tierung nach Zeit: neuere Einträge nach oben"
 395,10,215,220,12,1,"Bei Sortierung nach Ze&it: Verzeichnisse nach Namen sortieren"
 392,10,227,289,12,1,"Verzeichnisse wie Er&weiterungen behandeln (Erweiterungen in Erw-Spalte anzeigen)"
+14528,1,247,295,12,1,"Relative Pfade in der Spalte Path der Branch View verwenden"
 
 [DIALOG 1106]
 299,104,1,"Tabs"

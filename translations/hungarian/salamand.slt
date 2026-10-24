@@ -1135,7 +1135,7 @@ SLGINCOMPLETE,""
 1157,175,238,72,8,1,"elemek láthatóságát."
 
 [DIALOG 1105]
-299,243,1,"Panelek"
+299,263,1,"Panelek"
 599,1,3,118,12,1,"&Lapozott panelek használata"
 596,1,16,239,12,1,"Re&jtett vagy rendszer attribútumú fájlok és mappák rejtése (Ctrl+H)"
 302,1,28,182,12,1,"Almappákat is kijelölés/kijelölés törlése művelet&nél"
@@ -1161,6 +1161,7 @@ SLGINCOMPLETE,""
 391,10,203,163,12,1,"Rendezés időrend szerin&t: újabb elemek felül"
 395,10,215,188,12,1,"Rendezés &idő szerint: mappák rendezése név szerint"
 392,10,227,268,12,1,"Mint&ha a mappáknak kiterjesztése lenne (kiterjesztés látszik a Kit oszlopban)"
+14528,1,247,295,12,1,"Relatív útvonalak a Branch View Path oszlopában"
 
 [DIALOG 1106]
 299,104,1,"Lapok"

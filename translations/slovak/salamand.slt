@@ -1135,7 +1135,7 @@ SLGINCOMPLETE,""
 1157,175,238,22,8,1,"."
 
 [DIALOG 1105]
-299,243,1,"Panely"
+299,263,1,"Panely"
 599,1,3,118,12,1,"&Použiť tabuľkované panely"
 596,1,16,232,12,1,"&Skryť súbory a adresáre s atribútmi Skrytý a Systémový (Ctrl+H)"
 302,1,28,178,12,1,"Za&hrnúť adresáre do operácií vybrať/zrušiť výber"
@@ -1161,6 +1161,7 @@ SLGINCOMPLETE,""
 391,10,203,146,12,1,"Triediť pod&ľa času: novšie položky hore"
 395,10,215,176,12,1,"Tri&ediť podľa času: triediť adresáre podľa názvu"
 392,10,227,289,12,1,"Zaobchádzať s adresármi, ako by mali príp&ony (súčasne zobraziť prípony v stĺpci Prípona)"
+14528,1,247,295,12,1,"V stĺpci Cesta v pohľade na vetvu používať relatívne cesty"
 
 [DIALOG 1106]
 299,104,1,"Karty"
