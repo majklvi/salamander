@@ -3627,6 +3627,12 @@ void CPluginData::InitMenuItems(HWND parent, int index, CMenuPopup* menu)
     }
 }
 
+// S27f.01: File Comparator MID_COMPAREFILES=1 uses the accepted owned snapshots.
+BOOL CPluginData::IsBranchCommandAllowed(int id) const
+{
+    return DLLName != NULL && _stricmp(DLLName, "filecomp\\filecomp.spl") == 0 && id == 1;
+}
+
 BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, int suid, BOOL& unselect)
 {
     CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem(, , %d, %d, ) (%s v. %s)", index, suid, DLLName, Version);
@@ -3638,6 +3644,7 @@ BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, i
         if (MenuItems[i]->SUID == suid) // comparing the menu item's SUID with the executed command
         {
             id = MenuItems[i]->ID;
+            if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return TRUE;
             if (InitDLL(parent) && PluginIfaceForMenuExt.NotEmpty())
             {
                 DWORD mask = GetMaskForMenuItems(index);
@@ -3655,6 +3662,7 @@ BOOL CPluginData::ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, 
 {
     CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem2(, , %d, %d, ) (%s v. %s)", index, id, DLLName, Version);
     unselect = FALSE;
+    if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return FALSE;
     int i;
     for (i = 0; i < MenuItems.Count; i++)
     {
@@ -3681,6 +3689,7 @@ BOOL CPluginData::ExecuteToolbarCommand(CFilesWindow* panel, HWND parent,
     CALL_STACK_MESSAGE5("CPluginData::ExecuteToolbarCommand(, , %d, %d, ) (%s v. %s)",
                         index, id, DLLName, Version);
     unselect = FALSE;
+    if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return FALSE;
     if (PluginIfaceForMenuExt.NotEmpty())
     {
         const DWORD mask = GetMaskForMenuItems(index);

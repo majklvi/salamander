@@ -662,9 +662,12 @@ BOOL CPlugins::OnLastCommand(CFilesWindow* panel, HWND parent)
 
 BOOL CPlugins::ExecuteCommand(int pluginIndex, int menuItemIndex, CFilesWindow* panel, HWND parent)
 {
+    CPluginData* pluginData = Get(pluginIndex);
+    if (pluginData == NULL || menuItemIndex < 0 || menuItemIndex >= pluginData->MenuItems.Count)
+        return FALSE;
+    if (panel != NULL && panel->IsBranchView() &&
+        !pluginData->IsBranchCommandAllowed(pluginData->MenuItems[menuItemIndex]->ID)) return FALSE;
     CalculateStateCache();
-
-    CPluginData* pluginData = Data[pluginIndex];
 
     if (pluginData->InitDLL(parent)) // to call GetMenuItemStateType(), PluginIfaceForMenuExt must be initialized
     {
