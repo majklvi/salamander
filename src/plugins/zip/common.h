@@ -300,6 +300,8 @@ extern CConfiguration Config;
 
 char* LoadStr(int resID);
 WCHAR* LoadStrW(int resID);
+// Existing ZIP UTF8-first/ACP path conversion, with long-path prefix for I/O.
+std::wstring ZipPathToWide(const char* path);
 bool IsUTF8Encoded(const char* s, int len);
 int ZipEncodeEntryName(const char* utf8Path, bool isDir, char* dest, int destMax, bool* usedUtf8);
 void ZipUtf8ToOemBuffer(char* name, int nameMax);
