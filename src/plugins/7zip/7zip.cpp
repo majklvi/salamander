@@ -489,7 +489,7 @@ BOOL SafeDeleteFile(const char* fileName, BOOL& silent)
     do
     {
         mbRet = DIALOG_OK;
-        if (!::DeleteFile(fileName) && !silent)
+        if (!::DeleteFileW(GetSalamanderLongPath(GetSalamanderUnicodeString(fileName)).Ptr()) && !silent)
         {
             DWORD err = ::GetLastError();
             mbRet = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL,
@@ -1355,7 +1355,8 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
                 if (fi->CanDelete && !fi->IsDir)
                 {
                     // delete the file
-                    CSysString name2 = GetAnsiString(fi->FullPath);
+                    const std::string name2Utf8 = SalamanderDiskSelection::Utf8FromWide(fi->FullPath.Ptr());
+                    const char* name2 = name2Utf8.c_str();
 
                     // drop the read-only attribute if needed
                     SalamanderGeneral->ClearReadOnlyAttr(name2);
@@ -1584,43 +1585,48 @@ CPluginInterfaceForViewer::CanViewFile(const char *name)
 // Menu Handlers
 //
 
+static std::string ArchiveNameMessage(const char* pattern, const std::string& name)
+{
+    std::string text(pattern);
+    const size_t placeholder = text.find("%s");
+    if (placeholder != std::string::npos) text.replace(placeholder, 2, name);
+    return text;
+}
+
 static BOOL TestArchive(CSalamanderForOperationsAbstract* salamander, HWND hParent)
 {
-    // get the path to the focused 7z archive
-    const CFileData* cfd = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
-    if (cfd == NULL)
+    CSalamanderDiskSelection selection;
+    if (!selection.Capture(SalamanderGeneral, PANEL_SOURCE, SALDISKSELECTION_FOCUSED_ONLY) ||
+        selection.GetCount() != 1 || selection.GetItem(0)->IsDir) return FALSE;
+    try
+    {
+        const auto* item = selection.GetItem(0);
+        const std::string fileName = SalamanderDiskSelection::Utf8FromWide(item->FullPathW);
+        if (fileName.empty()) { SetLastError(ERROR_INVALID_NAME); return FALSE; }
+        // Prepare all strings before opening the progress dialog.
+        const std::string progress = ArchiveNameMessage(LoadStr(IDS_TESTING_ARCHIVE_NAME),
+            SalamanderDiskSelection::Utf8FromWide(item->NameW));
+        const std::string success = ArchiveNameMessage(LoadStr(IDS_TESTARCHIVEOK), fileName);
+        const std::string corrupt = ArchiveNameMessage(LoadStr(IDS_TESTARCHIVECORRUPTED), fileName);
+        C7zClient client;
+        salamander->OpenProgressDialog(LoadStr(IDS_TESTING_ARCHIVE), FALSE, NULL, FALSE);
+        salamander->ProgressDialogAddText(progress.c_str(), FALSE);
+        const int ret = client.TestArchive(salamander, fileName.c_str());
+        salamander->CloseProgressDialog();
+        if (ret == OPER_OK)
+        {
+            SalamanderGeneral->SalMessageBox(hParent, success.c_str(), LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONINFORMATION);
+            return TRUE;
+        }
+        if (ret == OPER_CONTINUE)
+            SalamanderGeneral->SalMessageBox(hParent, corrupt.c_str(), LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONINFORMATION);
         return FALSE;
-    char fileName[2 * MAX_PATH];
-
-    C7zClient client;
-
-    salamander->OpenProgressDialog(LoadStr(IDS_TESTING_ARCHIVE), FALSE, NULL, FALSE);
-    sprintf(fileName, LoadStr(IDS_TESTING_ARCHIVE_NAME), cfd->Name);
-    salamander->ProgressDialogAddText(fileName, FALSE);
-
-    SalamanderGeneral->GetPanelPath(PANEL_SOURCE, fileName, 2 * MAX_PATH, NULL, NULL);
-    SalamanderGeneral->SalPathAppend(fileName, cfd->Name, 2 * MAX_PATH);
-    int ret = client.TestArchive(salamander, fileName);
-    salamander->CloseProgressDialog();
-
-    if (ret == OPER_OK)
-    {
-        char text[1024];
-        text[0] = '\0';
-        sprintf(text, LoadStr(IDS_TESTARCHIVEOK), fileName);
-        SalamanderGeneral->SalMessageBox(hParent, text, LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONINFORMATION);
-        ret = TRUE;
     }
-    else if (ret == OPER_CONTINUE)
+    catch (const std::bad_alloc&)
     {
-        char text[1024];
-        text[0] = '\0';
-        sprintf(text, LoadStr(IDS_TESTARCHIVECORRUPTED), fileName);
-        SalamanderGeneral->SalMessageBox(hParent, text, LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONINFORMATION);
-        ret = FALSE;
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return FALSE;
     }
-
-    return ret;
 }
 
 //
