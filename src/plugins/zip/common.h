@@ -33,11 +33,16 @@ extern CSalamanderGUIAbstract* SalamanderGUI;
 class CZIPFileData
 {
 public:
-    CZIPFileData(QWORD qwPackedSize, int nItem, BOOL bUnix) : PackedSize(qwPackedSize), ItemNumber(nItem), Unix(bUnix) {}
+    CZIPFileData(QWORD qwPackedSize, int nItem, BOOL bUnix) : PackedSize(qwPackedSize), ItemNumber(nItem), Unix(bUnix), OwnedNameW(NULL) {}
+    ~CZIPFileData() { free(OwnedNameW); }
 
     QWORD PackedSize;
     int ItemNumber; // # of item in Cetral Directory, not offset
     BOOL Unix;
+    // The legacy directory callback does not adopt CFileData::NameW. Keep its
+    // optional Unicode view alive with the plugin data, released by the normal
+    // ReleasePluginData callback, including rejected entries and listing resets.
+    wchar_t* OwnedNameW;
 };
 
 struct CExtInfo
@@ -295,6 +300,8 @@ extern CConfiguration Config;
 
 char* LoadStr(int resID);
 WCHAR* LoadStrW(int resID);
+// Existing ZIP UTF8-first/ACP path conversion, with long-path prefix for I/O.
+std::wstring ZipPathToWide(const char* path);
 bool IsUTF8Encoded(const char* s, int len);
 int ZipEncodeEntryName(const char* utf8Path, bool isDir, char* dest, int destMax, bool* usedUtf8);
 void ZipUtf8ToOemBuffer(char* name, int nameMax);
