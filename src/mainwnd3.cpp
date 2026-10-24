@@ -3,6 +3,10 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/widepath.h"
+#include "branch_view.h"
+
+void ReleaseDPIAwareWindowIcons(HWND hWindow);
 
 #include <algorithm>
 #include <new>
@@ -929,7 +933,10 @@ std::wstring CMainWindow::GetPanelTabDisplayText(CFilesWindow* panel) const
         if (info != NULL)
             index = info->OriginalIndex;
     }
-    return BuildTabDisplayText(panel, index);
+    std::wstring text = BuildTabDisplayText(panel, index);
+    if (panel->IsBranchView())
+        text += L" [" + SalMultiByteToWidePath(LoadStr(IDS_BRANCH_VIEW), CP_UTF8) + L"]";
+    return text;
 }
 
 void CMainWindow::UpdatePanelTabTitle(CFilesWindow* panel)
@@ -4131,6 +4138,7 @@ void CMainWindow::OnConfiguration(int mode, int param)
     BOOL oldStatusArea = Configuration.StatusArea;
     BOOL oldPanelCaption = Configuration.ShowPanelCaption;
     BOOL oldPanelZoom = Configuration.ShowPanelZoom;
+    BOOL oldBranchViewRelativePaths = Configuration.BranchViewRelativePaths;
     BOOL oldTreeViewVisible = Configuration.TreeViewVisible;
     double visibleLeftRatio = GetVisibleLeftPanelRatio();
 
@@ -4236,6 +4244,13 @@ void CMainWindow::OnConfiguration(int mode, int param)
         // icon in progress windows
         ProgressDlgArray.PostIconChange();
 
+        if (oldBranchViewRelativePaths != Configuration.BranchViewRelativePaths)
+        {
+            // Branch automatic refresh is deferred; a display-only preference still needs repainting.
+            InvalidateRect(LeftPanel->GetListBoxHWND(), NULL, FALSE);
+            InvalidateRect(RightPanel->GetListBoxHWND(), NULL, FALSE);
+        }
+
         // tell both panels they need to refresh
         LeftPanel->RefreshForConfig();
         RightPanel->RefreshForConfig();
@@ -4260,6 +4275,111 @@ void CMainWindow::OnConfiguration(int mode, int param)
     }
 
     EndStopRefresh(); // snooper starts again now
+}
+
+// S26 transition gate: commands not exercised for a collection remain unavailable.
+static bool BranchReadOnlyCommandAllowed(UINT command)
+{
+    // S28: existing display templates and property sorts use the same identity-safe workers.
+    if ((command >= CM_ACTIVEMODE_1 && command <= CM_ACTIVEMODE_10) ||
+        (command >= CM_LEFTMODE_1 && command <= CM_LEFTMODE_10) ||
+        (command >= CM_RIGHTMODE_1 && command <= CM_RIGHTMODE_10) ||
+        (command >= CM_ACTIVEEXTRAMODE_MIN && command <= CM_ACTIVEEXTRAMODE_MAX) ||
+        (command >= CM_LEFTEXTRAMODE_MIN && command <= CM_LEFTEXTRAMODE_MAX) ||
+        (command >= CM_RIGHTEXTRAMODE_MIN && command <= CM_RIGHTEXTRAMODE_MAX) ||
+        (command >= CM_LEFTSORTBY_MIN && command <= CM_LEFTSORTBY_MAX) ||
+        (command >= CM_RIGHTSORTBY_MIN && command <= CM_RIGHTSORTBY_MAX))
+        return true;
+    switch (command)
+    {
+    case CM_BRANCHVIEW:
+    case CM_LEFT_BRANCHVIEW:
+    case CM_RIGHT_BRANCHVIEW:
+    case CM_CONFIGURATION: // S28a: normal guarded Configuration dialog also owns Branch display preferences.
+    case CM_COPYFILES:
+    case CM_MOVEFILES:
+    case CM_DELETEFILES:
+    case CM_PROPERTIES:
+    case CM_CLIPCOPY:
+    case CM_CLIPCUT:
+    case CM_CLIPPASTE:
+    case CM_LAST_PLUGIN_CMD: // router; OnLastCommand validates the current plugin/ID
+    case CM_PACK:
+    case CM_CONTEXTMENU:
+    case CM_RENAMEFILE:
+    case CM_OPEN:
+    case CM_VIEW:
+    case CM_ALTVIEW:
+    case CM_EDIT:
+    case CM_BRANCH_OPENPARENT:
+    case CM_BRANCH_STOP:
+    case CM_ACTIVEREFRESH:
+    case CM_LEFTREFRESH:
+    case CM_RIGHTREFRESH:
+    case CM_ACTIVESELECT:
+    case CM_ACTIVESELECTALL:
+    case CM_ACTIVEUNSELECT:
+    case CM_ACTIVEUNSELECTALL:
+    case CM_ACTIVEINVERTSEL:
+    case CM_ACTIVEINVERTSELALL:
+    case CM_SELECTBYFOCUSEDNAME:
+    case CM_UNSELECTBYFOCUSEDNAME:
+    case CM_SELECTBYFOCUSEDEXT:
+    case CM_UNSELECTBYFOCUSEDEXT:
+    case CM_RESELECT:
+    case CM_CLIPCOPYFULLNAME:
+    case CM_CLIPCOPYNAME:
+    case CM_CLIPCOPYFULLPATH:
+    case CM_CLIPCOPYUNCNAME:
+    case CM_ACTIVEPARENTDIR:
+    case CM_LPARENTDIR:
+    case CM_RPARENTDIR:
+    case CM_CLOSETAB:
+    case CM_LEFT_CLOSETAB:
+    case CM_RIGHT_CLOSETAB:
+    case CM_NEXTTAB:
+    case CM_PREVTAB:
+    case CM_LEFT_NEXTTAB:
+    case CM_LEFT_PREVTAB:
+    case CM_RIGHT_NEXTTAB:
+    case CM_RIGHT_PREVTAB:
+    case CM_EXIT:
+    case CM_LEFTNAME:
+    case CM_LEFTEXT:
+    case CM_LEFTTIME:
+    case CM_LEFTSIZE:
+    case CM_LEFTATTR:
+    case CM_LEFTTYPE:
+    case CM_RIGHTNAME:
+    case CM_RIGHTEXT:
+    case CM_RIGHTTIME:
+    case CM_RIGHTSIZE:
+    case CM_RIGHTATTR:
+    case CM_RIGHTTYPE:
+    case CM_ACTIVENAME:
+    case CM_ACTIVEEXT:
+    case CM_ACTIVETIME:
+    case CM_ACTIVESIZE:
+    case CM_ACTIVEATTR:
+    case CM_ACTIVETYPE:
+        return true;
+    default:
+        if (command >= CM_PLUGINCMD_MIN && command <= CM_PLUGINCMD_MAX)
+        {
+            for (int i = 0; i < Plugins.GetCount(); ++i)
+            {
+                CPluginData* plugin = Plugins.Get(i);
+                if (plugin == NULL) continue;
+                for (int j = 0; j < plugin->MenuItems.Count; ++j)
+                {
+                    const CPluginMenuItem* item = plugin->MenuItems[j];
+                    if (item != NULL && item->Type == pmitItemOrSeparator && item->Name != NULL && item->SUID == static_cast<int>(command))
+                        return plugin->IsBranchCommandAllowed(item->ID) != FALSE;
+                }
+            }
+        }
+        return false;
+    }
 }
 
 LRESULT
@@ -4594,7 +4714,6 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             ClosePanelTab(leftPanel, false);
             return -1;
         }
-        UpdatePanelTabVisibility(cpsLeft);
         SetActivePanel(leftPanel);
         //      ReleaseMenuNew();
         CFilesWindow* rightPanel = AddPanelTab(cpsRight);
@@ -4615,9 +4734,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             ClosePanelTab(rightPanel, false);
             return -1;
         }
-        UpdatePanelTabVisibility(cpsRight);
         LeftPanel = leftPanel;
         RightPanel = rightPanel;
+        // AddPanelTab creates inactive tabs; publish visibility only after both
+        // initial panels have become the current panels for their sides.
+        UpdatePanelTabVisibility(cpsLeft);
+        UpdatePanelTabVisibility(cpsRight);
 
         EditWindow = new CEditWindow;
         if (EditWindow == NULL || !EditWindow->IsGood())
@@ -5627,6 +5749,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
     case WM_COMMAND:
     {
+        CFilesWindow* branchCommandPanel = GetActivePanel();
+        if (branchCommandPanel != NULL && branchCommandPanel->IsBranchView() &&
+            !BranchReadOnlyCommandAllowed(LOWORD(wParam))) return 0;
         if (HelpMode && (HWND)lParam == NULL && LOWORD(wParam) != CM_HELP_CONTEXT)
         {
             DWORD id = LOWORD(wParam);
@@ -5890,7 +6015,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 char* listFull = userMenuAdvancedData.ListOfSelFullNames;
                 char* listFullEnd = listFull + USRMNUARGS_MAXLEN - 1;
                 smallBuf = FALSE;
-                char fullName[MAX_PATH];
+                std::string fullName;
                 if (activePanel->SelectedCount > 0)
                 {
                     int count = activePanel->Files->Count + activePanel->Dirs->Count;
@@ -5907,9 +6032,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                                 else
                                     break;
                             }
-                            lstrcpyn(fullName, activePanel->GetPath(), MAX_PATH);
-                            if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
-                                !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
+                            fullName = SalWideToMultiBytePath(activePanel->GetItemFullPathW(*file).c_str(), CP_UTF8);
+                            if (!AddToListOfNames(&listFull, listFullEnd, fullName.c_str(), (int)fullName.size()))
                                 break;
                         }
                     }
@@ -5928,9 +6052,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         (index != 0 || !subDir))
                     {
                         CFileData* file = (index < activePanel->Dirs->Count) ? &activePanel->Dirs->At(index) : &activePanel->Files->At(index - activePanel->Dirs->Count);
-                        lstrcpyn(fullName, activePanel->GetPath(), MAX_PATH);
-                        if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
-                            !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
+                        fullName = SalWideToMultiBytePath(activePanel->GetItemFullPathW(*file).c_str(), CP_UTF8);
+                        if (!AddToListOfNames(&listFull, listFullEnd, fullName.c_str(), (int)fullName.size()))
                         {
                             smallBuf = TRUE;
                         }
@@ -5949,16 +6072,18 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
                 if (LeftPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathLeft, LeftPanel->GetPath(), MAX_PATH);
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, MAX_PATH))
+                    std::string panelPath = SalWideToMultiBytePath(LeftPanel->GetPathW(), CP_UTF8);
+                    strcpy(userMenuAdvancedData.FullPathLeft, panelPath.c_str());
+                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, CUserMenuAdvancedData::PathCapacity))
                         userMenuAdvancedData.FullPathLeft[0] = 0;
                 }
                 else
                     userMenuAdvancedData.FullPathLeft[0] = 0;
                 if (RightPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathRight, RightPanel->GetPath(), MAX_PATH);
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathRight, MAX_PATH))
+                    std::string panelPath = SalWideToMultiBytePath(RightPanel->GetPathW(), CP_UTF8);
+                    strcpy(userMenuAdvancedData.FullPathRight, panelPath.c_str());
+                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathRight, CUserMenuAdvancedData::PathCapacity))
                         userMenuAdvancedData.FullPathRight[0] = 0;
                 }
                 else
@@ -6051,21 +6176,16 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
                 if (f1 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName1, activePanel->GetPath(), MAX_PATH);
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName1, f1->Name, MAX_PATH))
-                        userMenuAdvancedData.CompareName1[0] = 0;
+                    std::string comparedName = SalWideToMultiBytePath(activePanel->GetItemFullPathW(*f1).c_str(), CP_UTF8);
+                    strcpy(userMenuAdvancedData.CompareName1, comparedName.c_str());
                 }
                 if (f2 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName2,
-                             (f2FromInactPanel ? inactivePanel : activePanel)->GetPath(), MAX_PATH);
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName2, f2->Name, MAX_PATH))
-                        userMenuAdvancedData.CompareName2[0] = 0;
-                    else
-                    {
-                        if (f2FromInactPanel && inactivePanel == LeftPanel)
-                            userMenuAdvancedData.CompareNamesReversed = TRUE;
-                    }
+                    std::string comparedName = SalWideToMultiBytePath(
+                        (f2FromInactPanel ? inactivePanel : activePanel)->GetItemFullPathW(*f2).c_str(), CP_UTF8);
+                    strcpy(userMenuAdvancedData.CompareName2, comparedName.c_str());
+                    if (f2FromInactPanel && inactivePanel == LeftPanel)
+                        userMenuAdvancedData.CompareNamesReversed = TRUE;
                 }
                 if (userMenuAdvancedData.CompareName1[0] != 0 &&
                     userMenuAdvancedData.CompareName2[0] == 0 && activePanel == RightPanel)
@@ -6074,7 +6194,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 }
 
                 CUMDataFromPanel data(activePanel);
-                SetCurrentDirectory(activePanel->GetPath());
+                SetCurrentDirectoryW(activePanel->GetPathW());
                 UserMenu(HWindow, LOWORD(wParam) - CM_USERMENU_MIN, GetNextFileFromPanel,
                          &data, &userMenuAdvancedData);
                 SetCurrentDirectoryToSystem();
@@ -7064,6 +7184,28 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             return 0;
         }
 
+        case CM_BRANCHVIEW:
+        case CM_LEFT_BRANCHVIEW:
+        case CM_RIGHT_BRANCHVIEW:
+        {
+            CFilesWindow* panel = LOWORD(wParam) == CM_LEFT_BRANCHVIEW ? LeftPanel :
+                                  LOWORD(wParam) == CM_RIGHT_BRANCHVIEW ? RightPanel : activePanel;
+            if (panel != NULL && panel->Is(ptDisk) &&
+                (panel->IsBranchView() || Salamander::BranchView::ExperimentEnabled()))
+                panel->ToggleBranchView();
+            return 0;
+        }
+
+        case CM_BRANCH_STOP:
+            if (activePanel != NULL)
+                activePanel->CancelBranchViewScan();
+            return 0;
+
+        case CM_BRANCH_OPENPARENT:
+            if (activePanel != NULL)
+                activePanel->OpenBranchItemDirectory();
+            return 0;
+
         case CM_CHANGEFILTER:
             activePanel->ChangeFilter();
             return 0;
@@ -7406,8 +7548,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            char temporarySelected[MAX_PATH];
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
             activePanel->EmailFiles();
 
@@ -7455,8 +7597,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             activePanel->StoreSelection(); // save selection for Restore Selection command
 
             // if no item is selected, select the focused one and store its name
-            char temporarySelected[MAX_PATH];
-            activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+            CPanelTemporarySelection temporarySelected;
+            activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
             BOOL changeTargetRequested;
             do
@@ -7621,8 +7763,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 activePanel->StoreSelection(); // save selection for Restore Selection command
 
                 // if no item is selected, choose the one under the focus and store its name
-                char temporarySelected[MAX_PATH];
-                activePanel->SelectFocusedItemAndGetName(temporarySelected, MAX_PATH);
+                CPanelTemporarySelection temporarySelected;
+                activePanel->SelectFocusedItemAndGetName(temporarySelected);
 
                 activePanel->Convert();
 
@@ -9293,6 +9435,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         case CML_RIGHT:
         {
             BOOL left = popupID == CML_LEFT;
+            CFilesWindow* branchPanel = left ? LeftPanel : RightPanel;
+            popup->CheckItem(left ? CM_LEFT_BRANCHVIEW : CM_RIGHT_BRANCHVIEW, FALSE, branchPanel->IsBranchView());
+            popup->EnableItem(left ? CM_LEFT_BRANCHVIEW : CM_RIGHT_BRANCHVIEW, FALSE,
+                branchPanel->Is(ptDisk) && (branchPanel->IsBranchView() || Salamander::BranchView::ExperimentEnabled()));
+
 
             popup->CheckItem(left ? CM_LCHANGEFILTER : CM_RCHANGEFILTER, FALSE,
                              (left ? LeftPanel : RightPanel)->FilterEnabled);
@@ -9390,6 +9537,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CML_FILES:
         {
+            CFilesWindow* branchPanel = GetActivePanel();
+            popup->EnableItem(CM_BRANCH_OPENPARENT, FALSE, branchPanel != NULL && branchPanel->IsBranchView() && branchPanel->Files->Count > 0);
+            popup->EnableItem(CM_BRANCH_STOP, FALSE, branchPanel != NULL && branchPanel->IsBranchViewScanning());
+
             break;
         }
 
@@ -10594,7 +10745,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 // lower the thread priority to "normal" (so operations don't burden the system)
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-                data->GetPluginInterfaceForMenuExt()->ExecuteMenuItem(NULL, HWindow, (int)lParam, 0);
+                data->ExecutePostedMenuItem(GetActivePanel(), HWindow, (int)lParam, FALSE);
 
                 // raise the thread priority again, the operation has finished
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
@@ -11891,6 +12042,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         }
 
         UnregisterSessionNotification(HWindow);
+        // CWindow detaches at WM_DESTROY, so its owner never sees WM_NCDESTROY.
+        ReleaseDPIAwareWindowIcons(HWindow);
         KillTimer(HWindow, IDT_RESTOREWINDOWPLACEMENT);
 
         // notify the task list that we are exiting
