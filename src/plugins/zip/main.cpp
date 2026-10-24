@@ -729,7 +729,7 @@ CPluginInterfaceForMenuExt::GetMenuItemState(int id, DWORD eventMask)
 
     // use the selected files or the file under focus
     const CFileData* file = NULL;
-    BOOL isDir;
+    BOOL isDir = FALSE;
     if ((eventMask & MENU_EVENT_FILES_SELECTED) == 0)
     {
         if ((eventMask & MENU_EVENT_FILE_FOCUSED) == 0)
@@ -737,22 +737,29 @@ CPluginInterfaceForMenuExt::GetMenuItemState(int id, DWORD eventMask)
         file = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, &isDir); // nothing is selected -> enumeration fails
     }
 
-    BOOL ret = TRUE;
-    int count = 0;
-
-    int index = 0;
-    if (file == NULL)
-        file = SalamanderGeneral->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
-    while (file != NULL && ret)
+    try
     {
-        if (SalamanderGeneral->IsArchiveHandledByThisPlugin(file->Name))
-            count++;
-        else
-            ret = FALSE;
-        file = SalamanderGeneral->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
+        int count = 0;
+        int index = 0;
+        if (file == NULL)
+            file = SalamanderGeneral->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
+        while (file != NULL)
+        {
+            // A legacy display name can omit the extension after UTF-8
+            // shortening. Match the exact name, never a reconstructed path.
+            const std::string name = file->UseWideName() ?
+                SalamanderDiskSelection::Utf8FromWide(file->NameW) : std::string(file->Name);
+            if (isDir || name.empty() || !SalamanderGeneral->IsArchiveHandledByThisPlugin(name.c_str()))
+                return 0;
+            ++count;
+            file = SalamanderGeneral->GetPanelSelectedItem(PANEL_SOURCE, &index, &isDir);
+        }
+        return count > 0 ? MENU_ITEM_STATE_ENABLED : 0;
     }
-
-    return (ret && count > 0) ? MENU_ITEM_STATE_ENABLED : 0; // all selected files are handled by us
+    catch (const std::bad_alloc&)
+    {
+        return 0;
+    }
 }
 
 static std::string ArchiveNameMessage(const char* pattern, const std::string& name)
