@@ -2007,6 +2007,20 @@ int CZipPack::InsertDir(char* dir, TIndirectArray2<TIndirectArray2_char_>& table
     return 0;
 }
 
+// Source names come from the exact UTF-8 root-relative archive callback.
+static BOOL DeletePackedSourceFile(const char* name)
+{
+    std::wstring path = SalamanderDiskSelection::WideFromPath(name);
+    if (path.empty())
+    {
+        SetLastError(ERROR_INVALID_NAME);
+        return FALSE;
+    }
+    if (path.length() >= MAX_PATH && path.compare(0, 4, L"\\\\?\\") != 0)
+        path = path.compare(0, 2, L"\\\\") == 0 ? L"\\\\?\\UNC\\" + path.substr(2) : L"\\\\?\\" + path;
+    return DeleteFileW(path.c_str());
+}
+
 int CZipPack::CleanUpSource()
 {
     CALL_STACK_MESSAGE1("CZipPack::CleanUpSource()");
@@ -2023,7 +2037,7 @@ int CZipPack::CleanUpSource()
         if (next->Action != AF_ADD && next->Action != AF_OVERWRITE || next->IsDir)
             continue;
         SalamanderGeneral->ClearReadOnlyAttr(next->Name);
-        DeleteFile(next->Name);
+        DeletePackedSourceFile(next->Name);
     }
     //remove directories
     //sort directories by level
