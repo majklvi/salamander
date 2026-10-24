@@ -6002,8 +6002,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                     // snizime prioritu threadu na "normal" (aby operace prilis nezatezovaly stroj)
                                                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-                                                    CSalamanderForOperations sm(MainWindow->GetActivePanel());
-                                                    data->GetPluginInterfaceForMenuExt()->ExecuteMenuItem(&sm, MainWindow->HWindow, id, 0);
+                                                    data->ExecutePostedMenuItem(MainWindow->GetActivePanel(), MainWindow->HWindow, id, TRUE);
 
                                                     // opet zvysime prioritu threadu, operace dobehla
                                                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);

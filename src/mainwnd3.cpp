@@ -10725,7 +10725,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 // lower the thread priority to "normal" (so operations don't burden the system)
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-                data->GetPluginInterfaceForMenuExt()->ExecuteMenuItem(NULL, HWindow, (int)lParam, 0);
+                data->ExecutePostedMenuItem(GetActivePanel(), HWindow, (int)lParam, FALSE);
 
                 // raise the thread priority again, the operation has finished
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
