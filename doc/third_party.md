@@ -9,6 +9,12 @@ making their work available.
 
 | Component | Used for | Attribution and license notes |
 | --- | --- | --- |
+| Branch Rename metadata and temporary-selection integration | Exact per-item rename, cache/focus refresh and safe selection cleanup in experimental Branch View | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Scoped BranchItemRenamed/declaration/success hooks reuse the accepted S20a wide I/O and selection header; local lock/callback and modal identity guards adapt the staged target. Existing native harness extended without removing previous checks. GPL-2.0-or-later; source notices preserved. |
+| Branch flat-copy source planning | Actual per-item wide parent/name, ADS/network flags and read-storage scheduling | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Scoped BuildScriptMain hunks reuse accepted S19/S20b worker I/O; local copy-only/cache/CWD guards and existing native harness test adapters support staged activation. GPL-2.0-or-later; source notices retained. |
+| Branch relative-directory copy | Optional localized copy dialog, per-file ancestors and Skip labels | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Scoped hunks preserve target paths and scheduling; local CWD failure cleanup and native test adapters. GPL-2.0-or-later; notices preserved. |
+| Branch move source planning and completion refresh | Exact source scheduling, volume status and Branch notification dispatch | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, Open Salamander Authors and Samandarin Contributors. Scoped hunks and native test adapters preserve staged safety gates; GPL-2.0-or-later, notices retained. |
+| Branch permanent deletion and confirmations | Exact parent/name planning and relative identity in confirmation | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, Open Salamander Authors and Samandarin Contributors. Local single-item wide confirmation, safe unknown worker configuration and native extraction test adapters; GPL-2.0-or-later, notices preserved. |
+| Branch exact-selection recycle integration | Whole-selection queue, per-item paths and failure-safe setup | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, Open Salamander Authors and Samandarin Contributors. Retains the accepted target recycle/normalization policy; local HRESULT/current-identity guards and native queue/worker adapters. GPL-2.0-or-later, notices preserved. |
 | REGEXP | Regular expression matching | Copyright (C) 1986 Henry Spencer, University of Toronto. |
 | AES code | Cryptographic routines | Written by Dr Brian Gladman. Copyright (C) 2001 Dr Brian Gladman. |
 | PNGLite | PNG image support | Based on PNGLite by Daniel Karling. Copyright (C) 2007 Daniel Karling. |
@@ -24,7 +30,31 @@ making their work available.
 | llama.cpp | On-demand CPU inference executable for SalamatrixAI | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp), pinned release `b10107`. MIT License; the configuration downloader retrieves the runtime and its license notice directly for the user. |
 | Qwen2.5-Coder 1.5B Instruct GGUF | Recommended local SalamatrixAI model | [Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF](https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF), pinned `q4_k_m` file. Apache License 2.0; the configuration downloader retrieves the model and license notice directly for the user. |
 | Qwen2.5-Coder 0.5B Instruct GGUF | Lightweight, English-prompt-only local SalamatrixAI model | [Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF](https://huggingface.co/Qwen/Qwen2.5-Coder-0.5B-Instruct-GGUF), pinned `q4_k_m` file. Apache License 2.0; the configuration downloader retrieves the model and license notice directly for the user. |
+| Salamatrix owned sides/context serialization | Dynamic full UTF-8 JSON from wide snapshots and explicit native ABI limits | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Three production files preserve SPDX/copyright; adapted consumer tests validate actual payload, capacity and framing behavior. GPL-2.0-or-later. |
+| Owned worker operation paths | Wide copy/retry/ADS, directory and attribute I/O with existing scheduling | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Scoped worker/BuildName hunks, exact path helpers and native fixtures; preserve target handle-accounting fix, add BuildName acceptance coverage. GPL-2.0-or-later, original notices retained. |
+| Wide viewer enumeration and captions | Optional QueryService navigation with complete owned paths and paired PictView consumer | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Scoped host service/dispatcher and exact viewer/PictView sources and native tests; GPL-2.0-or-later, original notices preserved. |
+| Wide file-action launch | Exact Unicode/long argv and current directory for external editor/viewer and user menu | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Scoped donor launch hunks and native child-process tests; source notices preserved. GPL-2.0-or-later. |
+| Wide disk file-size boundary | Exact Unicode/long file and symlink target sizes with explicit errors | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Milan Kase, Open Salamander Authors and Samandarin Contributors. SalGetFileSize2 and both size test files copied exactly; ordinary getter harness adapted to S04 implementation, real Branch assertions deferred to S26. GPL-2.0-or-later, notices preserved. |
+| Undelete captured restore identities | Owned wide restore paths and lossless checks at legacy image boundary | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Milan Kase, Open Salamander Authors and Samandarin Contributors. Eight production files and C++ fixture copied exactly; Python adapts configuration selection only. EFS fixture uses a stub. GPL-2.0-or-later, original source notices preserved. |
+| PAK existing-only Optimize snapshot | Stable captured inputs, exact parent notifications and no creation of missing optimization sources | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Milan Kase, Open Salamander Authors and Samandarin Contributors. Five production files and C++ fixture copied exactly; Python adapts current shared test prefix and configuration selection. GPL-2.0-or-later, source notices preserved. |
+| 7-Zip owned focused archive input | Stable full path and progress/result strings for Test Archive | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Milan Kase, Open Salamander Authors and Samandarin Contributors. Three production files and complete native C++ fixture copied exactly; Python driver adapts existing compiler helper import. GPL-2.0-or-later, original source notices preserved. |
+| ZIP owned archive menu paths | Stable selected/focused command inputs and exact parent notifications | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Milan Kase, Open Salamander Authors and Samandarin Contributors. Three production files copied exactly; shared ZIP/7-Zip test adapted to defer 7-Zip until S14. GPL-2.0-or-later, source notices preserved. |
+| Paired PictView thumbnail and EXIF migration | Owned inputs, wide safe EXIF replacement and retained legacy export | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Milan Kase, Open Salamander Authors and Samandarin Contributors. Four production files and C++ fixture copied exactly, driver adapted only for configuration selection, source notices preserved. GPL-2.0-or-later. |
+| WIC thumbnail callback output preflight | Long path recognition and legacy memory output before paired EXIF migration | Existing WIC implementation by Open Salamander Authors and Samandarin Contributors, also present unchanged in [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`. Local baseline repair reuses the encoder; native harness adapts the donor disk selection test driver pattern. GPL-2.0-or-later. |
+| Automation owned COM items and collection snapshots | Stable wide item identities, shared snapshots and enumeration after panel changes | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Milan Kase, Open Salamander Authors and Samandarin Contributors. Production files preserve SPDX/copyright; native test adapted to stage Automation separately from S11 Salamatrix and exercise actual collection/enumerator code. GPL-2.0-or-later. |
+| Split & Combine owned inputs, wide paths and input identity safety | Stable source snapshots, actual-parent targets/discovery, UTF-8 BAT and guarded output creation | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Production files and native actual-consumer harness preserve SPDX notices; test runner registration adapted to existing stages. GPL-2.0-or-later. |
+| Checksum owned source identities, wide Calculate/Verify and manifest export | Stable disk snapshots before modeless workers, exact per-item paths and manifest-parent resolution | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Production hunks and native command/worker/parser/export harness preserved with SPDX notices. Native digest facade is a stub; local validation additionally uses the real plugin and independently calculated hashes. GPL-2.0-or-later. |
+| Batch Rename owned identities, preview and wide rename/Undo I/O | Immutable disk selection, per-item parents, bounded path generation and exact file operations | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Production hunks, renamer_paths.h/renamer_io.h and native test harnesses preserve original SPDX notices; local integration retains existing test registrations and verifies distinct same-basename contents through actual rename/Undo. GPL-2.0-or-later. |
+| File Comparator owned disk selections and native consumer tests | Exact selected/focused identities, unambiguous target pairing and bounded UTF-8 input | From [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Production hunks and native test driver preserved; native template additionally checks the snapshot UTF-8 capacity boundary. Existing dialog cleanup fix retained. GPL-2.0-or-later; original SPDX notices preserved. |
+| Icon-reader root scratch safety prerequisite | Heap-backed narrow/wide preparation without changing legacy shell path limits | Narrow CPathBuffer sizing adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Independent wide scratch and UTF-8-first/ACP character-offset repair avoid baseline corruption before S06 validation; full Branch/icon/overlay migration remains deferred to S26/S28. Native tests compile the actual preparation and path-buffer methods using the existing SafeFile test driver. GPL-2.0-or-later; SPDX notices preserved. |
+| Owned disk selection SDK, host service and DemoPlug example | Immutable copied disk-row metadata and paths through optional QueryService | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. SDK header, host service and released ABI golden preserved; DemoPlug retains its existing archive example. Native SDK/ownership assertions retained, PictView consumer subset deferred to S12. GPL-2.0-or-later; original SPDX notices preserved. |
+| Ordinary panel path getters and PanelItemPaths service | Complete Unicode/long disk-row paths through optional QueryService | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), pinned donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Ordinary getter subset moved from `branch_view.cpp`; existing wide join retained and byte fallback corrected to UTF-8-first/ACP. Tests adapt the donor ordinary getter fixtures and existing SafeFile compiler harness. GPL-2.0-or-later; original SPDX notices preserved. |
+| SafeFile Retry/Skip, Unicode/long-path I/O and native harness | Core file I/O regression coverage; S03 accepted at 770f48e0 after local runtime and exact-head CI | Adapted from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Samandarin Contributors. GPL-2.0-or-later; original SPDX notices are preserved. |
+| ZIP listing ownership, archive dispatch and regression harness | Baseline leak and wrong-plugin unpacking repair required by S03 runtime validation | Builds on [KRtkovo-eu-AI/salamander](https://github.com/KRtkovo-eu-AI/salamander), target `a84dbed6db632a9e63b5ed9f4bc6691e4cc5f449`, by Open Salamander Authors and Samandarin Contributors. Test extraction/compiler patterns adapted from the SafeFile harness in PR #769, donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`. GPL-2.0-or-later; original SPDX notices preserved. Independent baseline fixes, no additional donor feature import. |
+| Core wide handle wrappers and native fixtures | LoadImage and directory-notification A/W tracking | Wrapper hunks from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, building on Open Salamander Authors and Samandarin Contributors. Fixture lifecycle adapted from its SafeFile native harness; direct core tracker coverage added locally. GPL-2.0-or-later; original SPDX notices preserved. |
+| Plugin wide file handle wrappers and native diagnostics tests | CreateFile and FindFirstFile A/W monitoring | Wrapper hunks from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor `47661e92d4b3cbe5bb593ae3d75a3f1f698ef413`, by Open Salamander Authors and Samandarin Contributors. Fixture lifecycle adapted from its SafeFile harness via S02a; direct registry/fault coverage added locally. GPL-2.0-or-later; SPDX preserved. S02b accepted at code checkpoint `23d5406d` after full local runtime and exact-head fork CI. |
 | Test Reporter | Pull-request test result reports | [dorny/test-reporter](https://github.com/dorny/test-reporter), used by GitHub Actions to publish JUnit and Python xUnit results as Checks and workflow summaries. MIT License. |
+| Native Samandarin shutdown lifetime and regression harness | Bounded initialization readiness, callback draining and timely SDK diagnostics | Independent baseline repair building on [KRtkovo-eu-AI/salamander](https://github.com/KRtkovo-eu-AI/salamander), target `a84dbed6db632a9e63b5ed9f4bc6691e4cc5f449`, by Open Salamander Authors and Samandarin Contributors. Sent-message-only join adapted from its `src/plugins/shared/salamatrix_thread_join.h`; native project/harness follows accepted S02b tests. GPL-2.0-or-later; original SPDX notices preserved. No additional donor feature import. |
 | pytest | Python test execution and xUnit report generation in pull-request CI | [pytest-dev/pytest](https://github.com/pytest-dev/pytest). MIT License. |
 | cursor-sdk | Optional Python SDK for batch SLT translation through the Cursor API | Used only by `tools/localization/translate_slt_with_openai.py` when `-Provider cursor` is selected. Install with `pip install cursor-sdk`. |
 | OpenRouter API | Optional remote provider for batch SLT translation | Used by `tools/localization/translate_slt_with_openai.py` by default with the `openai/gpt-5.4-nano` model. Requires a user-supplied `OPENROUTER_API_KEY`; no key is stored in the repository. |
@@ -85,3 +115,247 @@ making their work available.
 | Base of Tree View panel | Tree View panel | Based on changes proposed by fgodoy. |
 | Localization scripts | Localization tooling portions | Samandarin includes localization tooling adapted from, or substantially informed by, fork [Sally](https://github.com/0xeb/sally) by [Elias Bachaalany (0xeb)](https://github.com/0xeb). Licensed under the GNU Library General Public License. |
 | Command shell template SVG icons | Windows Terminal profile menu icons | SVG artwork adapted from Microsoft product icon shapes for PowerShell, Windows PowerShell, Windows Terminal, Command Prompt, and Visual Studio, and from the SVG Repo Azure Cloud Shell icon. |
+
+### S20a ordinary rename and temporary selection
+
+Header/native fixtures EXACT and scoped host rename/selection hunks ADAPTED from [PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor 47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Samandarin Contributors, GPL-2.0-or-later. Original SPDX notices preserved. Branch integration deferred.
+
+### S20b ordinary copy/move planning
+
+Scoped donor planning buffers, Unicode Copy-of formatter and item-parent split-path hunks adapted from [PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor 47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, GPL-2.0-or-later; original notices preserved. Exact NameW capture extends ordinary-panel identity handling.
+
+### S20c exact delete/recycle and typed error formatting
+
+Scoped host/worker hunks, operationrecycle.h, recycle-only native fixture and typed text tests adapted from [PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor 47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, GPL-2.0-or-later. branch_view_text.h and its test project copied exactly; original notices preserved. Local adaptation resolves ordinary recycle eligibility through the exact wide volume root. Future Branch resource tests retained but deferred.
+
+### S21a exact Shell and clipboard identities
+
+branchshell.h, branchclipboard.h and their full context-menu/operation native fixtures/projects are copied exactly from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor 47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Original notices preserved; the already adapted S20c recycle helper remains unchanged.
+
+### S21b ordinary disk Shell call sites
+
+Scoped shellib, shellsup, fileswn5 and fileswn9 hunks derive from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Disk guard adaptation reuses existing exact item getters; no Branch stubs or virtual-panel changes.
+
+### S22 owned archive enumeration
+
+CPanelTmpEnumData, PanelEnumDiskSelection and the actual-function fixture derive from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Exact fixture driver; explicit file-only disk route adapter until Branch integration. Notices retained.
+
+### S23 array capacity reservation
+
+common/array.h Reserve/empty cleanup and array_reserve_tests.cpp/vcxproj copied exactly from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Original notices retained.
+
+### S25 isolated Branch scanner
+
+branch_view.h/.cpp scanner/path/snapshot subset and branch_view_tests derive from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Exact shared worker lifetime implementation; fixture-only future scheduler/sort checks retained deferred. All original notices preserved.
+
+### S26a association preparation and reentrant lifetime
+
+AssociationPreparation/session/lifetime, internal Shell association epoch/cache guards and branch_preparation_tests derive from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Exact helper/test blocks, scoped host hunks preserving target icon accounting; all notices retained.
+
+### S27a1 Branch viewer/editor and exact parent navigation
+
+Scoped OpenBranchItemDirectory/declaration/menu/dispatch derive from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Local current-row/preflight/wide-focus and transition viewer-policy adapters preserve target navigation and the S18 launch implementation; original notices retained. Enter/archive dispatch remains deferred after actual GUI boundary failures.
+
+### S27a2 Branch Enter and archive metadata preflight
+
+Scoped Execute Branch Shell/archive dispatch and CM_OPEN allowance derive from
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Current-cache/owned-path guards, explicit long
+Shell rejection and wide archive metadata preflight are local adaptations.
+Original notices retained. Archive correction validated; long executable Shell
+launch remains unresolved and S27a2 is not fully accepted.
+
+### S27a2 comparative launch research (no production source import)
+
+Reference-only analysis credits Eugene Roshal/Far Group (FarManager, BSD-3-Clause),
+Alexander Koblov and Double Commander contributors (GPL-2.0-or-later), the Explorer++
+Project (GPL-3.0-only), Files Community (MIT), and Directory Opus/GPSoftware developer
+guidance. Pinned source links and findings are recorded in
+[the S27a2 comparison](branch-view-port/steps/S27a2-shell-comparison.md).
+No source from these projects was imported into production. The local independent
+Shell class-selection probe did not solve the long-path launch failure.
+
+### S27a2 program/document separation
+
+Independent local implementation, Samandarin Contributors, GPL-2.0-or-later.
+FAR Manager (Eugene Roshal/Far Group) and Files Community informed the conceptual
+program/document split; their source code and fallback chains were not imported.
+Microsoft Windows Attachment Services owns final authorization and execution.
+S27a2 is now locally completed with explicitly accepted unsupported-case limits;
+see [the completion record](branch-view-port/steps/S27a2-completion.md).
+
+### S27d1 Branch Properties
+
+Scoped quiet context-menu / complete IDataObject / SHMultiFileProperties fallback
+hunks copied from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769),
+donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and
+Samandarin Contributors, GPL-2.0-or-later. Original notices retained. Local current
+cache/whole-selection guards and staged command gate adapt these hunks to the
+incremental port. Accepted S21 Shell helpers and native tests reused unchanged.
+
+### S27d2 Branch clipboard copy
+
+Existing complete Shell data-object/clipboard publication block and native Shell
+identity tests reused from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769),
+donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and
+Samandarin Contributors, GPL-2.0-or-later. Original notices retained. Local staged
+copy-only activation and actual-block regression harness adapt the accepted S21
+implementation to Branch selection. No duplicate Shell framework introduced.
+
+### S27d3a Branch cut export
+
+Cut publication, full-identity cross-panel marking and ClearCutToClipFlag reused
+from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices retained. Staged activation and
+actual-block native regression harness are local incremental-port adaptations.
+
+### S27d3b Branch clipboard paste
+
+Wide clipboard ingestion and operation planner reused from
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices retained. Owned wide-first drop
+metadata adapter and actual-function regression cases are local adaptations.
+
+### S27d4 Branch context menu
+
+TrackBranchHostContextMenu, containing-folder interception, mixed-parent fallback
+and deferred command dispatch copied as scoped hunks from
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices retained. Local staged activation
+and native recording-menu facade adapt the verified donor behavior to this port.
+
+### S27d5a Branch drag source
+
+Existing drag source and QueryContinueDrag are reused from
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices retained. Local staged activation,
+nothrow allocation and explicit native facades preserve the port's failure contract.
+
+### S27d5b Branch receiving
+
+Native drop/clipboard ingestion and wide worker integration are reused from
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices retained. Private root identity,
+staged safe receiving, queue ownership guards and native boundary tests are local
+adaptations; no public plugin ABI or Windows security policy changes.
+
+### S27e1 Branch ZIP/7-Zip packing
+
+The host selection callback and archive integration reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices retained. The staged bundled-packer
+gate, nothrow allocation adaptation and native boundary facades are local work;
+ZIP/7-Zip engines and the public plugin ABI remain unchanged.
+
+### S27e2 Branch archive move cleanup
+
+Archive callbacks and ZIP/7-Zip packing/cleanup algorithms reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices retained. Wide source deletion,
+full-path UTF8 preservation, staged activation and owned native fixtures are local
+adaptations; original archive success/cancellation behavior and plugin ABI remain.
+
+### S27f.01 Branch File Comparator integration
+
+Owned File Comparator selection/paths and the existing engine reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices retained. The staged private host
+command policy and recording dispatch tests are local adaptations; comparator
+consumer blobs and plugin SDK ABI remain unchanged.
+
+### S27f.02 Branch Batch Rename integration
+
+Batch Rename owned selection and wide I/O reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices and plugin blobs retained.
+The narrow private host command permission and recording tests are adaptations;
+plugin engine and SDK ABI are unchanged.
+
+### S27f.03 Branch Checksum Calculate/Verify integration
+
+Checksum owned selection, manifest handling and engines reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices and all plugin blobs retained.
+Private host command permission and recording dispatch tests are local adaptations.
+
+### S27f.04 Branch Split & Combine integration
+
+Split & Combine owned paths, plans and I/O engines reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Original notices/plugin blobs retained.
+Private host command permission and dispatch tests are local adaptations.
+
+### S27f.05 Branch Automation integration
+
+Automation owned COM selections and script consumers reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Existing notices and accepted S10/S11 adaptations
+are retained. Private host command permission and dispatch tests are local adaptations.
+
+### S27f.06a Branch Salamatrix package integration
+
+Owned full-path context and runtime consumers reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, Open Salamander Authors and Samandarin
+Contributors, GPL-2.0-or-later. Existing notices/accepted adaptations retained.
+Private registered-command permission and dispatch tests are local adaptations.
+Local validation uses PHP Group's official PHP CLI and existing Lua.org/PUC-Rio MIT
+interpreter assets, with notices preserved; no new interpreter redistribution.
+
+### S27f.06b Branch Automation menu integration
+
+Automation repository/manifest and immutable selection consumers reuse
+[Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769), donor
+47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, including work by Milan Kase,
+Ondřej Kotas, Open Salamander Authors and Samandarin Contributors,
+GPL-2.0-or-later. Existing notices retained. Private posted-command gates,
+repository macro/wide-path and one-shot dispatch integration fixes, balanced
+handle tracking and focused native regression are local adaptations.
+
+### S27f.07 PictView Branch thumbnail integration
+
+PictView thumbnail selection and paired EXIF10 consumers retain the accepted code
+from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769),
+donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, including work by Milan Kase,
+Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Existing
+PictView/EXIF notices remain intact. The narrow host command gate and its policy
+regressions are local integration adaptations; actual component code is unchanged.
+
+### S27f.08a ZIP Branch command and message boundaries
+
+Owned ZIP command selection retains [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769),
+donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, including work by Milan Kase,
+Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Existing
+notices retained. Exact menu association, private Test Archive gate, Unicode-safe
+existing host hard wrapping and focused regressions are local integration repairs.
+
+### S27f.08b1 ZIP Branch comments
+
+Owned ZIP archive selection retains [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769),
+donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, including work by Milan Kase,
+Open Salamander Authors and Samandarin Contributors, GPL-2.0-or-later. Existing
+notices retained. Comment-only private gate, early stop on failed save reopen,
+Unicode-created dialog and heap-backed title formatting plus native regressions
+are local repairs of demonstrated integration/baseline defects.
+
+### S27f.08b2 ZIP self-extracting archives
+
+Retains owned ZIP/SFX commands from [Samandarin PR #769](https://github.com/KRtkovo-eu-AI/salamander/pull/769),
+donor47661e92d4b3cbe5bb593ae3d75a3f1f698ef413, and the ZIP/SFX/PE resource
+work of Milan Kase, Open Salamander Authors and Samandarin Contributors under
+GPL-2.0-or-later; original file notices preserved. Heap paths, Unicode dialog/
+resource I/O, invalid-handle and allocation-flow repairs and native tests are local
+adaptations of demonstrated baseline prerequisites; original engines retained.
