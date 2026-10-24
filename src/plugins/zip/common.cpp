@@ -178,7 +178,7 @@ static bool ZipDecodeZipNameToUtf8(const CFileHeader* fileHeader, std::string& u
     return ZipWideToUtf8(wide.data(), (int)wide.size(), utf8);
 }
 
-static std::wstring ZipPathToWide(const char* path)
+std::wstring ZipPathToWide(const char* path)
 {
     if (path == NULL || *path == 0)
         return std::wstring();
@@ -2215,7 +2215,16 @@ int CZipCommon::TestIfExist(const char* name)
         CloseCFile(file);
         if (OverwriteDialog2(SalamanderGeneral->GetMsgBoxParent(), name, attr) != IDC_YES)
             return ErrorID = IDS_NODISPLAY;
-        SetFileAttributes(name, FILE_ATTRIBUTE_NORMAL);
+        try
+        {
+            const std::wstring wideName = ZipPathToWide(name);
+            if (!SetFileAttributesW(wideName.c_str(), FILE_ATTRIBUTE_NORMAL))
+                return ErrorID = IDS_NODISPLAY;
+        }
+        catch (const std::bad_alloc&)
+        {
+            return ErrorID = IDS_LOWMEM;
+        }
     }
     return 0;
 }
