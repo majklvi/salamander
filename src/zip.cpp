@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/widepath.h"
 
 #include "menu.h"
 #include "cfgdlg.h"
@@ -2865,6 +2866,38 @@ void CSalamanderGeneral::FocusNameInPanel(int panel, const char* path, const cha
         return;
     }
     CFilesWindow* p = GetPanel(panel);
+    if (p != NULL && p->Is(ptDisk))
+    {
+        try
+        {
+            // Borrow no panel names across ChangePathToDiskW: it replaces rows.
+            const std::wstring directory = SalMultiByteToWidePath(path,
+                IsValidPathUtf8Text(path) ? CP_UTF8 : CP_ACP);
+            const std::wstring focus = SalMultiByteToWidePath(name,
+                IsValidPathUtf8Text(name) ? CP_UTF8 : CP_ACP);
+            if (directory.empty() || focus.empty() || directory.size() >= SAL_MAX_PATH ||
+                focus.size() >= SAL_MAX_PATH || focus.find_first_of(L"\\/") != std::wstring::npos) return;
+            const std::wstring checked = directory.size() >= MAX_PATH ?
+                SalPathAddExtendedPrefixW(directory.c_str()) : directory;
+            const DWORD attributes = GetFileAttributesW(checked.c_str());
+            if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY)) return;
+            if (!p->ChangePathToDiskW(p->HWindow, directory.c_str())) return;
+            int match = -1;
+            for (int i = 0; i < p->Dirs->Count + p->Files->Count; ++i)
+            {
+                const CFileData& file = i < p->Dirs->Count ? p->Dirs->At(i) : p->Files->At(i - p->Dirs->Count);
+                const std::wstring current = file.UseWideName() ? file.NameW :
+                    SalMultiByteToWidePath(file.Name, IsValidPathUtf8Text(file.Name) ? CP_UTF8 : CP_ACP);
+                if (current == focus) { match = i; break; }
+                if (match == -1 && CompareStringOrdinal(current.c_str(), -1, focus.c_str(), -1, TRUE) == CSTR_EQUAL)
+                    match = i;
+            }
+            if (match != -1) p->SetCaretIndex(match, TRUE);
+            SetForegroundWindow(MainWindow->HWindow);
+        }
+        catch (const std::bad_alloc&) { TRACE_E(LOW_MEMORY); }
+        return;
+    }
     char pathBackup[MAX_PATH + 200];
     char nameBackup[MAX_PATH + 200];
     lstrcpyn(pathBackup, path, MAX_PATH + 200);
