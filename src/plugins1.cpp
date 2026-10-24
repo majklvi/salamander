@@ -3148,6 +3148,17 @@ static BOOL IsSamandarinPlugin(const char* dllName)
     return fileName != NULL && StrNICmp(fileName, "samandarin", 10) == 0;
 }
 
+BOOL CPluginData::PrepareNativeProcessExit(BOOL finalize)
+{
+    if (!UnloadingPluginsForMainWindowClose || DLL == NULL || !IsSamandarinPlugin(DLLName))
+        return TRUE;
+    typedef BOOL(WINAPI* FPrepareForProcessExit)(DWORD, BOOL);
+    FPrepareForProcessExit prepare = reinterpret_cast<FPrepareForProcessExit>(
+        GetProcAddress(DLL, "Samandarin_PrepareForProcessExit"));
+    // Older binaries keep the existing process-close behavior.
+    return prepare == NULL || prepare(2000, finalize);
+}
+
 BOOL CPluginData::Unload(HWND parent, BOOL ask)
 {
     CALL_STACK_MESSAGE5("CPluginData::Unload(0x%p, %d) (%s v. %s)", parent, ask, DLLName, Version);
@@ -3230,6 +3241,18 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
             if (!skipUnload && PluginIface.NotEmpty())
             {
                 // the plugin may unload: let it delete any remaining temp files from the disk cache
+                // New Samandarin builds can drain native initialization without
+                // invoking the managed callbacks skipped on process close.
+                // A timeout leaves interfaces/module ownership intact.
+                if (skipSamandarinShutdown)
+                {
+                    if (!PrepareNativeProcessExit(TRUE))
+                    {
+                        TRACE_E("Samandarin native initialization is still active; close deferred.");
+                        ThumbnailMasksDisabled = FALSE;
+                        return FALSE;
+                    }
+                }
                 CPluginInterfaceAbstract* unloadedPlugin = PluginIface.GetInterface();
                 DeleteManager.PluginMayBeUnloaded(parent, this);
 
@@ -3604,6 +3627,31 @@ void CPluginData::InitMenuItems(HWND parent, int index, CMenuPopup* menu)
     }
 }
 
+// S27f.01-.06a: Verified plugin commands use accepted owned snapshots.
+BOOL CPluginData::IsBranchCommandAllowed(int id)
+{
+    // Package commands are dynamic; require the exact currently registered item.
+    // The framework retains runtime, enabled state and manifest capability checks.
+    if (DLLName != NULL && _stricmp(DLLName, "salamatrix\\salamatrix.spl") == 0 &&
+        id >= 0x62000001)
+    {
+        for (int i = 0; i < MenuItems.Count; ++i)
+        {
+            CPluginMenuItem* item = MenuItems[i];
+            if (item != NULL && item->Type == pmitItemOrSeparator &&
+                item->Name != NULL && item->ID == id)
+                return TRUE;
+        }
+        return FALSE;
+    }
+    return DLLName != NULL &&
+        ((id == 1 && (_stricmp(DLLName, "filecomp\\filecomp.spl") == 0 ||
+                      _stricmp(DLLName, "renamer\\renamer.spl") == 0 ||
+                      _stricmp(DLLName, "automation\\automation.spl") == 0)) ||
+         ((id == 1 || id == 2) && (_stricmp(DLLName, "checksum\\checksum.spl") == 0 ||
+                                 _stricmp(DLLName, "splitcbn\\splitcbn.spl") == 0)));
+}
+
 BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, int suid, BOOL& unselect)
 {
     CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem(, , %d, %d, ) (%s v. %s)", index, suid, DLLName, Version);
@@ -3615,6 +3663,7 @@ BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, i
         if (MenuItems[i]->SUID == suid) // comparing the menu item's SUID with the executed command
         {
             id = MenuItems[i]->ID;
+            if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return TRUE;
             if (InitDLL(parent) && PluginIfaceForMenuExt.NotEmpty())
             {
                 DWORD mask = GetMaskForMenuItems(index);
@@ -3632,6 +3681,7 @@ BOOL CPluginData::ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, 
 {
     CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem2(, , %d, %d, ) (%s v. %s)", index, id, DLLName, Version);
     unselect = FALSE;
+    if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return FALSE;
     int i;
     for (i = 0; i < MenuItems.Count; i++)
     {
@@ -3658,6 +3708,7 @@ BOOL CPluginData::ExecuteToolbarCommand(CFilesWindow* panel, HWND parent,
     CALL_STACK_MESSAGE5("CPluginData::ExecuteToolbarCommand(, , %d, %d, ) (%s v. %s)",
                         index, id, DLLName, Version);
     unselect = FALSE;
+    if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return FALSE;
     if (PluginIfaceForMenuExt.NotEmpty())
     {
         const DWORD mask = GetMaskForMenuItems(index);
