@@ -822,8 +822,8 @@ static int CALLBACK RestoreBrowseCallback(HWND window, UINT message, LPARAM, LPA
     return 0;
 }
 
-CRestoreDialog::CRestoreDialog(HWND parent)
-    : CDialog(HLanguage, IDD_RESTORE, IDD_RESTORE, parent)
+CRestoreDialog::CRestoreDialog(HWND parent, const CSalamanderDiskSelection& selection)
+    : CDialog(HLanguage, IDD_RESTORE, IDD_RESTORE, parent), Selection(selection)
 {
 }
 
@@ -835,7 +835,6 @@ try
         return darkResult;
 
     CALL_STACK_MESSAGE4("CRestoreDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
-    char path[MAX_PATH + 300];
     switch (uMsg)
     {
     case WM_INITDIALOG:
@@ -849,39 +848,23 @@ try
             SetDlgItemTextW(HWindow, IDC_EDIT_TARGET, UndeletePaths::Wide(target.data()).c_str());
         ApplyUndeleteDarkModeIfSelected(GetDlgItem(HWindow, IDC_EDIT_TARGET));
 
-        int files, dirs;
-        char text1[200], text2[MAX_PATH + 100];
-        SalamanderGeneral->GetPanelSelection(PANEL_SOURCE, &files, &dirs);
-        SalamanderGeneral->GetCommonFSOperSourceDescr(text2, MAX_PATH + 100, PANEL_SOURCE, files, dirs, NULL, FALSE, FALSE);
-        GetDlgItemText(HWindow, IDC_LABEL_SOURCE, text1, 200);
-        BOOL labelSet = FALSE;
-        // if it is "file \"name.txt\"" or "directory \"name\"" we find the name and the remaining text
-        // we add the strings to text1 so that CSalamanderGUI::SetSubjectTruncatedText can be used
-        if (files + dirs <= 1)
+        int files = 0, dirs = 0;
+        for (int i = 0; i < Selection.GetCount(); ++i)
         {
-            char* beg = strchr(text2, '"');
-            char* end = strrchr(text2, '"');
-            if (beg != NULL && end != NULL && beg < end && end - (beg + 1) < MAX_PATH)
-            {
-                char fileName[MAX_PATH];
-                lstrcpyn(fileName, beg + 1, (int)(end - (beg + 1) + 1));
-                memmove(beg + 1 + 2, end, strlen(end) + 1);
-                memcpy(beg + 1, "%s", 2);
-                _snprintf_s(path, _TRUNCATE, text1, text2);
-
-                BOOL isDir = dirs == 1;
-                if (files + dirs == 0)
-                    SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, &isDir);
-                SalamanderGUI->SetSubjectTruncatedText(GetDlgItem(HWindow, IDC_LABEL_SOURCE), path,
-                                                       fileName, isDir, TRUE);
-                labelSet = TRUE;
-            }
+            if (Selection.GetItem(i)->IsDir) ++dirs;
+            else ++files;
         }
-        if (!labelSet)
-        {
-            _snprintf_s(path, _TRUNCATE, text1, text2);
-            SetDlgItemText(HWindow, IDC_LABEL_SOURCE, path);
-        }
+        // Ask the host only for its localized noun/count template. The owned
+        // snapshot supplies the exact name, never the shortened live-panel alias.
+        char description[1024];
+        SalamanderGeneral->GetCommonFSOperSourceDescr(description, _countof(description),
+                                                     -1, files, dirs, "%s", dirs == 1, FALSE);
+        std::wstring subject = UndeletePaths::Wide(description);
+        if (Selection.GetCount() == 1)
+            subject = UndeletePaths::RestoreSubject(subject, Selection.GetItem(0)->NameW);
+        const std::wstring pattern = UndeletePaths::ReadText(GetDlgItem(HWindow, IDC_LABEL_SOURCE));
+        const std::wstring label = UndeletePaths::RestoreSubject(pattern, subject.c_str());
+        SetDlgItemTextW(HWindow, IDC_LABEL_SOURCE, label.c_str());
         ApplyUndeleteDarkModeIfSelected(GetDlgItem(HWindow, IDC_LABEL_SOURCE));
         break;
     }

@@ -92,11 +92,12 @@ protected:
 class CRestoreDialog : public CDialog
 {
 public:
-    CRestoreDialog(HWND parent);
+    CRestoreDialog(HWND parent, const CSalamanderDiskSelection& selection);
 
     std::string TargetPath;
 
 protected:
+    const CSalamanderDiskSelection& Selection;
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
