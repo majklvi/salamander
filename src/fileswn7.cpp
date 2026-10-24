@@ -1981,9 +1981,25 @@ static BOOL UnpackArchiveToArchiveViaTemp(CFilesWindow* source, CPanelTmpEnumDat
     return done;
 }
 
+// S27e1 staged activation: only the bundled ZIP/7-Zip copy packers are verified.
+static BOOL IsVerifiedBranchPacker()
+{
+    const int index = PackerConfig.GetPreferedPacker();
+    if (PackerConfig.Move || index < 0 || index >= PackerConfig.GetPackersCount())
+        return FALSE;
+    const int type = PackerConfig.GetPackerType(index);
+    if (type >= 0)
+        return FALSE;
+    const CPluginData* plugin = Plugins.Get(-(type + 1));
+    return plugin != NULL && plugin->SupportCustomPack && plugin->DLLName != NULL &&
+        (_stricmp(plugin->DLLName, "zip\\zip.spl") == 0 ||
+         _stricmp(plugin->DLLName, "7zip\\7zip.spl") == 0);
+}
+
 void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* pluginName, int delFilesAfterPacking)
 {
-    if (IsBranchView() || target != NULL && target->IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+    if (target == NULL || target->IsBranchView() ||
+        (IsBranchView() && (!Is(ptDisk) || !target->Is(ptDisk) || delFilesAfterPacking == 1))) return;
 
     CALL_STACK_MESSAGE4("CFilesWindow::Pack(, %d, %s, %d)", pluginIndex, pluginName, delFilesAfterPacking);
     if (Files->Count + Dirs->Count == 0)
@@ -2013,7 +2029,15 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     if (data.IndexesCount > 1) // valid selection
     {
         nameByItem = FALSE;
-        data.Indexes = new int[data.IndexesCount];
+#ifdef new
+#undef new
+#define RESTORE_BRANCH_PACK_SELECTION_DEBUG_NEW_MACRO
+#endif
+        data.Indexes = new (std::nothrow) int[data.IndexesCount];
+#ifdef RESTORE_BRANCH_PACK_SELECTION_DEBUG_NEW_MACRO
+#define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
+#undef RESTORE_BRANCH_PACK_SELECTION_DEBUG_NEW_MACRO
+#endif
         if (data.Indexes == NULL)
         {
             TRACE_E(LOW_MEMORY);
@@ -2061,7 +2085,15 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
         }
         else
         {
-            data.Indexes = new int[1];
+#ifdef new
+#undef new
+#define RESTORE_BRANCH_PACK_SELECTION_DEBUG_NEW_MACRO
+#endif
+            data.Indexes = new (std::nothrow) int[1];
+#ifdef RESTORE_BRANCH_PACK_SELECTION_DEBUG_NEW_MACRO
+#define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
+#undef RESTORE_BRANCH_PACK_SELECTION_DEBUG_NEW_MACRO
+#endif
             if (data.Indexes == NULL)
             {
                 TRACE_E(LOW_MEMORY);
@@ -2231,6 +2263,11 @@ _PACK_AGAIN:
     if (dlg.Execute() == IDOK)
     {
         UpdateWindow(MainWindow->HWindow);
+        if (IsBranchView() && !IsVerifiedBranchPacker())
+        {
+            SalMessageBox(HWindow, GetErrorText(ERROR_NOT_SUPPORTED), LoadStr(IDS_PACKTITLE), MB_OK | MB_ICONEXCLAMATION);
+            goto _PACK_AGAIN;
+        }
         //--- adjust the archive name to its full form
         int errTextID;
         BOOL empty = FALSE;
