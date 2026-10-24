@@ -909,6 +909,28 @@ BOOL CPlugins::InitPluginMenuItemsForBar(HWND parent, int index, CMenuPopup* men
     return TRUE;
 }
 
+static int FocusedArchiveFormat(const CFileData* file)
+{
+    if (file == NULL)
+        return 0;
+    try
+    {
+        if (file->UseWideName())
+        {
+            // Name may be a shortened display alias without its extension.
+            if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, file->NameW, -1, NULL, 0, NULL, NULL) <= 0)
+                return 0;
+            const std::string name = SalWideToMultiBytePath(file->NameW, CP_UTF8);
+            return name.empty() ? 0 : PackerFormatConfig.PackIsArchive(name.c_str());
+        }
+        return file->Name != NULL ? PackerFormatConfig.PackIsArchive(file->Name) : 0;
+    }
+    catch (const std::bad_alloc&)
+    {
+        return 0;
+    }
+}
+
 void CPlugins::CalculateStateCache()
 {
     StateCache.Clean();
@@ -1039,7 +1061,7 @@ void CPlugins::CalculateStateCache()
                     CFileData* file = &MainWindow->GetActivePanel()->Files->At(caret -
                                                                                MainWindow->GetActivePanel()->Dirs->Count);
 
-                    int format = PackerFormatConfig.PackIsArchive(file->Name);
+                    int format = FocusedArchiveFormat(file);
                     if (format != 0) // not an error
                     {
                         format--;
