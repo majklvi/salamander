@@ -2951,6 +2951,7 @@ int CZipPack::SaveComment()
             ErrorID = IDS_LOWMEM;
         else
             ErrorID = IDS_NODISPLAY;
+        return ErrorID;
     }
 
     EONewCentrDir.CommentLen = (__UINT16)strlen(Comment);
