@@ -13,6 +13,8 @@
 #include "worker.h"
 #include "pack.h"
 #include "mapi.h"
+#include "common/widepath.h"
+#include "operationrecycle.h"
 
 
 static std::wstring ConfirmDeleteTextToWideWithCodePage(const char* text, UINT codePage, DWORD flags)
@@ -41,7 +43,7 @@ static std::wstring ConfirmDeleteTextToWide(const char* text)
     return wide;
 }
 
-static void AppendConfirmDeleteExtInfo(std::wstring& text, const wchar_t* path, int count, CFilesArray* dirs, CFilesArray* files)
+static void AppendConfirmDeleteExtInfo(std::wstring& text, const wchar_t* path, int count, CFilesArray* dirs, CFilesArray* files, CFilesWindow* panel)
 {
     if (count <= 1 || !Configuration.CnfrmConfirmDeleteExtInfo)
         return;
@@ -74,7 +76,8 @@ static void AppendConfirmDeleteExtInfo(std::wstring& text, const wchar_t* path, 
         {
             CFileData* file = &files->At(i);
             text += L"\r\n";
-            text += file->UseWideName() ? file->NameW : ConfirmDeleteTextToWide(file->Name);
+            text += panel->IsBranchView() ? panel->GetItemRelativePathW(*file) :
+                    (file->UseWideName() ? std::wstring(file->NameW) : ConfirmDeleteTextToWide(file->Name));
             text += L" (";
             text += fileLabel;
             text += L")";
@@ -125,6 +128,67 @@ BOOL PathContainsValidComponents(char* path, BOOL cutPath)
 BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileData* oneFile)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::DeleteThroughRecycleBin(, %d,)", selCount);
+
+    if (Is(ptDisk))
+    {
+        // IFileOperation accepts exact Unicode identities across different parents and
+        // supports long paths. Never feed a synthetic root/name pair to the recycle bin.
+        IFileOperation* operation = NULL;
+        HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                           IID_PPV_ARGS(&operation));
+        if (FAILED(result))
+            return FALSE;
+        result = operation->SetOwnerWindow(MainWindow->HWindow);
+        if (SUCCEEDED(result))
+            result = operation->SetOperationFlags(FOF_ALLOWUNDO | FOFX_RECYCLEONDELETE | FOFX_ADDUNDORECORD | FOFX_EARLYFAILURE);
+        const int total = selCount > 0 ? selCount : 1;
+        for (int item = 0; item < total && SUCCEEDED(result); ++item)
+        {
+            const CFileData* file = oneFile;
+            if (selCount > 0)
+            {
+                if (selection == NULL || selection[item] < 0 || selection[item] >= Dirs->Count + Files->Count)
+                {
+                    result = E_INVALIDARG;
+                    break;
+                }
+                file = selection[item] < Dirs->Count ? &Dirs->At(selection[item]) : &Files->At(selection[item] - Dirs->Count);
+            }
+            if (file == NULL || (IsBranchView() && GetBranchViewFileByCacheKey(GetItemCacheKeyPtr(*file)) != file))
+            {
+                result = HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+                break;
+            }
+            const std::wstring path = GetItemFullPathW(*file);
+            std::wstring shellPath;
+            if (FAILED(OperationRecyclePath(path, shellPath)))
+            {
+                result = HRESULT_FROM_WIN32(ERROR_INVALID_NAME);
+                break; // the recycle bin may trim trailing dots/spaces and delete a different item
+            }
+            IShellItem* shellItem = NULL;
+            result = SHCreateItemFromParsingName(shellPath.c_str(), NULL, IID_PPV_ARGS(&shellItem));
+            if (SUCCEEDED(result))
+            {
+                result = operation->DeleteItem(shellItem, NULL);
+                shellItem->Release();
+            }
+        }
+        // Queueing is all-or-nothing: a missing/unparsable item must not silently
+        // delete only the remaining part of the user's selection.
+        if (SUCCEEDED(result))
+            result = operation->PerformOperations();
+        BOOL aborted = TRUE;
+        if (SUCCEEDED(result))
+            result = operation->GetAnyOperationsAborted(&aborted);
+        operation->Release();
+        if (FAILED(result))
+        {
+            const DWORD error = HRESULT_FACILITY(result) == FACILITY_WIN32 ? HRESULT_CODE(result) : ERROR_GEN_FAILURE;
+            SalMessageBox(HWindow, GetErrorText(error), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+        }
+        return SUCCEEDED(result) && !aborted;
+    }
 
     int i = 0;
     char path[MAX_PATH];
@@ -205,6 +269,11 @@ void PluginFSConvertPathToExternal(char* path)
 void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int countSizeMode,
                                BOOL copyToSelectedDirs, BOOL* changeTargetRequested)
 {
+    // S27c1a: only flat copy into an ordinary disk panel is verified.
+    if (target != NULL && target->IsBranchView()) return;
+    if (IsBranchView() && (countSizeMode != 0 || copyToSelectedDirs ||
+        (type != atDelete && ((type != atCopy && type != atMove) || target == NULL || !target->Is(ptDisk))))) return;
+
     if (changeTargetRequested != NULL)
         *changeTargetRequested = FALSE;
     CALL_STACK_MESSAGE4("CFilesWindow::FilesAction(%d, , %d, %d)", type, countSizeMode,
@@ -454,7 +523,10 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         BOOL canUseRecycleBin = TRUE;
         if (type == atDelete)
         {
-            if (MyGetDriveType(GetPath()) != DRIVE_FIXED)
+            // Branch rows can reside on different volumes. Let force-recycle
+            // Shell operations validate each exact source; never infer permanent
+            // deletion from the synthetic root's drive type.
+            if (!IsBranchView() && OperationRecycleDriveTypeW(SalPathAddExtendedPrefixW(GetPathW())) != DRIVE_FIXED)
             {
                 recycle = 0;              // none
                 canUseRecycleBin = FALSE; // it will not work because Windows does not support it
@@ -558,8 +630,16 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
             if (type == atDelete && count > 1 && Configuration.CnfrmConfirmDeleteExtInfo)
             {
                 std::wstring messageText = ConfirmDeleteTextToWide(subject);
-                AppendConfirmDeleteExtInfo(messageText, GetPathW(), count, Dirs, Files);
+                AppendConfirmDeleteExtInfo(messageText, GetPathW(), count, Dirs, Files, this);
                 str.SetW(messageText.c_str(), NULL);
+            }
+            else if (type == atDelete && IsBranchView() && f != NULL)
+            {
+                // The display mirror may be shortened and duplicate basenames
+                // may belong to different parents. Confirm the owned relative identity.
+                const std::wstring relative = GetItemRelativePathW(*f);
+                const std::wstring messageText = ConfirmDeleteTextToWide(subject);
+                str.SetW(messageText.c_str(), relative.c_str());
             }
             else
                 str.Set(subject, count > 1 ? NULL : formatedFileName);
@@ -586,6 +666,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         if (CopyMoveOptions.Get() != NULL) // if they exist, pull the defaults
             criteria = *CopyMoveOptions.Get();
         CCriteriaData* criteriaPtr = NULL; // pointer to 'criteria'; if NULL, they are ignored
+        BOOL keepBranchPaths = FALSE;
         BOOL copyToExistingDir = FALSE;
         char nextFocus[MAX_PATH + 200]; // + 200 is a reserve (Windows can create paths longer than MAX_PATH)
         nextFocus[0] = 0;
@@ -611,7 +692,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                                Configuration.CopyHistory, COPY_HISTORY_SIZE,
                                                &criteria, havePermissions, supportsADS, &transferMode,
                                                &conflictMode, &operationSchedulingOverride, copyToSelectedDirs ? &selectedTargetPaths : NULL,
-                                               changeTargetRequested != NULL && !copyToSelectedDirs)
+                                               changeTargetRequested != NULL && !copyToSelectedDirs,
+                                               IsBranchView() ? &keepBranchPaths : NULL)
                           .Execute();
                 if (res == ID_CHANGE_SELECTED_TARGET_TAB)
                 {
@@ -658,15 +740,25 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                               type == atCopy ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
                               count <= 1 ? nextFocus : NULL, NULL, SAL_MAX_PATH))
                 {
+                    if (IsBranchView() && pathType != PATH_TYPE_WINDOWS)
+                    {
+                        SalMessageBox(HWindow, GetErrorText(ERROR_NOT_SUPPORTED), LoadStr(type == atCopy ? IDS_ERRORCOPY : IDS_ERRORMOVE),
+                                      MB_OK | MB_ICONEXCLAMATION);
+                        continue; // Do not enter unverified archive/plugin copy callbacks.
+                    }
                     // use 'if' instead of a 'switch' to ensure that 'break' and 'continue' work correctly
                     if (pathType == PATH_TYPE_WINDOWS) // Windows path (drive + UNC)
                     {
                         CFileData* dir = (count == 0) ? f : ((indexes[0] < Dirs->Count) ? &Dirs->At(indexes[0]) : &Files->At(indexes[0] - Dirs->Count));
 
+                        const std::wstring sourceDirectoryW = GetItemDirectoryW(*dir);
+                        const std::string sourceDirectory = SalWideToMultiBytePath(sourceDirectoryW.c_str(), CP_UTF8);
+                        const std::wstring fullSource = GetItemFullPathW(*dir);
+                        const std::string sourceBaseName = SalWideToMultiBytePath(SalPathFindFileNameW(fullSource.c_str()), CP_UTF8);
                         if (SalSplitWindowsPath(HWindow, LoadStr(type == atCopy ? IDS_COPY : IDS_MOVE),
                                                 LoadStr(type == atCopy ? IDS_ERRORCOPY : IDS_ERRORMOVE),
                                                 count, path, secondPart, pathIsDir, backslashAtEnd || mustBePath,
-                                                dir->Name, GetPath(), mask))
+                                                sourceBaseName.c_str(), sourceDirectory.c_str(), mask))
                         {
                             if (nextFocus[0] != 0 && secondPart[0] == 0)
                                 copyToExistingDir = TRUE;
@@ -1212,7 +1304,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             lstrcpyn(mutableTargetPath, targetPath->c_str(), SAL_MAX_PATH);
                             if (!BuildScriptMain(script, type, mutableTargetPath, mask, count, indexes,
                                                  f, NULL, &changeCaseData,
-                                                 countSizeMode != 0, criteriaPtr))
+                                                 countSizeMode != 0, criteriaPtr, keepBranchPaths))
                             {
                                 res2 = FALSE;
                                 break;
@@ -1229,7 +1321,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     {
                         res2 = BuildScriptMain(script, type, auxTargetPath, mask, count, indexes,
                                                f, NULL, &changeCaseData, countSizeMode != 0,
-                                               criteriaPtr);
+                                               criteriaPtr, keepBranchPaths);
                     }
                     // if there's nothing to do, don't show the progress dialog
                     BOOL emptyScript = script->Count == 0 && type != atCountSize;
