@@ -615,7 +615,8 @@ BOOL CPlugins::FindLastCommand(int* pluginIndex, int* menuItemIndex, BOOL rebuil
                         for (j = 0; j < p->MenuItems.Count; j++)
                         {
                             CPluginMenuItem* menuItem = p->MenuItems[j];
-                            if (menuItem->ID == LastPlgCmdID)
+                            if (menuItem->ID == LastPlgCmdID && menuItem->Type == pmitItemOrSeparator &&
+                                menuItem->Name != NULL)
                             {
                                 *pluginIndex = i;
                                 *menuItemIndex = j;
@@ -641,17 +642,21 @@ BOOL CPlugins::OnLastCommand(CFilesWindow* panel, HWND parent)
     int menuItemIndex;
     if (FindLastCommand(&pluginIndex, &menuItemIndex, FALSE, parent)) // returns FALSE if the plugin isn't loaded
     {
+        CPluginData* pluginData = Data[pluginIndex];
+        const int commandID = LastPlgCmdID;
+        // Reject an unaudited last command before querying plugin state.
+        if (panel != NULL && panel->IsBranchView() &&
+            !pluginData->IsBranchCommandAllowed(commandID)) return FALSE;
+
         // OnLastCommand can be triggered via Ctrl+I so the menu may not be shown
         // and the state cache might not be computed
         CalculateStateCache();
-
-        CPluginData* pluginData = Data[pluginIndex];
 
         MENU_ITEM_INFO dummy;
         if (pluginData->GetMenuItemStateType(pluginIndex, menuItemIndex, &dummy))
         {
             BOOL unselect;
-            if (pluginData->ExecuteMenuItem2(panel, parent, pluginIndex, LastPlgCmdID, unselect))
+            if (pluginData->ExecuteMenuItem2(panel, parent, pluginIndex, commandID, unselect))
             {
                 return unselect; // processed, stop
             }
