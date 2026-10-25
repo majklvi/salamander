@@ -359,6 +359,15 @@ try {
             )
         },
         @{
+            Name = 'create_directory_wrapper_tests'
+            ClassName = 'native-generated'
+            Arguments = @(
+                '-B',
+                (Join-Path $repositoryRoot 'src\tests\create_directory_wrapper_tests.py'),
+                '--configuration', $Configuration
+            )
+        },
+        @{
             Name = 'safe_file_paths_tests'
             ClassName = 'native-generated'
             Arguments = @(
