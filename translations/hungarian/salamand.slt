@@ -1135,7 +1135,7 @@ SLGINCOMPLETE,""
 1157,175,238,72,8,1,"elemek láthatóságát."
 
 [DIALOG 1105]
-299,243,1,"Panelek"
+299,263,1,"Panelek"
 599,1,3,118,12,1,"&Lapozott panelek használata"
 596,1,16,239,12,1,"Re&jtett vagy rendszer attribútumú fájlok és mappák rejtése (Ctrl+H)"
 302,1,28,182,12,1,"Almappákat is kijelölés/kijelölés törlése művelet&nél"
@@ -1161,6 +1161,7 @@ SLGINCOMPLETE,""
 391,10,203,163,12,1,"Rendezés időrend szerin&t: újabb elemek felül"
 395,10,215,188,12,1,"Rendezés &idő szerint: mappák rendezése név szerint"
 392,10,227,268,12,1,"Mint&ha a mappáknak kiterjesztése lenne (kiterjesztés látszik a Kit oszlopban)"
+14528,1,247,295,12,1,"Relatív útvonalak a Branch View Path oszlopában"
 
 [DIALOG 1106]
 299,104,1,"Lapok"
@@ -4139,9 +4140,41 @@ SLGINCOMPLETE,""
 14493,1,"Fájl/mappa típus eltérés"
 
 [STRINGTABLE 182]
-14991,1,"Társítások beolvasása fájltárolóból, kérem várjon..."
+14500,1,"Ágnézet"
+14501,1,"&Ágnézet\tCtrl+B"
+14502,1,"Útvonal"
+14503,1,"Tényleges szülőmappa"
+14504,1,"Tartalmazó &mappa megnyitása"
+14505,1,"Az ágnézet beolvasásának leállítása"
+14506,1,"Ágnézet - beolvasás... %I64u fájl"
+14507,1,"Ágnézet - %I64u fájl"
+14508,1,"Ágnézet - leállítva; %I64u fájl (hiányos)"
+14509,1,"Ágnézet - %I64u fájl; %I64u mappa nem olvasható"
+14510,1,"Az almappák útvonalának megtartása az ágnézet gyökeréhez képest"
+14511,1,"Útvonal: "
 
 [STRINGTABLE 183]
+14512,1,"A mappafa nem olvasható. Frissítse a nézetet az újrapróbáláshoz."
+14513,1,"Ágnézet - frissítés... %I64u fájl megtartva"
+14514,1,"Ágnézet - frissítés leállítva; korábbi eredmények megtartva (%I64u fájl)"
+14515,1,"Ágnézet - %I64u fájl előkészítése; %I64u korábbi eredmény megtartva"
+14516,0,"The program could not be started safely through Windows. It was not retried using another launch method."
+14517,0,"The item could not be opened through Windows Shell. The selected item was not retried using another launch method."
+14518,0,"Windows long-path setting: disabled."
+14519,0,"Windows long-path setting: enabled. Running processes may still use an earlier cached setting."
+14520,0,"Windows long-path setting: not configured (default behavior)."
+14521,0,"Windows long-path setting could not be determined."
+14522,0,"This setting is diagnostic information, not the established cause of this failure. Enabling it does not guarantee support by Shell, security services or the target application."
+14523,0,"Close"
+14524,0,"Windows settings guide"
+14525,0,"Windows long-path support"
+14526,0,"An administrator can enable the Windows policy:\nComputer Configuration > Administrative Templates > System > Filesystem > Enable Win32 long paths.\n\nIts registry equivalent is REG_DWORD LongPathsEnabled = 1 under:\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\n\nRestart affected applications; restarting Windows may also be necessary. Applications must support long paths themselves. This is not a way to override a security denial, and Shell or the target program may still reject the path. Salamander does not change this setting."
+14527,0,"Windows error:"
+
+[STRINGTABLE 184]
+14991,1,"Társítások beolvasása fájltárolóból, kérem várjon..."
+
+[STRINGTABLE 185]
 14992,1,"Beállítások mentése fájltárolóba, kérem várjon..."
 14993,1,"Régi beállítások törlése fájltárolóból, kérem várjon..."
 14994,1,"Társítások beolvasása fájltárolóból..."
@@ -4150,4 +4183,3 @@ SLGINCOMPLETE,""
 14997,1,"Felhasználói menü elemeinek beolvasása fájltárolóból..."
 14998,1,"Alapértelmezett (&UI) betűtípus használata"
 14999,1,"&UI betűtípus használata"
-

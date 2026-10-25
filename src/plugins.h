@@ -2623,6 +2623,8 @@ public:
     // 'parent' is the parent window for message boxes; if 'ask' is FALSE it saves without asking,
     // returns TRUE if the DLL was unloaded
     BOOL Unload(HWND parent, BOOL ask);
+    // Optional Samandarin native exit hook; readiness does not release resources.
+    BOOL PrepareNativeProcessExit(BOOL finalize);
 
     // checks if the plugin can be removed; 'parent' is the parent message box window,
     // 'index' is this plugin index in Plugins; returns TRUE if the plugin can be removed
@@ -2655,6 +2657,9 @@ public:
     // 'parent' is the parent message box window, 'index' is this plugin index in Plugins,
     // returns TRUE if 'suid' was found among the plugin's menu items,
     // returns 'unselect' = the return value of the plugin ExecuteMenuItem call
+    // Private host policy; no plugin SDK/vtable change. Only individually verified commands.
+    BOOL IsBranchCommandAllowed(int id);
+    BOOL ExecutePostedMenuItem(CFilesWindow* panel, HWND parent, int id, BOOL useOperationContext);
     BOOL ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, int suid, BOOL& unselect);
     // 'id' is the internal command ID; ExecuteMenuItem2 is used for Last Command
     BOOL ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, int id, BOOL& unselect);

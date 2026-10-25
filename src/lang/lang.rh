@@ -886,6 +886,9 @@
 #define IDC_EDPROP_MULTI_HINT           6293
 #define IDC_EDPROP_TAGS_GROUP           6294
 
+#define IDC_BRANCH_KEEP_PATHS            14510
+#define IDC_BRANCH_RELATIVE_PATHS        14528
+
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED
