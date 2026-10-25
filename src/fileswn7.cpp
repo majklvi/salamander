@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2408,6 +2408,26 @@ _PACK_AGAIN:
     EndStopRefresh();
 }
 
+// Capture the actual archive identity before modal callbacks; display names are not I/O paths.
+static BOOL PrepareUnpackArchiveSource(CFilesWindow* panel, const CFileData& file,
+                                       std::string& source, int& errorTextID)
+{
+    source.clear();
+    errorTextID = IDS_PATHISINVALID;
+    const std::wstring exact = panel->GetItemFullPathW(file);
+    if (exact.empty()) return FALSE;
+    std::string encoded = SalWideToMultiBytePath(exact.c_str(), CP_UTF8);
+    if (encoded.empty() || SalMultiByteToWidePath(encoded.c_str(), CP_UTF8) != exact)
+        return FALSE;
+    if (encoded.size() >= SAL_MAX_PATH)
+    {
+        errorTextID = IDS_TOOLONGPATH; // Legacy archiver API byte capacity; never pass a shortened identity.
+        return FALSE;
+    }
+    source.swap(encoded);
+    return TRUE;
+}
+
 void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* pluginName, const char* unpackMask)
 {
     if (IsBranchView() || target != NULL && target->IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
@@ -2423,6 +2443,14 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
         BeginStopRefresh();
 
         CFileData* file = &Files->At(i - Dirs->Count);
+        std::string archiveSource;
+        int sourceErrorTextID;
+        if (!PrepareUnpackArchiveSource(this, *file, archiveSource, sourceErrorTextID))
+        {
+            SalMessageBox(HWindow, LoadStr(sourceErrorTextID), LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+            EndStopRefresh();
+            return;
+        }
         char path[SAL_MAX_PATH];
         char pathAlt[MAX_PATH]; // alternate path displayed in the UnPack dialog combo box
         char mask[MAX_PATH];
@@ -2537,11 +2565,6 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             }
             if (text == NULL)
             {
-                int l = (int)strlen(GetPath());
-                if (l > 0 && GetPath()[l - 1] == '\\')
-                    l--;
-                memcpy(subject, GetPath(), l);
-                sprintf(subject + l, "\\%s", file->Name);
                 char newDir[MAX_PATH];
                 std::wstring pathW = SalMultiByteToWidePath(path, GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
                 std::wstring newDirW;
@@ -2558,7 +2581,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
                     // launch the unpacker
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                     CDynamicStringImp archiveVolumes;
-                    if (!UnpackerConfig.ExecuteUnpacker(MainWindow->HWindow, this, subject, mask,
+                    if (!UnpackerConfig.ExecuteUnpacker(MainWindow->HWindow, this, archiveSource.c_str(), mask,
                                                         path, delArchiveWhenDone,
                                                         delArchiveWhenDone ? &archiveVolumes : NULL))
                     {
