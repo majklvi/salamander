@@ -1155,9 +1155,50 @@ void CFilesWindow::EditWindowsProperties()
     }
 }
 
+// S31b3a3: own the operation identities across modal message dispatch.
+// A dialog must not approve a replacement tab/listing or a different selection.
+struct CBranchAttributeSelection
+{
+    std::wstring Root;
+    ULONGLONG Tab = 0, Generation = 0;
+    std::vector<std::wstring> Paths;
+
+    bool Capture(CFilesWindow* panel)
+    {
+        Paths.clear();
+        if (!panel->Is(ptDisk) || !panel->IsBranchView()) return false;
+        Root = panel->GetPathW();
+        Tab = panel->GetPanelTabId();
+        Generation = panel->GetBranchViewGeneration();
+        const int selected = panel->GetSelCount();
+        const int caret = panel->GetCaretIndex();
+        const int total = panel->Dirs->Count + panel->Files->Count;
+        if (Root.empty() || (selected == 0 && (caret < 0 || caret >= total))) return false;
+        for (int i = 0; i < total; ++i)
+        {
+            const CFileData& file = i < panel->Dirs->Count ? panel->Dirs->At(i) : panel->Files->At(i - panel->Dirs->Count);
+            if (selected != 0 ? file.Selected == 0 : i != caret) continue;
+            if (panel->GetBranchViewFileByCacheKey(panel->GetItemCacheKeyPtr(file)) != &file) return false;
+            const std::wstring path = panel->GetItemFullPathW(file);
+            if (path.empty()) return false;
+            Paths.push_back(path);
+        }
+        return !Paths.empty();
+    }
+
+    bool IsCurrent(CFilesWindow* panel) const
+    {
+        CBranchAttributeSelection current;
+        return current.Capture(panel) && Root == current.Root && Tab == current.Tab &&
+               Generation == current.Generation && Paths == current.Paths;
+    }
+};
+
 void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncryption, BOOL encrypted)
 {
-    if (IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
+    const bool branchAttributes = IsBranchView() != FALSE;
+    CBranchAttributeSelection branchSelection;
+    if (branchAttributes && (setCompress || setEncryption || !branchSelection.Capture(this))) return; // Fast NTFS commands remain staged.
 
     CALL_STACK_MESSAGE5("CFilesWindow::ChangeAttr(%d, %d, %d, %d)", setCompress, compressed, setEncryption, encrypted);
     if (Dirs->Count + Files->Count == 0)
@@ -1174,6 +1215,9 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
         if (Dirs->Count > 0 && index == 0 && strcmp(Dirs->At(0).Name, "..") == 0)
             return;
     }
+    const auto clearTemporarySelection = [&](const CPanelTemporarySelection& selection) {
+        if (!branchAttributes || branchSelection.IsCurrent(this)) UnselectItemWithName(selection);
+    };
     BeginStopRefresh(); // snooper takes a break
 
     // if no item is selected, select the one under focus and store its name
@@ -1294,9 +1338,14 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
             }
 
             CChangeAttrDialog chDlg(HWindow, attr, attrDiff,
-                                    SelectionContainsDirectory(), FileBasedCompression,
-                                    FileBasedEncryption,
+                                    SelectionContainsDirectory(), branchAttributes ? FALSE : FileBasedCompression,
+                                    branchAttributes ? FALSE : FileBasedEncryption,
                                     &timeModified, &timeCreated, &timeAccessed);
+            if (branchAttributes)
+            {
+                chDlg.Compressed = 2; // Preserve unverified NTFS properties until their own checkpoint.
+                chDlg.Encrypted = 2;
+            }
             if (setCompress || setEncryption)
             {
                 chDlg.Archive = 2;
@@ -1382,7 +1431,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     if (msgBox.Execute() != IDYES)
                     {
                         // if we selected an item, deselect it again
-                        UnselectItemWithName(temporarySelected);
+                        clearTemporarySelection(temporarySelected);
                         FilesActionInProgress = FALSE;
                         EndStopRefresh(); // snooper will start again now
                         return;
@@ -1394,10 +1443,10 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
             {
                 UpdateWindow(MainWindow->HWindow);
 
-                if (CheckPath(TRUE) != ERROR_SUCCESS)
+                if (CheckPath(TRUE) != ERROR_SUCCESS || (branchAttributes && !branchSelection.IsCurrent(this)))
                 {
                     // if we selected an item, we deselect it again
-                    UnselectItemWithName(temporarySelected);
+                    clearTemporarySelection(temporarySelected);
                     FilesActionInProgress = FALSE;
                     EndStopRefresh(); // snooper will start again now
                     return;
@@ -1436,7 +1485,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     {
                         TRACE_E(LOW_MEMORY);
                         // if we selected an item, we deselect it again
-                        UnselectItemWithName(temporarySelected);
+                        clearTemporarySelection(temporarySelected);
                         FilesActionInProgress = FALSE;
                         EndStopRefresh(); // snooper will start again now
                         return;
@@ -1449,7 +1498,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     if (i < 0 || i >= Dirs->Count + Files->Count)
                     {
                         // if we selected an item, we deselect it again
-                        UnselectItemWithName(temporarySelected);
+                        clearTemporarySelection(temporarySelected);
                         FilesActionInProgress = FALSE;
                         EndStopRefresh(); // snooper will start again now
                         return;           // invalid index (no files)
@@ -1457,7 +1506,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     if (i == 0 && subDir)
                     {
                         // if we selected an item, we deselect it again
-                        UnselectItemWithName(temporarySelected);
+                        clearTemporarySelection(temporarySelected);
                         FilesActionInProgress = FALSE;
                         EndStopRefresh(); // snooper will start again now
                         return;           // we do not work with ".."
@@ -1545,9 +1594,10 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     }
 
                     script->ClearReadonlyMask = 0xFFFFFFFF;
-                    BOOL res = BuildScriptMain(script, atChangeAttrs, NULL, NULL, count,
+                    BOOL res = (!branchAttributes || branchSelection.IsCurrent(this)) &&
+                               BuildScriptMain(script, atChangeAttrs, NULL, NULL, count,
                                                indexes, f, &attrsData, NULL, FALSE, NULL);
-                    if (script->Count == 0)
+                    if (script->Count == 0 || (branchAttributes && !branchSelection.IsCurrent(this)))
                         res = FALSE;
                     // reordered to allow the main window to activate (must not be disabled), otherwise it switches to another app
                     EnableWindow(MainWindow->HWindow, TRUE);
@@ -1577,8 +1627,11 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                     }
                     else // removal of selection index (no waiting for operation finish, operation runs in another thread)
                     {
-                        SetSel(FALSE, -1, TRUE);                        // explicit repaint
-                        PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // selection change notify
+                        if (!branchAttributes || branchSelection.IsCurrent(this))
+                        {
+                            SetSel(FALSE, -1, TRUE);                        // explicit repaint
+                            PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // selection change notify
+                        }
                         UpdateWindow(MainWindow->HWindow);
                     }
                 }
@@ -1631,7 +1684,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
         }
     }
     // if we selected an item, we deselect it again
-    UnselectItemWithName(temporarySelected);
+    clearTemporarySelection(temporarySelected);
 
     EndStopRefresh(); // snooper will start again now
 }
