@@ -318,7 +318,7 @@ public:
 };
 
 CMainWindow::CMainWindow()
-    : ChangeNotifArray(3, 5), LeftPanelTabs(1, 1, dtNoDelete), RightPanelTabs(1, 1, dtNoDelete)
+    : LeftPanelTabs(1, 1, dtNoDelete), RightPanelTabs(1, 1, dtNoDelete)
 {
     HANDLES(InitializeCriticalSection(&DispachChangeNotifCS));
     HANDLES(InitializeCriticalSection(&DetachedTabsCS));

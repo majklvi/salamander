@@ -3220,12 +3220,16 @@ void CMainWindow::PostChangeOnPathNotification(const char* path, BOOL includingS
     HANDLES(EnterCriticalSection(&DispachChangeNotifCS));
 
     // add this notification to the array (for later processing)
-    CChangeNotifData data;
-    lstrcpyn(data.Path, path, MAX_PATH);
-    data.IncludingSubdirs = includingSubdirs;
-    ChangeNotifArray.Add(data);
-    if (!ChangeNotifArray.IsGood())
-        ChangeNotifArray.ResetState(); // ignore errors (at worst we won't refresh)
+    try
+    {
+        ChangeNotifArray.push_back(CChangeNotifData{path, includingSubdirs});
+    }
+    catch (const std::bad_alloc&)
+    {
+        // Notifications are best effort; preserve the existing low-memory
+        // behavior and always release the dispatch lock below.
+        TRACE_E(LOW_MEMORY);
+    }
 
     // post a request to distribute path change notifications
     HANDLES(EnterCriticalSection(&TimeCounterSection));
@@ -9149,25 +9153,18 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 NeedToResentDispachChangeNotif = TRUE;
             else
             {
-                char path[MAX_PATH];
+                std::string pathStorage;
                 BOOL includingSubdirs;
                 BOOL ok = TRUE;
                 while (1)
                 {
                     HANDLES(EnterCriticalSection(&DispachChangeNotifCS));
-                    if (ChangeNotifArray.Count > 0)
+                    if (!ChangeNotifArray.empty())
                     {
-                        CChangeNotifData* item = &ChangeNotifArray[ChangeNotifArray.Count - 1];
-                        strcpy(path, item->Path);
-                        includingSubdirs = item->IncludingSubdirs;
-                        ChangeNotifArray.Delete(ChangeNotifArray.Count - 1);
-                        if (!ChangeNotifArray.IsGood())
-                        {
-                            ChangeNotifArray.ResetState();
-                            ChangeNotifArray.DestroyMembers();
-                            ChangeNotifArray.ResetState();
-                            ok = FALSE;
-                        }
+                        CChangeNotifData& item = ChangeNotifArray.back();
+                        pathStorage.swap(item.Path); // no allocation while detaching the queued path
+                        includingSubdirs = item.IncludingSubdirs;
+                        ChangeNotifArray.pop_back();
                     }
                     else
                         ok = FALSE;
@@ -9179,6 +9176,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     }
                     HANDLES(LeaveCriticalSection(&DispachChangeNotifCS));
 
+                    const char* path = pathStorage.c_str(); // owned until every subscriber callback returns
                     if (ok) // distribute a notification about the change on 'path' with 'includingSubdirs'
                     {
                         // send the message to all loaded plugins

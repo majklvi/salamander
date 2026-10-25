@@ -357,11 +357,11 @@ enum CMainWindowsHitTestEnum
 
 struct CChangeNotifData
 {
-    char Path[MAX_PATH];
+    std::string Path; // owned: queued notifications must not truncate long UTF-8 disk paths
     BOOL IncludingSubdirs;
 };
 
-typedef TDirectArray<CChangeNotifData> CChangeNotifArray;
+typedef std::vector<CChangeNotifData> CChangeNotifArray;
 
 //
 // ****************************************************************************
