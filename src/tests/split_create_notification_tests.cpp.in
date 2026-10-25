@@ -1,0 +1,88 @@
+// SPDX-FileCopyrightText: 2026 Samandarin Contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Actual shared split/create flow, real owned NTFS directories; explicit UI/notification doubles.
+#define WIN32_LEAN_AND_MEAN
+#define _CRT_SECURE_NO_WARNINGS
+#include <windows.h>
+#include <string>
+#include <vector>
+#include <filesystem>
+#include <cstdio>
+#include <cstring>
+#include <algorithm>
+#define SAL_MAX_PATH 32768
+#define SAL_MAX_EXTENDED_PATH 32768
+#define TRACE_E(...) ((void)0)
+#define CALL_STACK_MESSAGE1(...) ((void)0)
+#define CALL_STACK_MESSAGE2(...) ((void)0)
+#define CALL_STACK_MESSAGE3(...) ((void)0)
+#define CALL_STACK_MESSAGE4(...) ((void)0)
+@@IDS@@
+using SGP_IsTheSamePathF = BOOL (*)(const char*,const char*);
+struct MSGBOXEX_PARAMS { HWND HParent; DWORD Flags; const char *Caption,*Text,*CheckBoxText; BOOL* CheckBoxValue; };
+enum { MSGBOXEX_YESNO=1,MSGBOXEX_ICONQUESTION=2,MSGBOXEX_SILENT=4,MSGBOXEX_ESCAPEENABLED=8,MSGBOXEX_HINT=16 };
+static unsigned char LowerCase[256];
+static int StrICmp(const char*a,const char*b){return _stricmp(a,b);}
+static BOOL IsTheSamePath(const char*a,const char*b){return StrICmp(a,b)==0;} // rename comparison outside fixture scope
+static struct {BOOL CnfrmCreatePath=TRUE;} Configuration;
+static int Answer=IDYES,Prompts=0,Messages=0;
+static std::string LastMessage;
+static const char* LoadStr(int id){return id==IDS_MOVECOPY_CREATEPATH?"Create path %s?":id==IDS_CREATEDIRFAILED?"Cannot create %s":"localized message";}
+static int SalMessageBox(HWND,const char* message,const char*,UINT){++Messages;LastMessage=message;return Answer;}
+static int SalMessageBoxEx(MSGBOXEX_PARAMS* params){++Prompts;LastMessage=params->Text;return Answer;}
+struct NotificationSink {std::vector<std::string> Paths;std::vector<BOOL> Recursive;void PostChangeOnPathNotification(const char* path,BOOL subdirs){Paths.emplace_back(path);Recursive.push_back(subdirs);}};
+static NotificationSink Notifications;
+static NotificationSink* MainWindow=&Notifications;
+@@WIDE@@
+@@UTILS@@
+BOOL SalSplitGeneralPath(HWND,const char*,const char*,int,char*,char*,char*,BOOL,BOOL,const char*,const char*,char*&,char*,SGP_IsTheSamePathF);
+@@SPLIT@@
+static int Checks=0,Failures=0;
+static void Check(bool ok,const char*label){++Checks;if(!ok){++Failures;printf("FAIL: %s\n",label);}}
+static std::string Utf8(const std::wstring&path){return SalWideToMultiBytePath(path.c_str(),CP_UTF8);}
+static std::wstring Full(std::filesystem::path path){path.make_preferred();return SalPathAddExtendedPrefixW(path.c_str());}
+static void Reset(int answer=IDYES){Answer=answer;Prompts=Messages=0;LastMessage.clear();Notifications.Paths.clear();Notifications.Recursive.clear();Configuration.CnfrmCreatePath=TRUE;}
+static bool WriteOwned(const std::filesystem::path& path,const std::string& data){HANDLE f=CreateFileW(Full(path).c_str(),GENERIC_WRITE,0,nullptr,CREATE_NEW,0,nullptr);if(f==INVALID_HANDLE_VALUE)return false;DWORD n=0;bool ok=WriteFile(f,data.data(),(DWORD)data.size(),&n,nullptr)&&n==data.size();CloseHandle(f);return ok;}
+static std::string ReadOwned(const std::filesystem::path&path){HANDLE f=CreateFileW(Full(path).c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);if(f==INVALID_HANDLE_VALUE)return {};char data[64];DWORD n=0;bool ok=ReadFile(f,data,sizeof(data),&n,nullptr)!=FALSE;CloseHandle(f);return ok?std::string(data,n):std::string();}
+static bool Redzone(const std::vector<char>&buffer){return std::all_of(buffer.begin()+SAL_MAX_PATH,buffer.end(),[](char c){return c=='Z';});}
+int wmain(int argc,wchar_t**argv)
+{
+    if(argc!=2)return 2;
+    for(int i=0;i<256;++i)LowerCase[i]=(unsigned char)(i>='A'&&i<='Z'?i+32:i);
+    auto root=std::filesystem::absolute(argv[1]);root.make_preferred();
+    if(root.filename()!=L"owned-fixtures"||std::filesystem::exists(Full(root)))return 3;
+    std::filesystem::create_directories(Full(root));
+    const std::vector<std::filesystem::path> shapes={L"ascii",L"unicode-name",L"rodič-東京",std::filesystem::path(L"první-🙂")/L"druhý-東京",std::wstring(140,L'東'),std::filesystem::path(std::wstring(100,L'日'))/std::wstring(100,L'本')/std::wstring(100,L'東')};
+    for(size_t i=0;i<shapes.size();++i)
+    {
+        auto base=root/shapes[i];base.make_preferred();std::filesystem::create_directories(Full(base));
+        Check(WriteOwned(base/L"keep.bin","unchanged sentinel"),"create own source sentinel");
+        const std::wstring name=i==1?L"東京-🙂.txt":L"same.txt";
+        const std::string prefix=Utf8(base.wstring())+"\\";
+        const std::string input=prefix+Utf8(L"new-東京\\sub\\"+name);
+        std::vector<char> buffer(SAL_MAX_PATH+16,'Z');memcpy(buffer.data(),input.c_str(),input.size()+1);char* mask=nullptr;Reset();
+        const bool ok=SalSplitWindowsPath(nullptr,"Copy","Copy error",1,buffer.data(),buffer.data()+prefix.size(),TRUE,FALSE,nullptr,nullptr,mask)!=FALSE;
+        const auto target=base/L"new-東京"/L"sub";
+        Check(ok&&std::string(buffer.data())==Utf8(target.wstring())&&mask&&std::string(mask)==Utf8(name),"actual shared split returns exact directory and Unicode operation mask");
+        Check(std::filesystem::is_directory(Full(target))&&!std::filesystem::exists(Full(target/name)),"actual wide create reaches whole target; split does not create output file");
+        Check(Notifications.Paths==std::vector<std::string>{prefix}&&Notifications.Recursive==std::vector<BOOL>{FALSE},"notification owns complete existing parent without truncation or recursive broadening");
+        Check(Prompts==1&&Messages==0&&Configuration.CnfrmCreatePath,"existing confirmation remains enabled and precedes creation");
+        Check(ReadOwned(base/L"keep.bin")=="unchanged sentinel"&&Redzone(buffer),"source sentinel and caller red zone remain untouched");
+        if(i==4)Check(prefix.size()>MAX_PATH&&base.wstring().size()<MAX_PATH,"UTF8 prefix exceeds old byte capacity while UTF16 is short");
+        if(i==5)Check(base.wstring().size()>MAX_PATH,"real long UTF16 parent exercised");
+        const std::string canceled=prefix+"cancel-new\\file.txt";memcpy(buffer.data(),canceled.c_str(),canceled.size()+1);Reset(IDNO);mask=nullptr;
+        Check(!SalSplitWindowsPath(nullptr,"Copy","Copy error",1,buffer.data(),buffer.data()+prefix.size(),TRUE,FALSE,nullptr,nullptr,mask)&&std::string(buffer.data())==canceled,"confirmation cancellation restores complete input including mask");
+        Check(Prompts==1&&Notifications.Paths.empty()&&!std::filesystem::exists(Full(base/L"cancel-new")),"cancel performs no directory write or notification");
+        Check(WriteOwned(base/L"blocked","existing file"),"create own race-collision sentinel");
+        const std::string failed=prefix+"blocked\\new\\file.txt";memcpy(buffer.data(),failed.c_str(),failed.size()+1);Reset();mask=nullptr;
+        Check(!SalSplitWindowsPath(nullptr,"Copy","Copy error",1,buffer.data(),buffer.data()+prefix.size(),TRUE,FALSE,nullptr,nullptr,mask)&&std::string(buffer.data())==failed,"directory creation failure restores complete caller path");
+        Check(Messages==1&&Notifications.Paths==std::vector<std::string>{prefix}&&Notifications.Recursive==std::vector<BOOL>{FALSE},"failed creation retains error and complete parent refresh");
+        Check(ReadOwned(base/L"blocked")=="existing file"&&ReadOwned(base/L"keep.bin")=="unchanged sentinel"&&Redzone(buffer),"failure neither replaces files nor exceeds caller capacity");
+        const std::string existing=Utf8(base.wstring());memcpy(buffer.data(),existing.c_str(),existing.size()+1);Reset();mask=nullptr;
+        Check(SalSplitWindowsPath(nullptr,"Copy","Copy error",1,buffer.data(),buffer.data()+existing.size(),TRUE,TRUE,nullptr,nullptr,mask)&&mask&&std::string(mask)=="*.*"&&Notifications.Paths.empty()&&Prompts==0,"existing destination retains universal mask with no new directory notification");
+    }
+    std::error_code error;std::filesystem::remove_all(Full(root),error);
+    Check(!error&&!std::filesystem::exists(Full(root)),"cleanup only exact owned fixture root");
+    printf("Actual split/create notification: %d checks, %d failures\n",Checks,Failures);
+    return Failures?1:0;
+}

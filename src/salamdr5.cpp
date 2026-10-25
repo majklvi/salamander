@@ -996,6 +996,9 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
 
         if (newDirs[0] != 0) // create new directories on the target path
         {
+            // Own the complete existing prefix before creating anything. It can
+            // exceed MAX_PATH bytes even when the UTF-16 path is short.
+            const std::string changesRoot(path, secondPart - path);
             memmove(newDirs + (secondPart - path), newDirs, strlen(newDirs) + 1);
             memmove(newDirs, path, secondPart - path);
             SalPathRemoveBackslash(newDirs);
@@ -1040,12 +1043,9 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
 
             // --- refresh non-automatically refreshed directories (takes place after stop-refresh
             // ends, so only after the operation is finished)
-            char changesRoot[MAX_PATH];
-            memmove(changesRoot, path, secondPart - path);
-            changesRoot[secondPart - path] = 0;
             // path change - creation of new subdirectories along the path (required even if
             // the new directories could not be created) - change without subdirectories (only subdirectories were being created)
-            MainWindow->PostChangeOnPathNotification(changesRoot, FALSE);
+            MainWindow->PostChangeOnPathNotification(changesRoot.c_str(), FALSE);
 
             if (!ok)
             {
