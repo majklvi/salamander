@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "fileswnd.h"
+#include "branch_view.h"
 #include "cfgdlg.h"
 
 #define HOT_PATHS_COUNT 30
@@ -419,6 +420,8 @@ public:
         int InsertIndex;
         std::string GeneralPath;
         std::string FallbackPath;
+        std::wstring DiskPathW;
+        CBranchViewRestoreState BranchState;
         int ViewTemplateIndex;
         CSortType SortType;
         DWORD SortCustomData;

@@ -740,6 +740,8 @@ void CMainWindow::RememberClosedTab(CPanelSide side, CFilesWindow* panel, int in
     if (basicPath != NULL)
         info.FallbackPath.assign(basicPath);
 
+    info.BranchState = panel->CaptureBranchViewState();
+    info.DiskPathW = panel->Is(ptDisk) ? panel->GetPathW() : L"";
     info.ViewTemplateIndex = panel->GetViewTemplateIndex();
     info.SortType = panel->SortType;
     info.SortCustomData = panel->SortCustomData;
@@ -2304,13 +2306,16 @@ CFilesWindow* CMainWindow::CreateDuplicatePanelTab(CPanelSide targetSide, CFiles
     // Capture this before creating the target HWND or copying view state.
     // Both can synchronously dispatch UI messages, while sourcePanel can be a
     // hidden tab which must retain its own location throughout the operation.
-    char sourcePath[2 * MAX_PATH];
+    CPathBuffer sourcePathBuffer(4 * SAL_MAX_PATH);
+    char* sourcePath = sourcePathBuffer.Data();
     sourcePath[0] = 0;
-    if (!sourcePanel->GetGeneralPath(sourcePath, _countof(sourcePath), TRUE))
+    const std::wstring sourceDiskPath = sourcePanel->Is(ptDisk) ? sourcePanel->GetPathW() : L"";
+    const CBranchViewRestoreState sourceBranchView = sourcePanel->CaptureBranchViewState();
+    if (!sourcePanel->GetGeneralPath(sourcePath, sourcePathBuffer.Capacity(), TRUE))
     {
         const char* currentSourcePath = sourcePanel->GetPath();
         if (currentSourcePath != NULL)
-            lstrcpyn(sourcePath, currentSourcePath, _countof(sourcePath));
+            lstrcpyn(sourcePath, currentSourcePath, sourcePathBuffer.Capacity());
     }
 
     CFilesWindow* newPanel = AddPanelTab(targetSide, insertIndex);
@@ -2391,8 +2396,16 @@ CFilesWindow* CMainWindow::CreateDuplicatePanelTab(CPanelSide targetSide, CFiles
 
     newPanel->UserWorkedOnThisPath = sourcePanel->UserWorkedOnThisPath;
 
-    if (sourcePath[0] != 0)
+    if (!sourceDiskPath.empty())
+        newPanel->ChangePathToDiskW(HWindow, sourceDiskPath.c_str());
+    else if (sourcePath[0] != 0)
         newPanel->ChangeDir(sourcePath);
+    if (sourceBranchView.Enabled && newPanel->Is(ptDisk) && sourceDiskPath == newPanel->GetPathW())
+    {
+        newPanel->RestoreBranchViewState(sourceBranchView);
+        if (sourcePanel->SortType == stCustom)
+            newPanel->ChangeCustomSortType(sourcePanel->SortCustomData, sourcePanel->ReverseSort, TRUE);
+    }
 
     UpdatePanelTabColor(newPanel);
     UpdatePanelTabTitle(newPanel);
@@ -2555,10 +2568,18 @@ bool CMainWindow::CommandReopenClosedTab(CPanelSide side)
 
     panel->UserWorkedOnThisPath = entry.UserWorkedOnPath;
 
-    if (!entry.GeneralPath.empty())
+    if (!entry.DiskPathW.empty())
+        panel->ChangePathToDiskW(HWindow, entry.DiskPathW.c_str());
+    else if (!entry.GeneralPath.empty())
         panel->ChangeDir(entry.GeneralPath.c_str());
     else if (!entry.FallbackPath.empty())
         panel->ChangeDir(entry.FallbackPath.c_str());
+    if (entry.BranchState.Enabled && panel->Is(ptDisk) && entry.DiskPathW == panel->GetPathW())
+    {
+        panel->RestoreBranchViewState(entry.BranchState);
+        if (entry.SortType == stCustom)
+            panel->ChangeCustomSortType(entry.SortCustomData, entry.ReverseSort, TRUE);
+    }
 
     UpdatePanelTabColor(panel);
     UpdatePanelTabTitle(panel);
@@ -4290,6 +4311,10 @@ static bool BranchReadOnlyCommandAllowed(UINT command)
         (command >= CM_LEFTSORTBY_MIN && command <= CM_LEFTSORTBY_MAX) ||
         (command >= CM_RIGHTSORTBY_MIN && command <= CM_RIGHTSORTBY_MAX))
         return true;
+    // S29: existing tab/history handlers restore owned full-identity snapshots.
+    if ((command >= CM_LEFTHISTORYPATH_MIN && command <= CM_LEFTHISTORYPATH_MAX) ||
+        (command >= CM_RIGHTHISTORYPATH_MIN && command <= CM_RIGHTHISTORYPATH_MAX))
+        return true;
     switch (command)
     {
     case CM_BRANCHVIEW:
@@ -4334,6 +4359,20 @@ static bool BranchReadOnlyCommandAllowed(UINT command)
     case CM_ACTIVEPARENTDIR:
     case CM_LPARENTDIR:
     case CM_RPARENTDIR:
+    case CM_DUPLICATETAB:
+    case CM_LEFT_DUPLICATETAB:
+    case CM_RIGHT_DUPLICATETAB:
+    case CM_LEFT_DUPLICATETABTORIGHT:
+    case CM_RIGHT_DUPLICATETABTOLEFT:
+    case CM_REOPENTAB:
+    case CM_LEFT_REOPENTAB:
+    case CM_RIGHT_REOPENTAB:
+    case CM_ACTIVEBACK:
+    case CM_ACTIVEFORWARD:
+    case CM_LBACK:
+    case CM_LFORWARD:
+    case CM_RBACK:
+    case CM_RFORWARD:
     case CM_CLOSETAB:
     case CM_LEFT_CLOSETAB:
     case CM_RIGHT_CLOSETAB:

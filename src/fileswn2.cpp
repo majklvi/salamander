@@ -2824,6 +2824,11 @@ void CFilesWindow::RefreshPathHistoryData()
     CALL_STACK_MESSAGE1("CFilesWindow::RefreshPathHistoryData()");
 
     int index = GetCaretIndex();
+    if (Is(ptDisk) && Files->Count + Dirs->Count == 0)
+    {
+        const CBranchViewRestoreState branch = CaptureBranchViewState();
+        PathHistory->ChangeActualPathData(0, GetPath(), NULL, NULL, NULL, ListBox->GetTopIndex(), NULL, &branch);
+    }
     if (index >= 0 && index < Files->Count + Dirs->Count) // bounds check to prevent data inconsistency
     {
         int topIndex = ListBox->GetTopIndex();
@@ -2838,7 +2843,8 @@ void CFilesWindow::RefreshPathHistoryData()
         {
             if (Is(ptDisk))
             {
-                PathHistory->ChangeActualPathData(0, GetPath(), NULL, NULL, NULL, topIndex, file->Name);
+                const CBranchViewRestoreState branch = CaptureBranchViewState();
+                PathHistory->ChangeActualPathData(0, GetPath(), NULL, NULL, NULL, topIndex, file->Name, &branch);
             }
             else
             {
