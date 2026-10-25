@@ -443,7 +443,7 @@ BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& second
 // problem uz byl uzivateli ohlasen
 BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle, int selCount,
                          char* path, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                         const char* dirName, const char* curDiskPath, char*& mask);
+                         const char* dirName, const char* curDiskPath, char*& mask, int pathBufSize);
 
 // ziska z cilove cesty existujici cast a operacni masku; pripadnou neexistujici cast rozpozna; pri
 // uspechu vraci TRUE, relativni cestu k vytvoreni (v 'newDirs'), existujici cilovou cestu (v 'path';
@@ -469,7 +469,7 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
 BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle, int selCount,
                          char* path, char* afterRoot, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
                          const char* dirName, const char* curPath, char*& mask, char* newDirs,
-                         SGP_IsTheSamePathF isTheSamePathF);
+                         SGP_IsTheSamePathF isTheSamePathF, int pathBufSize, int newDirsBufSize);
 
 // zjisti jestli je mozne retezec 'fileNameComponent' pouzit jako komponentu
 // jmena na Windows filesystemu (resi retezce delsi nez MAX_PATH-4 (4 = "C:\"

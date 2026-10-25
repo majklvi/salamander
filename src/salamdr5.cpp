@@ -971,21 +971,80 @@ PARSE_AGAIN:
     }
 }
 
-BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle, int selCount,
-                         char* path, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
-                         const char* dirName, const char* curDiskPath, char*& mask)
+// S31b5b3b: capacities refer to the real caller buffers, including both NULs.
+static bool GetSplitPathLength(const char* path, int capacity, size_t& length)
 {
+    if (path == NULL || capacity <= 0) return false;
+    const size_t limit = (std::min)((size_t)capacity, (size_t)SAL_MAX_PATH);
+    length = strnlen(path, limit);
+    return length < limit;
+}
+
+static bool IsSplitPathPosition(const char* path, size_t length, const char* position)
+{
+    const UINT_PTR begin = (UINT_PTR)path, address = (UINT_PTR)position;
+    return position != NULL && address >= begin && address - begin <= length;
+}
+
+static bool SplitPathHasRoom(size_t length, int capacity, size_t extra)
+{
+    return capacity > 0 && length < (size_t)capacity && extra <= (size_t)capacity - length - 1;
+}
+
+static BOOL ReportSplitPathError(HWND parent, const char* title, int resource)
+{
+    SalMessageBox(parent, LoadStr(resource), title, MB_OK | MB_ICONEXCLAMATION);
+    return FALSE;
+}
+
+BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle, int selCount,
+                         char* callerPath, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
+                         const char* dirName, const char* curDiskPath, char*& callerMask, int pathBufSize)
+{
+    callerMask = NULL;
+    size_t pathLength;
+    if (!GetSplitPathLength(callerPath, pathBufSize, pathLength) || pathLength == 0 ||
+        !IsSplitPathPosition(callerPath, pathLength, secondPart))
+        return ReportSplitPathError(parent, errorTitle, IDS_PATHISINVALID);
+    // The general split keeps a trailing slash that this Windows adapter removes.
+    // Work privately so that an exactly fitting final result need not fit that
+    // one-byte-larger intermediate representation in the caller's buffer.
+    std::vector<char> working;
+    try
+    {
+        working.resize((std::min)((size_t)pathBufSize + 1, (size_t)SAL_MAX_PATH + 8));
+    }
+    catch (const std::bad_alloc&)
+    {
+        SalMessageBox(parent, GetErrorText(ERROR_NOT_ENOUGH_MEMORY), errorTitle, MB_OK | MB_ICONEXCLAMATION);
+        return FALSE;
+    }
+    char* path = working.data();
+    memcpy(path, callerPath, pathLength + 1);
+    secondPart = path + (secondPart - callerPath);
+    char* mask = NULL;
     char root[SAL_MAX_PATH];
-    GetRootPath(root, path);
+    if (!ReadParsePathRoot(root, path))
+        return ReportSplitPathError(parent, errorTitle, IDS_TOOLONGPATH);
+    const size_t rootLength = strlen(root);
+    if (rootLength == 0 || rootLength - 1 > pathLength)
+        return ReportSplitPathError(parent, errorTitle, IDS_PATHISINVALID);
     char* afterRoot = path + strlen(root) - 1;
     if (*afterRoot == '\\')
         afterRoot++;
 
     char newDirs[SAL_MAX_PATH];
     char textBuf[2 * SAL_MAX_PATH + 200];
+    int splitCapacity = (int)working.size();
+    // A drive-root file mask keeps its root slash, so there is no byte to reclaim.
+    // Reject its insufficient caller capacity before the multi-item warning too.
+    if (*path != '\\' && secondPart == afterRoot && *secondPart != 0 &&
+        strchr(secondPart, '\\') == NULL && (!pathIsDir || !backslashAtEnd))
+        splitCapacity = (int)(std::min)((size_t)pathBufSize, working.size());
 
     if (SalSplitGeneralPath(parent, title, errorTitle, selCount, path, afterRoot, secondPart,
-                            pathIsDir, backslashAtEnd, dirName, curDiskPath, mask, newDirs, NULL))
+                            pathIsDir, backslashAtEnd, dirName, curDiskPath, mask, newDirs, NULL,
+                            splitCapacity, _countof(newDirs)))
     {
         if (mask - 1 > path && *(mask - 2) == '\\' &&
             (mask - 1 > afterRoot || *path == '\\'))           // not a root or it is a UNC root
@@ -993,6 +1052,10 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
             memmove(mask - 2, mask - 1, 1 + strlen(mask) + 1); // '\0' + mask + '\0'
             mask--;
         }
+
+        const size_t packedLength = (size_t)(mask - path) + strlen(mask) + 1;
+        if (packedLength > (size_t)pathBufSize)
+            return ReportSplitPathError(parent, errorTitle, IDS_TOOLONGPATH);
 
         if (newDirs[0] != 0) // create new directories on the target path
         {
@@ -1057,6 +1120,8 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
                 return FALSE;                           // go back to the copy/move dialog
             }
         }
+        memcpy(callerPath, path, packedLength);
+        callerMask = callerPath + (mask - path);
         return TRUE;
     }
     else
@@ -1066,9 +1131,16 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
 BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle, int selCount,
                          char* path, char* afterRoot, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
                          const char* dirName, const char* curPath, char*& mask, char* newDirs,
-                         SGP_IsTheSamePathF isTheSamePathF)
+                         SGP_IsTheSamePathF isTheSamePathF, int pathBufSize, int newDirsBufSize)
 {
     mask = NULL;
+    if (newDirs != NULL && newDirsBufSize > 0) newDirs[0] = 0;
+    size_t pathLength;
+    if (!GetSplitPathLength(path, pathBufSize, pathLength) ||
+        !IsSplitPathPosition(path, pathLength, afterRoot) ||
+        !IsSplitPathPosition(path, pathLength, secondPart) ||
+        (UINT_PTR)afterRoot > (UINT_PTR)secondPart || (newDirs != NULL && newDirsBufSize <= 0))
+        return ReportSplitPathError(parent, errorTitle, IDS_PATHISINVALID);
     char textBuf[2 * SAL_MAX_PATH + 200];
     char tmpNewDirs[SAL_MAX_PATH];
     tmpNewDirs[0] = 0;
@@ -1095,6 +1167,14 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                     break;
                 }
             }
+
+            // Check all output growth before changing path or asking to create directories.
+            const bool directoryTarget = !hasMask && backslashAtEnd;
+            const size_t extra = directoryTarget ? (pathLength != 0 && path[pathLength - 1] == '\\' ? 4 : 5) : 1;
+            const size_t relativeLength = directoryTarget ? strlen(secondPart) : (size_t)(maskFrom - secondPart);
+            if (!SplitPathHasRoom(pathLength, pathBufSize, extra) ||
+                (newDirs != NULL && relativeLength >= (size_t)newDirsBufSize))
+                return ReportSplitPathError(parent, errorTitle, IDS_TOOLONGPATH);
 
             if (maskFrom != secondPart) // there is some path before the mask
             {
@@ -1130,7 +1210,7 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                 else // name with a trailing slash -> directory
                 {
                     SalPathAppend(tmpNewDirs, maskFrom, SAL_MAX_PATH);
-                    SalPathAddBackslash(path, SAL_MAX_PATH); // the path must always end with a backslash; make sure it does...
+                    SalPathAddBackslash(path, pathBufSize); // the path must always end with a backslash; make sure it does...
                     mask = path + strlen(path) + 1;
                     strcpy(mask, "*.*");
                 }
@@ -1200,6 +1280,11 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                         (isTheSamePathF != NULL && isTheSamePathF(path, curPath) ||
                          isTheSamePathF == NULL && IsTheSamePath(path, curPath)))
                     { // renaming a directory to the same name (except for letter case, identity is possible)
+                        if (!SplitPathHasRoom(pathLength, pathBufSize, 1))
+                        {
+                            *(name - 1) = '\\';
+                            return ReportSplitPathError(parent, errorTitle, IDS_TOOLONGPATH);
+                        }
                         // ensure the split into a path (ending with a backslash) and a mask
                         memmove(name + 1, name, strlen(name) + 1);
                         *(name - 1) = '\\';
@@ -1214,7 +1299,10 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
             }
 
             // simple target path with a universal mask
-            SalPathAddBackslash(path, SAL_MAX_PATH); // the path must always end with a backslash; make sure it does...
+            if (!SplitPathHasRoom(pathLength, pathBufSize,
+                                  pathLength != 0 && path[pathLength - 1] == '\\' ? 4 : 5))
+                return ReportSplitPathError(parent, errorTitle, IDS_TOOLONGPATH);
+            SalPathAddBackslash(path, pathBufSize); // the path must always end with a backslash; make sure it does...
             mask = path + strlen(path) + 1;
             strcpy(mask, "*.*");
             return TRUE; // leave the Copy/Move dialog loop and perform the operation
@@ -1227,6 +1315,8 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
             nameEnd++;
         if (*nameEnd == 0 && !backslashAtEnd) // renaming/overwriting an existing file
         {
+            if (!SplitPathHasRoom(pathLength, pathBufSize, 1))
+                return ReportSplitPathError(parent, errorTitle, IDS_TOOLONGPATH);
             if (selCount > 1 &&
                 SalMessageBox(parent, LoadStr(IDS_MOVECOPY_NONSENSE), title,
                               MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDYES)
@@ -1246,7 +1336,7 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
         {
             SalMessageBox(parent, LoadStr(IDS_ARCPATHNOTSUPPORTED), errorTitle, MB_OK | MB_ICONEXCLAMATION);
             if (backslashAtEnd)
-                SalPathAddBackslash(path, 2 * MAX_PATH); // if the '\\' was trimmed, add it back
+                SalPathAddBackslash(path, pathBufSize); // if the '\\' was trimmed, add it back
             return FALSE;                                // go back to the copy/move dialog
         }
     }

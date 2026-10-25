@@ -660,7 +660,7 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type, CFilesWindow* t
                             char* mask;
                             if (SalSplitWindowsPath(HWindow, LoadStr(copy ? IDS_COPY : IDS_MOVE),
                                                     errTitle, count, targetPath, secondPart, pathIsDir,
-                                                    backslashAtEnd || mustBePath, NULL, NULL, mask))
+                                                    backslashAtEnd || mustBePath, NULL, NULL, mask, SAL_MAX_PATH))
                             {
                                 if (!operationMask && mask != NULL &&
                                     (strcmp(mask, "*.*") == 0 || strcmp(mask, "*") == 0))

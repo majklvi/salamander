@@ -3724,7 +3724,7 @@ BOOL CSalamanderGeneral::SalSplitWindowsPath(HWND parent, const char* title, con
                          title, errorTitle, selCount, path, secondPart, pathIsDir, backslashAtEnd,
                          dirName, curDiskPath);
     return ::SalSplitWindowsPath(parent, title, errorTitle, selCount, path, secondPart,
-                                 pathIsDir, backslashAtEnd, dirName, curDiskPath, mask);
+                                 pathIsDir, backslashAtEnd, dirName, curDiskPath, mask, 2 * MAX_PATH);
 }
 
 BOOL CSalamanderGeneral::SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
@@ -3738,7 +3738,7 @@ BOOL CSalamanderGeneral::SalSplitGeneralPath(HWND parent, const char* title, con
                          dirName, curPath);
     return ::SalSplitGeneralPath(parent, title, errorTitle, selCount, path, afterRoot, secondPart,
                                  pathIsDir, backslashAtEnd, dirName, curPath, mask, newDirs,
-                                 isTheSamePathF);
+                                 isTheSamePathF, 2 * MAX_PATH, MAX_PATH);
 }
 
 BOOL CSalamanderGeneral::SalRemovePointsFromPath(char* afterRoot)
