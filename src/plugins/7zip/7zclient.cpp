@@ -352,6 +352,24 @@ static wchar_t* DupUtf8NameW(const char* name, int nameLen)
     return nameW;
 }
 
+// The host deliberately projects only the historical CFileData fields when
+// accepting plug-in listings. NameW is not transferred by AddFile/AddDir;
+// keep this optional input owned here, including successful insertion paths.
+class CListedNameWGuard
+{
+    CFileData& File;
+
+public:
+    explicit CListedNameWGuard(CFileData& file) : File(file) {}
+    ~CListedNameWGuard()
+    {
+        free(File.NameW);
+        File.NameW = NULL;
+    }
+    CListedNameWGuard(const CListedNameWGuard&) = delete;
+    CListedNameWGuard& operator=(const CListedNameWGuard&) = delete;
+};
+
 static void FreeListedFileDataName(CFileData& fd)
 {
     if (fd.NameW != NULL)
@@ -409,6 +427,7 @@ BOOL C7zClient::AddFileDir(IInArchive* archive, UINT32 idx,
         LPTSTR filePath = p;
 
         CFileData fd = {0};
+        CListedNameWGuard nameWGuard(fd);
         fd.Name = SalamanderGeneral->DupStr(fileName);
         if (fd.Name == NULL)
         {
