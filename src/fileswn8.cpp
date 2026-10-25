@@ -264,12 +264,73 @@ void PluginFSConvertPathToExternal(char* path)
     }
 }
 
+// S31b5b2: own the disk destination across modal dispatch. A saved pointer is
+// compared only with live tab registry entries before it is dereferenced.
+struct CFilesActionDiskTarget
+{
+    CFilesWindow* Panel = NULL;
+    ULONGLONG Tab = 0, Generation = 0;
+    std::wstring Root;
+    std::string DefaultPath;
+    BOOL Branch = FALSE;
+    int VisibleSide = 0;
+
+    static CFilesWindow* FindLive(CMainWindow* main, CFilesWindow* expected)
+    {
+        if (main == NULL || expected == NULL) return NULL;
+        const CPanelSide sides[] = {cpsLeft, cpsRight};
+        for (int side = 0; side < 2; ++side)
+            for (int index = 0; index < main->GetPanelTabCount(sides[side]); ++index)
+            {
+                CFilesWindow* current = main->GetPanelTabAt(sides[side], index);
+                if (current == expected) return current;
+            }
+        for (int index = 0; index < main->GetDetachedTabCount(); ++index)
+        {
+            CFilesWindow* current = main->GetDetachedTabAt(index);
+            if (current == expected) return current;
+        }
+        return NULL;
+    }
+
+    bool Capture(CMainWindow* main, CFilesWindow* panel)
+    {
+        Panel = NULL;
+        CFilesWindow* live = FindLive(main, panel);
+        if (live == NULL || !live->Is(ptDisk) || live->IsBranchViewScanning()) return false;
+        const std::wstring root(live->GetPathW());
+        const std::string encoded = SalWideToMultiBytePath(root.c_str(), CP_UTF8);
+        if (root.empty() || SalMultiByteToWidePath(encoded.c_str(), CP_UTF8) != root) return false;
+        const std::string defaultPath = encoded + (root.back() == L'\\' ? "*.*" : "\\*.*");
+        if (defaultPath.size() >= SAL_MAX_PATH || live->GetPanelTabId() == 0) return false;
+        Root = root;
+        DefaultPath = defaultPath;
+        Tab = live->GetPanelTabId();
+        Branch = live->IsBranchView();
+        Generation = Branch ? live->GetBranchViewGeneration() : 0;
+        VisibleSide = main->LeftPanel == live ? 1 : main->RightPanel == live ? 2 : 0;
+        Panel = live;
+        return true;
+    }
+
+    bool IsCurrent(CMainWindow* main) const
+    {
+        CFilesWindow* live = FindLive(main, Panel);
+        return live != NULL && live->GetPanelTabId() == Tab && live->Is(ptDisk) &&
+               !live->IsBranchViewScanning() && Root == live->GetPathW() &&
+               live->IsBranchView() == Branch &&
+               (!Branch || Generation == live->GetBranchViewGeneration()) &&
+               (VisibleSide != 1 || main->LeftPanel == live) &&
+               (VisibleSide != 2 || main->RightPanel == live);
+    }
+};
+
 // countSizeMode - 0 normal calculation, 1 calculation for the selected item,
 // 2 calculation for all subdirectories
 void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int countSizeMode,
                                BOOL copyToSelectedDirs, BOOL* changeTargetRequested)
 {
-    // S27c1a: only flat copy into an ordinary disk panel is verified.
+    // S31b5: Branch destination admission is deferred until root/mask runtime verification.
     if (target != NULL && target->IsBranchView()) return;
     if (IsBranchView() && (countSizeMode != 0 || copyToSelectedDirs ||
         (type != atDelete && ((type != atCopy && type != atMove) || target == NULL || !target->Is(ptDisk))))) return;
@@ -282,6 +343,21 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         return;
     if ((type == atCopy || type == atMove) && target == NULL)
         return;
+
+    CFilesActionDiskTarget diskTarget;
+    const bool watchDiskTarget = (type == atCopy || type == atMove) && target->Is(ptDisk);
+    if (watchDiskTarget && !diskTarget.Capture(MainWindow, target))
+    {
+        SalMessageBox(HWindow, LoadStr(IDS_PATHISINVALID),
+                      LoadStr(type == atCopy ? IDS_ERRORCOPY : IDS_ERRORMOVE), MB_OK | MB_ICONEXCLAMATION);
+        return;
+    }
+    const auto validateDiskTarget = [&]() {
+        if (!watchDiskTarget || diskTarget.IsCurrent(MainWindow)) return true;
+        SalMessageBox(HWindow, GetErrorText(ERROR_RETRY),
+                      LoadStr(type == atCopy ? IDS_ERRORCOPY : IDS_ERRORMOVE), MB_OK | MB_ICONEXCLAMATION);
+        return false;
+    };
 
     std::vector<std::string> selectedTargetPaths;
     if (copyToSelectedDirs)
@@ -332,7 +408,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 
     if (!FilesActionInProgress)
     {
-        if (CheckPath(TRUE) != ERROR_SUCCESS)
+        if (CheckPath(TRUE) != ERROR_SUCCESS || !validateDiskTarget())
             return; // the source is always the current directory
 
         if (type != atCountSize && countSizeMode != 0)
@@ -447,13 +523,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         {
             if (copyToSelectedDirs)
                 lstrcpyn(path, selectedTargetPaths[0].c_str(), SAL_MAX_PATH);
+            else if (watchDiskTarget)
+                memcpy(path, diskTarget.DefaultPath.c_str(), diskTarget.DefaultPath.size() + 1);
             else
                 target->GetGeneralPath(path, SAL_MAX_PATH);
-            if (target->Is(ptDisk) && !copyToSelectedDirs)
-            {
-                SalPathAppend(path, "*.*", SAL_MAX_PATH);
-            }
-            else
+            if (!watchDiskTarget)
             {
                 if (target->Is(ptZIPArchive))
                 {
@@ -513,7 +587,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     }
                 }
             }
-            if (path[0] != 0)
+            if (path[0] != 0 && (!watchDiskTarget || diskTarget.IsCurrent(MainWindow)))
             {
                 target->UserWorkedOnThisPath = TRUE; // default action = working with the path in the target panel
             }
@@ -684,6 +758,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 havePermissions = (flags & FS_PERSISTENT_ACLS) != 0;
             while (1)
             {
+                if (!validateDiskTarget())
+                {
+                    res = IDCANCEL;
+                    break;
+                }
                 if (strlen(path) >= SAL_MAX_PATH)
                     path[0] = 0; // the path is too long; not an ideal solution but I'm not up for a better one now :(
                 res = (int)CCopyMoveMoreDialog(HWindow, path, SAL_MAX_PATH,
@@ -704,6 +783,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     criteria.CopySecurity = FALSE;
                 if (res != IDOK)
                     break;
+                if (!validateDiskTarget())
+                {
+                    res = IDCANCEL;
+                    break;
+                }
                 if (Configuration.CopyMoveScheduling == CMTP_KEEP_LAST)
                     Configuration.CopyMoveLastTransferMode = transferMode;
                 if (type == atMove && conflictMode == CMCM_SCAN_AHEAD &&
@@ -715,6 +799,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     Configuration.CopyMoveLastConflictMode = conflictMode;
                 criteriaPtr = criteria.IsDirty() ? &criteria : NULL;
                 UpdateWindow(MainWindow->HWindow);
+                if (!validateDiskTarget())
+                {
+                    res = IDCANCEL;
+                    break;
+                }
 
                 if (copyToSelectedDirs)
                     break;
@@ -740,6 +829,11 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                               type == atCopy ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
                               count <= 1 ? nextFocus : NULL, NULL, SAL_MAX_PATH))
                 {
+                    if (!validateDiskTarget())
+                    {
+                        res = IDCANCEL;
+                        break;
+                    }
                     if (IsBranchView() && pathType != PATH_TYPE_WINDOWS)
                     {
                         SalMessageBox(HWindow, GetErrorText(ERROR_NOT_SUPPORTED), LoadStr(type == atCopy ? IDS_ERRORCOPY : IDS_ERRORMOVE),
@@ -1185,7 +1279,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         }
         }
         if (res == IDOK && // begin disk operation
-            CheckPath(TRUE) == ERROR_SUCCESS)
+            CheckPath(TRUE) == ERROR_SUCCESS && validateDiskTarget())
         {
             if (type == atDelete && recycle == 1)
             {
@@ -1291,8 +1385,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     char* auxTargetPath = NULL;
                     if (type == atCopy || type == atMove)
                         auxTargetPath = path;
-                    BOOL res2 = TRUE;
-                    if (copyToSelectedDirs)
+                    BOOL res2 = validateDiskTarget();
+                    if (res2 && copyToSelectedDirs)
                     {
                         CQuadWord totalFileSize(0, 0);
                         CQuadWord occupiedSpace(0, 0);
@@ -1302,7 +1396,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         {
                             char mutableTargetPath[SAL_MAX_PATH];
                             lstrcpyn(mutableTargetPath, targetPath->c_str(), SAL_MAX_PATH);
-                            if (!BuildScriptMain(script, type, mutableTargetPath, mask, count, indexes,
+                            if (!validateDiskTarget() ||
+                                !BuildScriptMain(script, type, mutableTargetPath, mask, count, indexes,
                                                  f, NULL, &changeCaseData,
                                                  countSizeMode != 0, criteriaPtr, keepBranchPaths))
                             {
@@ -1317,7 +1412,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         script->OccupiedSpace = occupiedSpace;
                         script->CompressedSize = compressedSize;
                     }
-                    else
+                    else if (res2)
                     {
                         res2 = BuildScriptMain(script, type, auxTargetPath, mask, count, indexes,
                                                f, NULL, &changeCaseData, countSizeMode != 0,
@@ -1376,6 +1471,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                         }
                     }
 
+                    // Tree analysis and the free-space prompt can dispatch messages too.
+                    if (!validateDiskTarget()) cancel = TRUE;
                     if (!cancel)
                     {
                         // prepare refresh of directories that are not auto-refreshed

@@ -1,0 +1,88 @@
+// SPDX-FileCopyrightText: 2026 Samandarin Contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Actual target snapshot; panel registry/storage are explicit doubles. No file operation is simulated as GUI proof.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <string>
+#include <vector>
+#include <cstdio>
+#include <algorithm>
+#define SAL_MAX_PATH 32768
+#define SAL_MAX_EXTENDED_PATH 32768
+enum CPanelSide {cpsLeft,cpsRight};
+enum {ptDisk,ptZIPArchive,ptPluginFS};
+struct CFilesWindow
+{
+    int Kind=ptDisk; ULONGLONG Tab=1, Generation=7;
+    BOOL Branch=FALSE, Scanning=FALSE;
+    std::wstring Root=L"C:\\target";
+    BOOL Is(int kind) const {return Kind==kind;}
+    BOOL IsBranchView() const {return Branch;}
+    BOOL IsBranchViewScanning() const {return Scanning;}
+    ULONGLONG GetPanelTabId() const {return Tab;}
+    ULONGLONG GetBranchViewGeneration() const {return Generation;}
+    const wchar_t* GetPathW() const {return Root.c_str();}
+};
+struct CMainWindow
+{
+    CFilesWindow *LeftPanel=nullptr,*RightPanel=nullptr;
+    std::vector<CFilesWindow*> Left,Right,Detached;
+    int GetPanelTabCount(CPanelSide side) const {return (int)(side==cpsLeft?Left:Right).size();}
+    CFilesWindow* GetPanelTabAt(CPanelSide side,int index) const {return (side==cpsLeft?Left:Right).at(index);}
+    int GetDetachedTabCount() const {return (int)Detached.size();}
+    CFilesWindow* GetDetachedTabAt(int index) const {return Detached.at(index);}
+};
+@@WIDE@@
+@@SNAPSHOT@@
+static int Checks=0,Failures=0;
+static void Check(bool ok,const char* label){++Checks;if(!ok){++Failures;printf("FAIL: %s\n",label);}}
+int main()
+{
+    CFilesWindow source,target,replacement;source.Tab=2;replacement.Tab=3;
+    CMainWindow main;main.Left={&source};main.Right={&target,&replacement};main.LeftPanel=&source;main.RightPanel=&target;
+    CFilesActionDiskTarget snapshot;
+    const std::vector<std::wstring> roots={L"C:\\ascii",L"C:\\東京-🙂",L"C:\\rodič\\same",L"C:\\první-🙂\\druhý-東京",L"C:\\"+std::wstring(180,L'東'),L"C:\\"+std::wstring(100,L'日')+L"\\"+std::wstring(100,L'本')+L"\\"+std::wstring(100,L'東')};
+    for(size_t i=0;i<roots.size();++i)
+    {
+        target.Root=roots[i];
+        Check(snapshot.Capture(&main,&target)&&snapshot.IsCurrent(&main),"capture actual complete wide disk target");
+        const std::string expected=SalWideToMultiBytePath((roots[i]+L"\\*.*").c_str(),CP_UTF8);
+        Check(snapshot.Root==roots[i]&&snapshot.DefaultPath==expected,"default root and mask preserve complete UTF8 identity");
+        const std::wstring owned=snapshot.Root;target.Root+=L"\\changed";
+        Check(!snapshot.IsCurrent(&main)&&snapshot.Root==owned,"owned root is stable and changed live root refused");
+        target.Root=roots[i];Check(snapshot.IsCurrent(&main),"same root restored within same stable tab");
+        if(i==4)Check(expected.size()>520&&roots[i].size()<MAX_PATH,"UTF8-only long root fixture");
+        if(i==5)Check(roots[i].size()>MAX_PATH,"full UTF16 long root fixture");
+    }
+    target.Root=L"C:\\";Check(snapshot.Capture(&main,&target)&&snapshot.DefaultPath=="C:\\*.*","drive root avoids duplicate slash");
+    target.Root=L"\\\\server\\share";Check(snapshot.Capture(&main,&target)&&snapshot.DefaultPath=="\\\\server\\share\\*.*","UNC root preserved as transport only; no network I/O claim");
+    target.Root=L"C:\\target";Check(snapshot.Capture(&main,&target),"baseline target captured");
+    target.Tab++;Check(!snapshot.IsCurrent(&main),"same address with replacement tab ID refused");target.Tab--;
+    main.RightPanel=&replacement;Check(!snapshot.IsCurrent(&main),"visible target switched while old tab remains live refused");main.RightPanel=&target;
+    main.Right={&replacement};Check(!snapshot.IsCurrent(&main),"closed target refused without dereferencing missing pointer");
+    main.Right={&target,&replacement};target.Kind=ptZIPArchive;Check(!snapshot.IsCurrent(&main),"changed target panel type refused");target.Kind=ptDisk;
+    target.Branch=TRUE;Check(!snapshot.IsCurrent(&main),"ordinary target replaced by Branch refused");
+    Check(snapshot.Capture(&main,&target)&&snapshot.IsCurrent(&main),"Branch identity can be prepared without granting admission");
+    target.Generation++;Check(!snapshot.IsCurrent(&main),"Branch listing generation replacement refused");target.Generation--;
+    target.Scanning=TRUE;Check(!snapshot.IsCurrent(&main)&&!snapshot.Capture(&main,&target),"scanning target invalidates capture and use");target.Scanning=FALSE;
+    target.Branch=FALSE;main.RightPanel=&replacement;
+    Check(snapshot.Capture(&main,&target)&&snapshot.IsCurrent(&main),"explicitly selected inactive tab remains a valid destination");
+    main.Right={&replacement};main.Detached={&target};
+    Check(snapshot.IsCurrent(&main),"owned inactive target identity remains valid when detached");
+    Check(snapshot.Capture(&main,&target)&&snapshot.IsCurrent(&main),"detached registry target can be captured");
+    main.Detached.clear();Check(!snapshot.IsCurrent(&main),"closed detached target refused");
+    Check(!snapshot.Capture(&main,reinterpret_cast<CFilesWindow*>(1)),"unregistered invalid address never dereferenced");
+    main.Right={&target,&replacement};main.RightPanel=&target;
+    target.Root=L"";Check(!snapshot.Capture(&main,&target),"empty root refused");
+    target.Root=std::wstring(L"C:\\")+wchar_t(0xd800);Check(!snapshot.Capture(&main,&target),"lossy wide root refused");
+    target.Root=L"C:\\"+std::wstring(12000,L'東');Check(!snapshot.Capture(&main,&target),"UTF8 capacity overflow refused instead of prefix default");
+    target.Root=L"C:\\target";target.Tab=0;Check(!snapshot.Capture(&main,&target),"zero tab identity refused");target.Tab=1;
+    target.Kind=ptPluginFS;Check(!snapshot.Capture(&main,&target),"plugin filesystem is not reinterpreted as disk");target.Kind=ptDisk;
+    Check(!snapshot.Capture(nullptr,&target)&&!snapshot.IsCurrent(nullptr),"missing registry refused");
+    Check(!snapshot.Capture(&main,nullptr),"null target refused");
+    // Explicit ordinary target text belongs to the dialog/resolver, not this snapshot:
+    // changing that text does not change panel identity or constrain it to the panel root.
+    Check(snapshot.Capture(&main,&target)&&snapshot.IsCurrent(&main),"ordinary manual destination edits do not invalidate panel identity");
+    printf("Actual disk destination snapshot: %d checks, %d failures\n",Checks,Failures);
+    return Failures?1:0;
+}
