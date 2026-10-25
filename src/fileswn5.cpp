@@ -6,6 +6,7 @@
 #include "fileactionpath.h"
 
 #include <new>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -30,48 +31,41 @@
 #include "filetags.h"
 #include "svg.h"
 
-static void FormatEditPropertiesLocalizedArguments(char* output, size_t outputSize,
-                                                   const char* format, const char* const* arguments,
-                                                   size_t argumentCount)
+static std::wstring EditPropertiesLocalizedToWide(const char* text)
 {
-    std::string result;
+    const char* value = text != NULL ? text : "";
+    return SalMultiByteToWidePath(value, IsValidPathUtf8Text(value) ? CP_UTF8 : CP_ACP);
+}
+
+// Substitute localized tokens as data, never as a printf format or a fixed path buffer.
+static std::wstring FormatEditPropertiesLocalizedArguments(const wchar_t* format,
+                                                           const std::vector<std::wstring>& arguments)
+{
+    std::wstring result;
     size_t argument = 0;
-    for (const char* p = format != NULL ? format : ""; *p != 0;)
+    for (const wchar_t* p = format != NULL ? format : L""; *p != 0;)
     {
-        if (p[0] == '%' && p[1] == '%')
+        if (p[0] == L'%' && p[1] == L'%')
         {
-            result.push_back('%');
+            result.push_back(L'%');
             p += 2;
         }
         else
         {
             size_t tokenLength = 0;
-            if (p[0] == '%' && (p[1] == 'd' || p[1] == 's'))
+            if (p[0] == L'%' && (p[1] == L'd' || p[1] == L's'))
                 tokenLength = 2;
-            else if (p[0] == '%' && strncmp(p, "%08X", 4) == 0)
+            else if (p[0] == L'%' && wcsncmp(p, L"%08X", 4) == 0)
                 tokenLength = 4;
-
-            if (tokenLength != 0 && argument < argumentCount)
+            if (tokenLength != 0 && argument < arguments.size())
             {
-                const char* value = arguments[argument++];
-                result.append(value != NULL ? value : "");
+                result.append(arguments[argument++]);
                 p += tokenLength;
             }
             else
                 result.push_back(*p++);
         }
     }
-    _snprintf_s(output, outputSize, _TRUNCATE, "%s", result.c_str());
-}
-
-static std::wstring EditPropertiesLocalizedToWide(const char* text)
-{
-    int length = MultiByteToWideChar(CP_ACP, 0, text != NULL ? text : "", -1, NULL, 0);
-    if (length <= 0)
-        return std::wstring();
-    std::wstring result((size_t)length, L'\0');
-    MultiByteToWideChar(CP_ACP, 0, text != NULL ? text : "", -1, &result[0], length);
-    result.resize((size_t)length - 1);
     return result;
 }
 
@@ -100,7 +94,8 @@ class CEditWindowsPropertiesDialog : public CCommonDialog
         BOOL Modified;
     };
 
-    const std::vector<std::wstring>& Paths;
+    const std::vector<std::wstring> Paths;
+    const std::function<bool()> SelectionCurrent;
     CEditListBox* TagsList;
     std::vector<CTagItem*> Tags;
     std::vector<CPropertyRow> PropertyRows;
@@ -396,6 +391,13 @@ class CEditWindowsPropertiesDialog : public CCommonDialog
         return result;
     }
 
+    BOOL CheckSelection()
+    {
+        if (!SelectionCurrent || SelectionCurrent()) return TRUE;
+        EndDialog(HWindow, IDCANCEL); // A replaced panel/selection cannot approve more writes.
+        return FALSE;
+    }
+
     BOOL Apply()
     {
         if (TagsList != NULL)
@@ -406,6 +408,7 @@ class CEditWindowsPropertiesDialog : public CCommonDialog
         int tagsState = IsDlgButtonChecked(HWindow, IDC_EDPROP_TAGS_ENABLE);
         std::vector<std::wstring> tags = GetTags();
         BOOL tagsChanged = tagsState != InitialTagsState || tags != InitialTags;
+        if (!CheckSelection()) return FALSE;
         BOOL anyAttempted = FALSE;
         BOOL tagsSucceeded = FALSE;
         int updated = 0;
@@ -427,6 +430,7 @@ class CEditWindowsPropertiesDialog : public CCommonDialog
                 std::vector<std::wstring> values = tagsState == BST_CHECKED
                                                        ? tags
                                                        : std::vector<std::wstring>();
+                if (!CheckSelection()) { SetCursor(oldCursor); return FALSE; }
                 HRESULT hr = WriteFileTagsW(Paths[pathIndex].c_str(), values);
                 if (SUCCEEDED(hr))
                 {
@@ -460,6 +464,7 @@ class CEditWindowsPropertiesDialog : public CCommonDialog
                     continue;
                 anyAttempted = TRUE;
                 propertyAttempted[rowIndex] = TRUE;
+                if (!CheckSelection()) { SetCursor(oldCursor); return FALSE; }
                 HRESULT hr;
                 if (state == BST_CHECKED &&
                     GetExplorerColumnType(row.ExplorerIndex) == (VT_VECTOR | VT_LPWSTR))
@@ -493,6 +498,7 @@ class CEditWindowsPropertiesDialog : public CCommonDialog
                 failed++;
         }
         SetCursor(oldCursor);
+        if (!CheckSelection()) return FALSE;
 
         for (size_t rowIndex = 0; rowIndex < PropertyRows.size(); rowIndex++)
         {
@@ -519,19 +525,14 @@ class CEditWindowsPropertiesDialog : public CCommonDialog
         }
         if (failed > 0 || (anyAttempted && Paths.size() > 1))
         {
-            char result[1200];
-            char updatedText[32];
-            char failedText[32];
-            _snprintf_s(updatedText, _countof(updatedText), _TRUNCATE, "%d", updated);
-            _snprintf_s(failedText, _countof(failedText), _TRUNCATE, "%d", failed);
-            const char* resultArguments[] = {updatedText, failedText};
-            FormatEditPropertiesLocalizedArguments(result, _countof(result),
-                                                    LoadStr(IDS_EDPROP_RESULT), resultArguments,
-                                                    _countof(resultArguments));
+            std::wstring result = FormatEditPropertiesLocalizedArguments(
+                EditPropertiesLocalizedToWide(LoadStr(IDS_EDPROP_RESULT)).c_str(),
+                {std::to_wstring(updated), std::to_wstring(failed)});
             if (failed > 0 && !firstFailedPath.empty())
             {
                 const char* reason = LoadStr(IDS_EDPROP_REASON_OTHER);
-                DWORD attributes = GetFileAttributesW(firstFailedPath.c_str());
+                const std::wstring failureIoPath = SalPathAddExtendedPrefixW(firstFailedPath.c_str());
+                DWORD attributes = GetFileAttributesW(failureIoPath.c_str());
                 if (firstFailure == E_ACCESSDENIED || firstFailure == STG_E_ACCESSDENIED ||
                     firstFailure == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) ||
                     firstFailure == HRESULT_FROM_WIN32(ERROR_WRITE_PROTECT) ||
@@ -542,28 +543,29 @@ class CEditWindowsPropertiesDialog : public CCommonDialog
                 else if (firstFailure == (HRESULT)0x88982F41L || firstFailureUnsupported)
                     reason = LoadStr(IDS_EDPROP_REASON_UNSUPPORTED);
 
-                char detail[800];
-                std::string path = SalWideToMultiBytePath(firstFailedPath.c_str(), CP_ACP);
-                char failureCode[32];
-                _snprintf_s(failureCode, _countof(failureCode), _TRUNCATE, "%08X",
-                            (DWORD)firstFailure);
-                const char* detailArguments[] = {
-                    path.c_str(), firstFailedProperty.c_str(), reason, failureCode};
-                FormatEditPropertiesLocalizedArguments(detail, _countof(detail),
-                                                        LoadStr(IDS_EDPROP_RESULT_DETAIL),
-                                                        detailArguments, _countof(detailArguments));
-                strncat_s(result, _countof(result), "\n\n", _TRUNCATE);
-                strncat_s(result, _countof(result), detail, _TRUNCATE);
+                wchar_t failureCode[32]; // numeric HRESULT only, no file/path text
+                _snwprintf_s(failureCode, _countof(failureCode), _TRUNCATE, L"%08X", (DWORD)firstFailure);
+                result += L"\n\n";
+                result += FormatEditPropertiesLocalizedArguments(
+                    EditPropertiesLocalizedToWide(LoadStr(IDS_EDPROP_RESULT_DETAIL)).c_str(),
+                    {firstFailedPath, EditPropertiesLocalizedToWide(firstFailedProperty.c_str()),
+                     EditPropertiesLocalizedToWide(reason), failureCode});
             }
-            SalMessageBox(HWindow, result, LoadStr(IDS_EDPROP_TITLE),
-                          failed > 0 ? MB_ICONEXCLAMATION | MB_OK : MB_ICONINFORMATION | MB_OK);
+            CTruncatedString text;
+            if (text.SetW(result.c_str(), NULL))
+            {
+                CMessageBox message(HWindow, MSGBOXEX_OK | (failed > 0 ? MSGBOXEX_ICONEXCLAMATION : MSGBOXEX_ICONINFORMATION),
+                                    LoadStr(IDS_EDPROP_TITLE), &text, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL);
+                message.Execute();
+            }
         }
         return failed == 0;
     }
 
 public:
-    CEditWindowsPropertiesDialog(HWND parent, const std::vector<std::wstring>& paths)
-        : CCommonDialog(HLanguage, IDD_EDIT_PROPERTIES, parent), Paths(paths)
+    CEditWindowsPropertiesDialog(HWND parent, const std::vector<std::wstring>& paths,
+                                 const std::function<bool()>& selectionCurrent = std::function<bool()>())
+        : CCommonDialog(HLanguage, IDD_EDIT_PROPERTIES, parent), Paths(paths), SelectionCurrent(selectionCurrent)
     {
         TagsList = NULL;
         PropertiesList = NULL;
@@ -610,7 +612,7 @@ protected:
                 if (RenderSVGIconBitmap("Modify", propertyIconSize, TRUE, &editBitmap))
                 {
                     ImageList_Add(PropertyImages, editBitmap, NULL);
-                    DeleteObject(editBitmap);
+                    HANDLES(DeleteObject(editBitmap));
                     ListView_SetImageList(PropertiesList, PropertyImages, LVSIL_SMALL);
                 }
                 else
@@ -1117,44 +1119,6 @@ void CFilesWindow::Convert()
     EndStopRefresh(); // snooper will start again now
 }
 
-void CFilesWindow::EditWindowsProperties()
-{
-    if (IsBranchView()) return; // S26 experiment: unverified operation is blocked at direct dispatch.
-
-    CALL_STACK_MESSAGE1("CFilesWindow::EditWindowsProperties()");
-    if (!Is(ptDisk) || CheckPath(TRUE) != ERROR_SUCCESS)
-        return;
-
-    std::vector<int> indexes;
-    int selected = GetSelCount();
-    if (selected > 0)
-    {
-        indexes.resize(selected);
-        GetSelItems(selected, indexes.data());
-    }
-    else
-        indexes.push_back(GetCaretIndex());
-
-    std::vector<std::wstring> paths;
-    for (size_t i = 0; i < indexes.size(); i++)
-    {
-        int index = indexes[i];
-        if (index < Dirs->Count || index >= Dirs->Count + Files->Count)
-            continue;
-        CFileData* file = &Files->At(index - Dirs->Count);
-        paths.push_back(GetItemFullPathW(*file));
-    }
-    if (paths.empty())
-        return;
-
-    CEditWindowsPropertiesDialog dialog(HWindow, paths);
-    if (dialog.Execute() == IDOK)
-    {
-        RefreshListBox(-1, -1, FocusedIndex, FALSE, FALSE);
-        PostMessage(HWindow, WM_USER_REFRESH_DIR, 0, GetTickCount());
-    }
-}
-
 // S31b3a3: own the operation identities across modal message dispatch.
 // A dialog must not approve a replacement tab/listing or a different selection.
 struct CBranchAttributeSelection
@@ -1193,6 +1157,55 @@ struct CBranchAttributeSelection
                Generation == current.Generation && Paths == current.Paths;
     }
 };
+
+void CFilesWindow::EditWindowsProperties()
+{
+    const bool branchProperties = IsBranchView() != FALSE;
+    CBranchAttributeSelection selection;
+    if (branchProperties && !selection.Capture(this)) return;
+
+    CALL_STACK_MESSAGE1("CFilesWindow::EditWindowsProperties()");
+    if (!Is(ptDisk) || CheckPath(TRUE) != ERROR_SUCCESS ||
+        (branchProperties && !selection.IsCurrent(this)))
+        return;
+
+    std::vector<int> indexes;
+    int selected = GetSelCount();
+    if (selected > 0)
+    {
+        indexes.resize(selected);
+        GetSelItems(selected, indexes.data());
+    }
+    else
+        indexes.push_back(GetCaretIndex());
+
+    std::vector<std::wstring> paths;
+    for (size_t i = 0; i < indexes.size(); i++)
+    {
+        int index = indexes[i];
+        if (index < Dirs->Count || index >= Dirs->Count + Files->Count)
+            continue;
+        CFileData* file = &Files->At(index - Dirs->Count);
+        if (branchProperties && GetBranchViewFileByCacheKey(GetItemCacheKeyPtr(*file)) != file) return;
+        const std::wstring path = GetItemFullPathW(*file);
+        if (path.empty()) return;
+        paths.push_back(path);
+    }
+    if (paths.empty())
+        return;
+
+    std::function<bool()> selectionCurrent;
+    if (branchProperties) selectionCurrent = [this, &selection]() { return selection.IsCurrent(this); };
+    CEditWindowsPropertiesDialog dialog(HWindow, paths, selectionCurrent);
+    BeginStopRefresh();
+    const INT_PTR result = dialog.Execute();
+    EndStopRefresh();
+    if (result == IDOK && (!branchProperties || selection.IsCurrent(this)))
+    {
+        RefreshListBox(-1, -1, FocusedIndex, FALSE, FALSE);
+        PostMessage(HWindow, WM_USER_REFRESH_DIR, 0, GetTickCount());
+    }
+}
 
 // Build the confirmation with typed wide identities; display text is not an I/O path.
 static BOOL PrepareNtfsConfirmation(CFilesWindow* panel, int textID, int count, CTruncatedString& text)
