@@ -1150,7 +1150,7 @@ BOOL CFilesWindowAncestor::IsPathFromActiveFS(const char* fsName, char* fsUserPa
 BOOL CFilesWindowAncestor::GetGeneralPath(char* buf, int bufSize, BOOL convertFSPathToExternal)
 {
     CALL_STACK_MESSAGE_NONE
-    if (bufSize == 0)
+    if (buf == NULL || bufSize <= 0)
         return FALSE;
     BOOL ret = TRUE;
     char buf2[2 * MAX_PATH];
@@ -1169,21 +1169,15 @@ BOOL CFilesWindowAncestor::GetGeneralPath(char* buf, int bufSize, BOOL convertFS
     {
         if (Is(ptZIPArchive))
         {
-            strcpy(buf2, GetZIPArchive());
+            std::string archivePath(GetZIPArchive());
             if (GetZIPPath()[0] != 0)
             {
                 if (GetZIPPath()[0] != '\\')
-                    strcat(buf2, "\\");
-                strcat(buf2, GetZIPPath());
+                    archivePath += "\\";
+                archivePath += GetZIPPath();
             }
-            int l = (int)strlen(buf2);
-            if (l >= bufSize)
-            {
-                l = bufSize - 1;
-                ret = FALSE;
-            }
-            memcpy(buf, buf2, l);
-            buf[l] = 0;
+            ret = archivePath.size() < static_cast<size_t>(bufSize);
+            CopyStringTruncateUtf8(buf, bufSize, archivePath.c_str());
         }
         else
         {
@@ -3442,8 +3436,10 @@ BOOL CFilesWindow::CanUnloadPlugin(HWND parent, CPluginInterfaceAbstract* plugin
         {
             if (Is(ptZIPArchive) || Is(ptPluginFS)) // archive -> just leave it; plug-in FS -> return to the last disk path
             {
-                char path[MAX_PATH];
-                strcpy(path, GetPath());
+                const std::string currentPath(GetPath());
+                std::vector<char> pathStorage(currentPath.begin(), currentPath.end());
+                pathStorage.push_back(0);
+                char* path = pathStorage.data();
 
                 DWORD err, lastErr;
                 BOOL pathInvalid, cut;
@@ -3478,17 +3474,18 @@ void CFilesWindow::DirectoryLineSetText()
     CALL_STACK_MESSAGE1("CFilesWindow::DirectoryLineSetText()");
     char ZIPbuf[2 * MAX_PATH];
     std::string diskPathText;
+    std::string archivePathText;
     const char* path = NULL;
     if (Is(ptZIPArchive))
     {
-        strcpy(ZIPbuf, GetZIPArchive());
+        archivePathText = GetZIPArchive();
         if (GetZIPPath()[0] != 0)
         {
             if (GetZIPPath()[0] != '\\')
-                strcat(ZIPbuf, "\\");
-            strcat(ZIPbuf, GetZIPPath());
+                archivePathText += "\\";
+            archivePathText += GetZIPPath();
         }
-        path = ZIPbuf;
+        path = archivePathText.c_str();
         PathHistory->AddPath(1, GetZIPArchive(), GetZIPPath(), NULL, NULL);
     }
     else
