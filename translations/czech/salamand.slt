@@ -1135,7 +1135,7 @@ SLGINCOMPLETE,""
 1157,175,238,22,8,1,"."
 
 [DIALOG 1105]
-299,243,1,"Panely"
+299,263,1,"Panely"
 599,1,3,118,12,1,"&Používat karty panelů"
 596,1,16,232,12,1,"&Skrýt soubory a adresáře s atributy Skrytý a Systémový (Ctrl+H)"
 302,1,28,177,12,1,"Za&hrnout adresáře do operací vybrat/zrušit výběr"
@@ -1161,6 +1161,7 @@ SLGINCOMPLETE,""
 391,10,203,159,12,1,"Seřadit pod&le času: novější položky navrchu"
 395,10,215,169,12,1,"Seřadit podl&e času: řadit adresáře podle názvu"
 392,10,227,289,12,1,"Nakládat s adresáři, jako by měly příp&ony (současně zobrazit přípony ve sloupci Přípona)"
+14528,1,247,295,12,1,"Ve sloupci Cesta v pohledu na větev používat relativní cesty"
 
 [DIALOG 1106]
 299,104,1,"Karty"
@@ -4139,9 +4140,41 @@ SLGINCOMPLETE,""
 14493,1,"Neshoda typu soubor/adresář"
 
 [STRINGTABLE 182]
-14991,1,"Čtení přidružení souborů ze souborového úložiště, čekejte prosím..."
+14500,1,"Pohled na větev"
+14501,1,"&Pohled na větev\tCtrl+B"
+14502,1,"Cesta"
+14503,1,"Skutečná nadřazená složka"
+14504,1,"Otevřít obsahující &složku"
+14505,1,"Zastavit prohledávání větve"
+14506,1,"Pohled na větev - prohledávání... %I64u souborů"
+14507,1,"Pohled na větev - %I64u souborů"
+14508,1,"Pohled na větev - zastaveno; %I64u souborů (neúplné)"
+14509,1,"Pohled na větev - %I64u souborů; %I64u složek nebylo možné přečíst"
+14510,1,"Zachovat cesty podsložek relativní ke kořeni pohledu na větev"
+14511,1,"Cesta: "
 
 [STRINGTABLE 183]
+14512,1,"Strom složek nebylo možné přečíst. Obnovte zobrazení a zkuste to znovu."
+14513,1,"Pohled na větev - obnovování... ponecháno %I64u souborů"
+14514,1,"Pohled na větev - obnova zastavena; předchozí výsledky ponechány (%I64u souborů)"
+14515,1,"Pohled na větev - příprava %I64u souborů; ponecháno %I64u předchozích výsledků"
+14516,1,"Program se nepodařilo bezpečně spustit prostřednictvím Windows. Nebyl proveden náhradní pokus jiným způsobem."
+14517,1,"Položku se nepodařilo otevřít prostřednictvím Windows Shell. Nebyl proveden náhradní pokus jiným způsobem."
+14518,1,"Nastavení dlouhých cest ve Windows: vypnuto."
+14519,1,"Nastavení dlouhých cest ve Windows: zapnuto. Běžící procesy mohou stále používat dřívější stav."
+14520,1,"Nastavení dlouhých cest ve Windows: nenastaveno (výchozí chování)."
+14521,1,"Nastavení dlouhých cest ve Windows se nepodařilo zjistit."
+14522,1,"Jde o diagnostický údaj, nikoli o prokázanou příčinu této chyby. Zapnutí nezaručuje podporu v Shellu, bezpečnostních službách ani cílové aplikaci."
+14523,1,"Zavřít"
+14524,1,"Návod k nastavení Windows"
+14525,1,"Podpora dlouhých cest ve Windows"
+14526,1,"Správce může zapnout zásadu Windows:\nKonfigurace počítače > Šablony pro správu > Systém > Systém souborů > Povolit dlouhé cesty Win32 (Enable Win32 long paths).\n\nOdpovídající hodnota registru je REG_DWORD LongPathsEnabled = 1 v:\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\n\nRestartujte dotčené aplikace; může být nutný také restart Windows. Samotné aplikace musí dlouhé cesty podporovat. Toto nastavení nepřekonává bezpečnostní zamítnutí a Shell nebo cílový program mohou cestu nadále odmítat. Salamander nastavení nemění."
+14527,1,"Chyba Windows:"
+
+[STRINGTABLE 184]
+14991,1,"Čtení přidružení souborů ze souborového úložiště, čekejte prosím..."
+
+[STRINGTABLE 185]
 14992,1,"Ukládání konfigurace do souborového úložiště, čekejte prosím..."
 14993,1,"Odstraňování staré konfigurace ze souborového úložiště, čekejte prosím..."
 14994,1,"Probíhá čtení přidružení souborů ze souborového úložiště..."
@@ -4150,4 +4183,3 @@ SLGINCOMPLETE,""
 14997,1,"Probíhá čtení položek uživatelské nabídky ze souborového úložiště..."
 14998,1,"Použít výchozí (&UI) písmo"
 14999,1,"Použít &UI písmo"
-
