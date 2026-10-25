@@ -1194,11 +1194,59 @@ struct CBranchAttributeSelection
     }
 };
 
+// Build the confirmation with typed wide identities; display text is not an I/O path.
+static BOOL PrepareNtfsConfirmation(CFilesWindow* panel, int textID, int count, CTruncatedString& text)
+{
+    if (count < 0 || count != panel->GetSelCount()) return FALSE;
+    const auto wideText = [](const char* value) {
+        return SalMultiByteToWidePath(value, IsValidPathUtf8Text(value) ? CP_UTF8 : CP_ACP);
+    };
+    std::wstring format = wideText(LoadStr(textID));
+    const auto insertSubject = [&](const std::wstring& subject) {
+        for (size_t i = 0; i + 1 < format.size(); ++i)
+        {
+            if (format[i] != L'%') continue;
+            if (format[i + 1] == L'%') { ++i; continue; }
+            if (format[i + 1] == L's')
+            {
+                std::wstring result = format;
+                result.replace(i, 2, subject);
+                return result;
+            }
+        }
+        return format + L" " + subject;
+    };
+    if (count > 1)
+    {
+        int files = 0, dirs = 0;
+        for (int i = 0; i < panel->Dirs->Count; ++i)
+            if (panel->Dirs->At(i).Selected && strcmp(panel->Dirs->At(i).Name, "..") != 0) ++dirs;
+        for (int i = 0; i < panel->Files->Count; ++i)
+            if (panel->Files->At(i).Selected) ++files;
+        if (files + dirs != count) return FALSE;
+        char expanded[200]; // localized counts only, no file/path text
+        ExpandPluralFilesDirs(expanded, sizeof(expanded), files, dirs, epfdmNormal, FALSE);
+        format = insertSubject(wideText(expanded));
+        return text.SetW(format.c_str(), NULL);
+    }
+    int index = panel->GetCaretIndex();
+    if (count == 1) panel->GetSelItems(1, &index);
+    if (index < 0 || index >= panel->Dirs->Count + panel->Files->Count) return FALSE;
+    const BOOL isDir = index < panel->Dirs->Count;
+    const CFileData& file = isDir ? panel->Dirs->At(index) : panel->Files->At(index - panel->Dirs->Count);
+    if (strcmp(file.Name, "..") == 0) return FALSE;
+    if (panel->IsBranchView() && panel->GetBranchViewFileByCacheKey(panel->GetItemCacheKeyPtr(file)) != &file) return FALSE;
+    const std::wstring identity = panel->IsBranchView() ? panel->GetItemRelativePathW(file) : panel->GetItemFullPathW(file);
+    if (identity.empty()) return FALSE;
+    format = insertSubject(wideText(LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE)));
+    return text.SetW(format.c_str(), identity.c_str());
+}
+
 void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncryption, BOOL encrypted)
 {
     const bool branchAttributes = IsBranchView() != FALSE;
     CBranchAttributeSelection branchSelection;
-    if (branchAttributes && (setCompress || setEncryption || !branchSelection.Capture(this))) return; // Fast NTFS commands remain staged.
+    if (branchAttributes && !branchSelection.Capture(this)) return;
 
     CALL_STACK_MESSAGE5("CFilesWindow::ChangeAttr(%d, %d, %d, %d)", setCompress, compressed, setEncryption, encrypted);
     if (Dirs->Count + Files->Count == 0)
@@ -1241,10 +1289,12 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
             else
                 subDir = FALSE;
 
-            DWORD attr, attrDiff;
+            DWORD attr = 0, attrDiff = 0;
             SYSTEMTIME timeModified;
             SYSTEMTIME timeCreated;
             SYSTEMTIME timeAccessed;
+            GetLocalTime(&timeModified); // Fast commands still construct the common dialog.
+            timeCreated = timeAccessed = timeModified;
             if (!setCompress && !setEncryption)
             {
                 int count = GetSelCount();
@@ -1338,14 +1388,9 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
             }
 
             CChangeAttrDialog chDlg(HWindow, attr, attrDiff,
-                                    SelectionContainsDirectory(), branchAttributes ? FALSE : FileBasedCompression,
-                                    branchAttributes ? FALSE : FileBasedEncryption,
+                                    SelectionContainsDirectory(), FileBasedCompression,
+                                    FileBasedEncryption,
                                     &timeModified, &timeCreated, &timeAccessed);
-            if (branchAttributes)
-            {
-                chDlg.Compressed = 2; // Preserve unverified NTFS properties until their own checkpoint.
-                chDlg.Encrypted = 2;
-            }
             if (setCompress || setEncryption)
             {
                 chDlg.Archive = 2;
@@ -1370,47 +1415,7 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                 if (setCompress && Configuration.CnfrmNTFSPress || // ask whether to compress/decompress
                     setEncryption && Configuration.CnfrmNTFSCrypt) // ask whether to encrypt/decrypt
                 {
-                    char subject[MAX_PATH + 100];
-                    char expanded[200];
-                    int count = GetSelCount();
-                    char path[MAX_PATH];
-                    if (count > 1)
-                    {
-                        int totalCount = Dirs->Count + Files->Count;
-                        int files = 0;
-                        int dirs = 0;
-                        CFileData* f;
-                        int i;
-                        for (i = 0; i < totalCount; i++)
-                        {
-                            BOOL isDir = i < Dirs->Count;
-                            f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
-                            if (i == 0 && isDir && strcmp(Dirs->At(0).Name, "..") == 0)
-                                continue;
-                            if (f->Selected == 1)
-                            {
-                                if (isDir)
-                                    dirs++;
-                                else
-                                    files++;
-                            }
-                        }
-
-                        ExpandPluralFilesDirs(expanded, 200, files, dirs, epfdmNormal, FALSE);
-                    }
-                    else
-                    {
-                        int index;
-                        if (count == 0)
-                            index = GetCaretIndex();
-                        else
-                            GetSelItems(1, &index);
-
-                        BOOL isDir = index < Dirs->Count;
-                        CFileData* f = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
-                        AlterFileName(path, f->Name, -1, Configuration.FileNameFormat, 0, index < Dirs->Count);
-                        lstrcpy(expanded, LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
-                    }
+                    const int count = GetSelCount();
                     int resTextID;
                     int resTitleID;
                     if (setCompress)
@@ -1423,9 +1428,15 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                         resTextID = encrypted ? IDS_CONFIRM_NTFSENCRYPT : IDS_CONFIRM_NTFSDECRYPT;
                         resTitleID = encrypted ? IDS_CONFIRM_NTFSENCRYPT_TITLE : IDS_CONFIRM_NTFSDECRYPT_TITLE;
                     }
-                    _snprintf_s(subject, _TRUNCATE, "%s %s", LoadStr(resTextID), expanded);
                     CTruncatedString str;
-                    str.Set(subject, count > 1 ? NULL : path);
+                    if ((branchAttributes && !branchSelection.IsCurrent(this)) ||
+                        !PrepareNtfsConfirmation(this, resTextID, count, str))
+                    {
+                        clearTemporarySelection(temporarySelected);
+                        FilesActionInProgress = FALSE;
+                        EndStopRefresh();
+                        return;
+                    }
                     CMessageBox msgBox(HWindow, MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_ICONQUESTION | MSGBOXEX_SILENT,
                                        LoadStr(resTitleID), &str, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL);
                     if (msgBox.Execute() != IDYES)

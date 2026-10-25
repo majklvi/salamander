@@ -359,6 +359,11 @@ try {
             )
         },
         @{
+            Name = 'branch_ntfs_confirmation_tests'
+            ClassName = 'native-generated'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_ntfs_confirmation_tests.py'), '--configuration', $Configuration)
+        },
+        @{
             Name = 'branch_ntfs_worker_tests'
             ClassName = 'native-generated'
             Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_ntfs_worker_tests.py'), '--configuration', $Configuration)
