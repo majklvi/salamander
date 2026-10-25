@@ -852,7 +852,7 @@ class CUnpackerConfig;
 class CUnpackDialog : public CCommonDialog
 {
 public:
-    CUnpackDialog(HWND parent, char* path, const char* pathAlt, char* mask,
+    CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
                   CTruncatedString* subject, CUnpackerConfig* config,
                   BOOL* delArchiveWhenDone);
 
@@ -865,6 +865,7 @@ protected:
 
     char *Mask,
         *Path;
+    int PathBufSize;
     const char* PathAlt;
     CTruncatedString* Subject;
     CUnpackerConfig* UnpackerConfig;

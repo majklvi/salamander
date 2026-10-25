@@ -23,6 +23,7 @@
 #include "worker.h"
 #include "menu.h"
 #include "darkmode.h"
+#include "common/widepath.h"
 
 namespace
 {
@@ -2903,11 +2904,44 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CUnpackDialog
 //
 
-CUnpackDialog::CUnpackDialog(HWND parent, char* path, const char* pathAlt, char* mask,
+// Keep the Unpack target atomic: a shortened edit value must never become an I/O path.
+static BOOL ReadUnpackDialogPath(HWND control, int capacity, std::string& path, int& errorTextID)
+{
+    path.clear();
+    errorTextID = IDS_PATHISINVALID;
+    if (capacity <= 0 || !IsWindow(control) || !IsWindowUnicode(control)) return FALSE;
+    const int length = GetWindowTextLengthW(control);
+    if (length >= SAL_MAX_PATH)
+    {
+        errorTextID = IDS_TOOLONGPATH;
+        return FALSE;
+    }
+    std::vector<wchar_t> text((size_t)length + 1, L'\0');
+    SetLastError(ERROR_SUCCESS);
+    const int copied = GetWindowTextW(control, text.data(), (int)text.size());
+    if (copied != length || (copied == 0 && GetLastError() != ERROR_SUCCESS) ||
+        GetWindowTextLengthW(control) != copied) return FALSE;
+    const std::wstring exact(text.data(), copied);
+    std::string encoded = SalWideToMultiBytePath(exact.c_str(), CP_UTF8);
+    if (SalMultiByteToWidePath(encoded.c_str(), CP_UTF8) != exact) return FALSE;
+    if (encoded.size() >= (size_t)capacity)
+    {
+        errorTextID = IDS_TOOLONGPATH;
+        return FALSE;
+    }
+    path.swap(encoded);
+    return TRUE;
+}
+
+CUnpackDialog::CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
                              CTruncatedString* subject, CUnpackerConfig* config,
                              BOOL* delArchiveWhenDone)
     : CCommonDialog(HLanguage, IDD_UNPACK, IDD_UNPACK, parent)
 {
+#ifndef _UNICODE
+    UnicodeWnd = TRUE;
+#endif
+    PathBufSize = pathBufSize;
     Subject = subject;
     Path = path;
     PathAlt = pathAlt;
@@ -2927,6 +2961,21 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CUnpackDialog::Transfer()");
     HWND combo;
+    std::string target;
+    if (ti.Type == ttDataFromWindow)
+    {
+        int errorTextID = IDS_PATHISINVALID;
+        if (!ti.GetControl(combo, IDE_PATH) || !ReadUnpackDialogPath(combo, PathBufSize, target, errorTextID))
+        {
+            // Missing controls are already marked by CTransferInfo; do not change caller state.
+            if (ti.IsGood())
+            {
+                SalMessageBox(HWindow, LoadStr(errorTextID), LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+                ti.ErrorOn(IDE_PATH);
+            }
+            return;
+        }
+    }
     if (ti.GetControl(combo, IDC_PACKER))
     {
         if (ti.Type == ttDataToWindow)
@@ -2953,16 +3002,23 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow)
     {
         ti.GetControl(combo, IDE_PATH);
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)Path);
+        const auto widePath = [](const char* value) {
+            return SalMultiByteToWidePath(value, IsValidPathUtf8Text(value) ? CP_UTF8 : CP_ACP);
+        };
+        const std::wstring initial = widePath(Path);
+        const std::wstring alternate = widePath(PathAlt);
+        SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)initial.c_str());
         // if the alternative path matches the first one, don't add it (target isn't ptDisk)
         if (StrICmp(Path, PathAlt) != 0)
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)PathAlt);
+            SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)alternate.c_str());
+        SendMessage(combo, CB_LIMITTEXT, PathBufSize > 0 ? PathBufSize - 1 : 0, 0);
         SendMessage(combo, CB_SETCURSEL, 0, 0);
+        SetWindowTextW(combo, initial.c_str());
         ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
     }
     else
     {
-        ti.EditLine(IDE_PATH, Path, MAX_PATH);
+        memcpy(Path, target.c_str(), target.size() + 1);
         if (IsWindowEnabled(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES)))
             ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
         else
@@ -2984,7 +3040,10 @@ CUnpackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
-            SetWindowText(hSubject, Subject->Get());
+        {
+            if (Subject->IsWide()) SetWindowTextW(hSubject, Subject->GetW());
+            else SetControlTextUtf8(hSubject, Subject->Get());
+        }
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)
