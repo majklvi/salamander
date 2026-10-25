@@ -3492,6 +3492,11 @@ void CFilesWindow::RenameFileInternalW(CFileData* f, const std::wstring& newName
 
 void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName, BOOL isDir, BOOL* mayChange, BOOL* tryAgain)
 {
+    if (IsBranchView())
+    {
+        RenameFileInternalW(f, MultiByteFileNameToWideBest(formatedFileName), isDir, mayChange, tryAgain);
+        return;
+    }
     *tryAgain = TRUE;
     const char* s = formatedFileName;
     while (*s != 0 && *s != '\\' && *s != '/' && *s != ':' &&
