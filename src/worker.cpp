@@ -8903,20 +8903,31 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     FILETIME ftCreated, ftAccessed, ftModified;
-                    GetFileTime(file, &ftCreated, &ftAccessed, &ftModified);
-                    if (timeCreated != NULL)
-                        ftCreated = *timeCreated;
-                    if (timeAccessed != NULL)
-                        ftAccessed = *timeAccessed;
-                    if (timeModified != NULL)
-                        ftModified = *timeModified;
-                    SetFileTime(file, &ftCreated, &ftAccessed, &ftModified);
+                    // Preserve the Windows failure before CloseHandle/attribute restore.
+                    // A failed read must never feed uninitialized times to SetFileTime.
+                    if (!GetFileTime(file, &ftCreated, &ftAccessed, &ftModified))
+                        error = GetLastError();
+                    else
+                    {
+                        if (timeCreated != NULL)
+                            ftCreated = *timeCreated;
+                        if (timeAccessed != NULL)
+                            ftAccessed = *timeAccessed;
+                        if (timeModified != NULL)
+                            ftModified = *timeModified;
+                        if (!SetFileTime(file, &ftCreated, &ftAccessed, &ftModified))
+                            error = GetLastError();
+                    }
                     HANDLES(CloseHandle(file));
-                    if (attrs & FILE_ATTRIBUTE_READONLY)
-                        SetFileAttributesW(nameSetAttrs.c_str(), attrs);
+                    if ((attrs & FILE_ATTRIBUTE_READONLY) &&
+                        !SetFileAttributesW(nameSetAttrs.c_str(), attrs) && error == ERROR_SUCCESS)
+                        error = GetLastError();
+                    if (error != ERROR_SUCCESS)
+                        goto SHOW_ERROR;
                 }
                 else
                 {
+                    error = GetLastError();
                     if (attrs & FILE_ATTRIBUTE_READONLY)
                         SetFileAttributesW(nameSetAttrs.c_str(), attrs);
                     goto SHOW_ERROR;
