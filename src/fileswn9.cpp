@@ -62,19 +62,44 @@ CColumDataItem* GetStdColumn(int i, BOOL isDisk)
 BOOL CFilesWindow::ParsePath(char* path, int& type, BOOL& isDir, char*& secondPart,
                              const char* errorTitle, char* nextFocus, int* error, int pathBufSize)
 {
-    CALL_STACK_MESSAGE3("CFilesWindow::ParsePath(%s, , , , %s, ,)", path, errorTitle);
+    CALL_STACK_MESSAGE4("CFilesWindow::ParsePath(%.*s, , , , %s, ,)",
+                        path != NULL && pathBufSize > 0 ? pathBufSize : 0, path != NULL ? path : "", errorTitle);
 
+    CPathBuffer currentPath(SAL_MAX_PATH);
     const char* curArchivePath = NULL;
-    char curPath[2 * MAX_PATH];
-    GetGeneralPath(curPath, 2 * MAX_PATH);
-    if (Is(ptZIPArchive))
+    int failure = 0;
+    if (Is(ptDisk))
     {
-        SalPathAddBackslash(curPath, 2 * MAX_PATH);
+        const std::wstring wide = GetPathW();
+        const std::string encoded = SalWideToMultiBytePath(wide.c_str(), CP_UTF8);
+        if (wide.empty() || SalMultiByteToWidePath(encoded.c_str(), CP_UTF8) != wide)
+            failure = IDS_PATHISINVALID;
+        else if (encoded.size() >= (size_t)currentPath.Capacity())
+            failure = IDS_TOOLONGPATH;
+        else
+            memcpy(currentPath.Data(), encoded.c_str(), encoded.size() + 1);
+    }
+    else if (!GetGeneralPath(currentPath.Data(), currentPath.Capacity()))
+        failure = IDS_TOOLONGPATH; // do not reinterpret the shortened prefix as a valid context
+    if (failure == 0 && Is(ptZIPArchive))
+    {
+        if (!SalPathAddBackslash(currentPath.Data(), currentPath.Capacity()))
+            failure = IDS_TOOLONGPATH;
         curArchivePath = GetZIPArchive();
+    }
+    if (failure != 0)
+    {
+        type = -1;
+        isDir = FALSE;
+        secondPart = NULL;
+        if (nextFocus != NULL) nextFocus[0] = 0;
+        if (error != NULL) *error = SPP_WINDOWSPATHERROR;
+        SalMessageBox(HWindow, LoadStr(failure), errorTitle, MB_OK | MB_ICONEXCLAMATION);
+        return FALSE;
     }
 
     return SalParsePath(HWindow, path, type, isDir, secondPart, errorTitle, nextFocus,
-                        Is(ptDisk) || Is(ptZIPArchive), curPath, curArchivePath, error, pathBufSize);
+                        Is(ptDisk) || Is(ptZIPArchive), currentPath.Data(), curArchivePath, error, pathBufSize);
 }
 
 void CFilesWindow::SetPanelSide(CPanelSide side)

@@ -658,15 +658,52 @@ _CHECK_AGAIN:
     return !pathInvalid && err == ERROR_SUCCESS;
 }
 
+// The input path can be SAL_MAX_PATH bytes; size the localized error instead of truncating it.
+static void ShowParsePathError(HWND parent, const char* path, const char* detail, const char* title)
+try
+{
+    // LoadStr uses a rotating buffer; preserve arguments before loading another resource.
+    const std::string ownedPath(path), ownedDetail(detail), ownedTitle(title);
+    const std::string format(LoadStr(IDS_PATHERRORFORMAT));
+    const int length = _scprintf(format.c_str(), ownedPath.c_str(), ownedDetail.c_str());
+    if (length < 0)
+    {
+        SalMessageBox(parent, ownedDetail.c_str(), ownedTitle.c_str(), MB_OK | MB_ICONEXCLAMATION);
+        return;
+    }
+    std::vector<char> message((size_t)length + 1);
+    sprintf_s(message.data(), message.size(), format.c_str(), ownedPath.c_str(), ownedDetail.c_str());
+    SalMessageBox(parent, message.data(), ownedTitle.c_str(), MB_OK | MB_ICONEXCLAMATION);
+}
+catch (const std::bad_alloc&)
+{
+    SalMessageBox(parent, GetErrorText(ERROR_NOT_ENOUGH_MEMORY), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+}
+
+// GetRootPath and drive reconnect callbacks still use a MAX_PATH root ABI.
+static BOOL ReadParsePathRoot(char* root, const char* path)
+{
+    if (path[0] == '\\' && path[1] == '\\')
+    {
+        const char* end = path + 2;
+        while (*end != 0 && *end != '\\') ++end;
+        if (*end != 0) ++end;
+        while (*end != 0 && *end != '\\') ++end;
+        if (end - path > MAX_PATH - 2) return FALSE;
+    }
+    GetRootPath(root, path);
+    return TRUE;
+}
+
 BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& secondPart,
                   const char* errorTitle, char* nextFocus, BOOL curPathIsDiskOrArchive,
                   const char* curPath, const char* curArchivePath, int* error,
                   int pathBufSize)
 {
-    CALL_STACK_MESSAGE7("SalParsePath(%s, , , , %s, , %d, %s, %s, , %d)", path, errorTitle,
+    CALL_STACK_MESSAGE8("SalParsePath(%.*s, , , , %s, , %d, %s, %s, , %d)",
+                        path != NULL && pathBufSize > 0 ? pathBufSize : 0, path != NULL ? path : "", errorTitle,
                         curPathIsDiskOrArchive, curPath, curArchivePath, pathBufSize);
 
-    char errBuf[3 * MAX_PATH + 300];
     type = -1;
     secondPart = NULL;
     isDir = FALSE;
@@ -674,6 +711,12 @@ BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& second
         nextFocus[0] = 0;
     if (error != NULL)
         *error = 0;
+    if (path == NULL || pathBufSize <= 0 || strnlen(path, pathBufSize) >= (size_t)pathBufSize)
+    {
+        if (error != NULL) *error = SPP_WINDOWSPATHERROR;
+        SalMessageBox(parent, LoadStr(IDS_PATHISINVALID), errorTitle, MB_OK | MB_ICONEXCLAMATION);
+        return FALSE;
+    }
 
 PARSE_AGAIN:
 
@@ -685,8 +728,7 @@ PARSE_AGAIN:
         int fsNameIndex;
         if (!Plugins.IsPluginFS(fsName, index, fsNameIndex))
         {
-            sprintf(errBuf, LoadStr(IDS_PATHERRORFORMAT), path, LoadStr(IDS_NOTPLUGINFS));
-            SalMessageBox(parent, errBuf, errorTitle, MB_OK | MB_ICONEXCLAMATION);
+            ShowParsePathError(parent, path, LoadStr(IDS_NOTPLUGINFS), errorTitle);
             if (error != NULL)
                 *error = SPP_NOTPLUGINFS;
             return FALSE;
@@ -728,15 +770,23 @@ PARSE_AGAIN:
         {
             if (errTextID == IDS_EMPTYNAMENOTALLOWED)
             {
-                if (curPath == NULL) // there is nothing to substitute for an empty path (interpreted as the current directory)
+                if (curPath == NULL || *curPath == 0) // there is nothing to substitute for an empty path (interpreted as the current directory)
                 {
                     if (error != NULL)
                         *error = SPP_EMPTYPATHNOTALLOWED;
                 }
                 else
                 {
-                    lstrcpyn(path, curPath, pathBufSize);
-                    goto PARSE_AGAIN;
+                    if (strlen(curPath) >= (size_t)pathBufSize)
+                    {
+                        errTextID = IDS_TOOLONGPATH;
+                        if (error != NULL) *error = SPP_WINDOWSPATHERROR;
+                    }
+                    else
+                    {
+                        memcpy(path, curPath, strlen(curPath) + 1);
+                        goto PARSE_AGAIN;
+                    }
                 }
             }
             else
@@ -765,12 +815,22 @@ PARSE_AGAIN:
             if (curArchivePath != NULL && StrICmp(path, curArchivePath) == 0)
             { // helper for users: an operation from an archive to the archive root must end with '\\', otherwise it will only
                 // overwrite the existing file
-                SalPathAddBackslash(path, pathBufSize);
+                if (!SalPathAddBackslash(path, pathBufSize))
+                {
+                    if (error != NULL) *error = SPP_WINDOWSPATHERROR;
+                    ShowParsePathError(parent, path, LoadStr(IDS_TOOLONGPATH), errorTitle);
+                    return FALSE;
+                }
                 backslashAtEnd = TRUE;
             }
 
             char root[MAX_PATH];
-            GetRootPath(root, path);
+            if (!ReadParsePathRoot(root, path))
+            {
+                if (error != NULL) *error = SPP_WINDOWSPATHERROR;
+                ShowParsePathError(parent, path, LoadStr(IDS_TOOLONGPATH), errorTitle);
+                return FALSE;
+            }
 
             // we do not test network paths if they were recently accessed
             BOOL tryNet = !curPathIsDiskOrArchive || curPath == NULL || !HasTheSameRootPath(root, curPath);
@@ -904,8 +964,7 @@ PARSE_AGAIN:
             }
         }
 
-        sprintf(errBuf, LoadStr(IDS_PATHERRORFORMAT), path, text);
-        SalMessageBox(parent, errBuf, errorTitle, MB_OK | MB_ICONEXCLAMATION);
+        ShowParsePathError(parent, path, text, errorTitle);
         if (backslashAtEnd || mustBePath)
             SalPathAddBackslash(path, pathBufSize);
         return FALSE;
