@@ -2597,12 +2597,15 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                             {
                                 panel->ContextMenu = CreatePanelShellMenu(MainWindow->HWindow, panel->GetPath(),
                                                                          (count == 0) ? 1 : count, EnumFileNames,
-                                                                         &selectionEnumData);
+                                                                         &selectionEnumData, TRUE);
                                 if (panel->ContextMenu != NULL)
                                     ShellActionAux5(flags, panel, h);
                             }
                         }
                     }
+                }
+                if (panel->ContextMenu != NULL && h != NULL)
+                {
                     RemoveUselessSeparatorsFromMenu(h);
 
                     char cmdName[2000]; // we intentionally use 2000 instead of 200; shell extensions sometimes write twice as much (idea: Unicode = 2 * "number of characters"), etc.
