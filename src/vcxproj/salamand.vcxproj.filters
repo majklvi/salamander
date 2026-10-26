@@ -845,6 +845,7 @@
     <ClInclude Include="..\panel_temporary_selection.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\fileactiondisktarget.h" />
     <ClInclude Include="..\operationrecycle.h">
       <Filter>h</Filter>
     </ClInclude>

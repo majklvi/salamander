@@ -14,6 +14,7 @@
 #include "zip.h"
 #include "pack.h"
 #include "common/widepath.h"
+#include "fileactiondisktarget.h"
 
 //
 // ****************************************************************************
