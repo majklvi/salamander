@@ -327,10 +327,13 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
                         source, target, remapNameFrom, remapNameTo);
     if (!FilesActionInProgress)
     {
-        if (CheckPath(TRUE, source) != ERROR_SUCCESS)
-            return FALSE;
-
+        // Keep this panel alive across CheckPath/progress callbacks; tab close respects this flag.
         FilesActionInProgress = TRUE;
+        if (CheckPath(TRUE, source) != ERROR_SUCCESS)
+        {
+            FilesActionInProgress = FALSE;
+            return FALSE;
+        }
 
         SetCurrentDirectory(source); // for a faster move (the system prefers it)
 

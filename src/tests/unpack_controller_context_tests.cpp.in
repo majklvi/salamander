@@ -1,0 +1,311 @@
+// SPDX-FileCopyrightText: 2026 Samandarin Contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Actual entire controller, source capture, backend binding/dispatcher/wrapper. Modal, registry, filesystem and SDK doubles are explicit.
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <string>
+#include <vector>
+#include <cstdio>
+#include <cstring>
+#include <algorithm>
+#include <functional>
+#include <new>
+#include <cstdlib>
+#include <climits>
+#define SAL_MAX_PATH 32768
+#define SAL_MAX_EXTENDED_PATH 32768
+enum CPanelSide {cpsLeft,cpsRight};
+enum {ptDisk,ptZIPArchive,ptPluginFS};
+#define PATH_TYPE_WINDOWS 1 // unchanged public spl_gen.h value; checked by generator
+struct CPluginData;
+struct CPluginDataInterfaceAbstract;
+struct Binding { const CPluginDataInterfaceAbstract* Interface=nullptr; BOOL Contains(const CPluginDataInterfaceAbstract* p) const {return p!=nullptr&&p==Interface;} };
+struct CFileData {
+ std::wstring Full=L"C:\\source\\archive.7z",NameW=L"archive.7z";
+ char Name[32]="archive.7z";char* Ext=Name+8;BOOL Wide=TRUE;
+ BOOL UseWideName() const{return Wide;}
+};
+struct Listing {int Count=0;CFileData Item;CFileData& At(int){return Item;}};
+struct CFilesWindow
+{
+ Listing DirStore,FileStore;Listing *Dirs=&DirStore,*Files=&FileStore;
+ HWND HWindow=reinterpret_cast<HWND>(2);BOOL UserWorkedOnThisPath=FALSE,Retired=FALSE;
+ mutable unsigned StaleReads=0;
+ char NextFocusName[128]="original";
+ CFilesWindow(){FileStore.Count=1;}
+ void Touch() const{++AccessorReads;if(Retired)++StaleReads;}
+ int GetCaretIndex(){Touch();return 0;}
+ std::wstring GetItemFullPathW(const CFileData& file) const{Touch();return file.Full;}
+ mutable std::string GetterScratch;
+ const char* GetPath() const;
+ void Unpack(CFilesWindow*,int,const char*,const char*);
+ BOOL CheckPath(BOOL,const char*);
+ BOOL MoveFiles(const char*,const char*,const char*,const char*);
+
+    BOOL FilesActionInProgress=FALSE;
+    Binding PluginData; CPluginData* Owner=nullptr; const char* Archive="source.zip";
+    CPluginData* GetPluginDataForPluginIface() {return Owner;}
+    const char* GetZIPArchive() const {return Archive;}
+    int Kind=ptDisk; ULONGLONG Tab=1, Generation=7;
+    BOOL Branch=FALSE, Scanning=FALSE;
+    std::wstring Root=L"C:\\target";
+    mutable unsigned AccessorReads=0;
+    BOOL Is(int kind) const {Touch();return Kind==kind;}
+    BOOL IsBranchView() const {Touch();return Branch;}
+    BOOL IsBranchViewScanning() const {Touch();return Scanning;}
+    ULONGLONG GetPanelTabId() const {Touch();return Tab;}
+    ULONGLONG GetBranchViewGeneration() const {Touch();return Generation;}
+    const wchar_t* GetPathW() const {Touch();return Root.c_str();}
+};
+#define CALL_STACK_MESSAGE1(...) ((void)0)
+struct CDetachedTabInfo {CFilesWindow* Panel=nullptr;};
+struct CMainWindow
+{
+ CDetachedTabInfo Info;
+ void ClosePanelTab(CFilesWindow*,bool=true);
+ void CloseDetachedTab(CFilesWindow*);
+ CDetachedTabInfo* FindDetachedTab(CFilesWindow* panel){if(std::find(Detached.begin(),Detached.end(),panel)==Detached.end())return nullptr;Info.Panel=panel;return &Info;}
+ void UpdateDefaultDir(BOOL){}
+ CFilesWindow* GetActivePanel(){return LeftPanel;}
+ void PostChangeOnPathNotification(const char*,BOOL);
+
+    HWND HWindow=nullptr;
+    CFilesWindow *LeftPanel=nullptr,*RightPanel=nullptr;
+    std::vector<CFilesWindow*> Left,Right,Detached;
+    int GetPanelTabCount(CPanelSide side) const {return (int)(side==cpsLeft?Left:Right).size();}
+    CFilesWindow* GetPanelTabAt(CPanelSide side,int index) const {return (side==cpsLeft?Left:Right).at(index);}
+    int GetDetachedTabCount() const {return (int)Detached.size();}
+    CFilesWindow* GetDetachedTabAt(int index) const {return Detached.at(index);}
+};
+@@ACTION@@
+@@WIDE@@
+const char* CFilesWindow::GetPath() const{Touch();GetterScratch=SalWideToMultiBytePath(Root.c_str(),CP_UTF8);return GetterScratch.c_str();}
+@@SNAPSHOT@@
+
+static int Checks=0,Failures=0,StopDepth=0,Begins=0,Ends=0,PriorityDepth=0,PriorityChanges=0;
+static int Creates=0,Cleanups=0,Resolves=0,Dialogs=0,Updates=0,Notifications=0,Messages=0,FocusPosts=0;
+static std::vector<std::pair<std::string,BOOL>> NotificationPaths;
+static int DetachedTransitions=0;
+static BOOL RecordNewDirectory=FALSE;
+static int SDKCalls=0,ExternalCalls=0,MoveCalls=0,OperationContexts=0,DeletedVolumes=0,CloseCalls=0;
+static BOOL ExpectedDiskTarget=TRUE;
+static BOOL RootExists=TRUE,CreateOK=TRUE,ResolveOK=TRUE,BackendOK=TRUE,RequestDelete=FALSE;
+static int DialogResult=IDOK;
+static std::string ManualPath,ExpectedSource,ExpectedTarget;
+static std::function<void()> OnDialog,OnUpdate,OnCreate,OnInit,OnBackend,OnNotify,OnCheck,OnMove,OnDelete;
+static CMainWindow* MainWindow=nullptr;
+static void Check(bool ok,const char* why){++Checks;if(!ok){++Failures;printf("FAIL: %s\n",why);}}
+static void RemovePanel(CMainWindow& main,CFilesWindow* panel){
+ for(auto* list:{&main.Left,&main.Right,&main.Detached})list->erase(std::remove(list->begin(),list->end(),panel),list->end());
+ if(main.LeftPanel==panel)main.LeftPanel=nullptr;if(main.RightPanel==panel)main.RightPanel=nullptr;panel->Retired=TRUE;++CloseCalls;
+}
+@@CLOSE_ATTACHED@@
+@@CLOSE_DETACHED@@
+BOOL CFilesWindow::CheckPath(BOOL,const char*){if(OnCheck)OnCheck();return ERROR_SUCCESS;}
+@@MOVE_PREFIX@@
+static BOOL OwnUpdateWindow(HWND){++Updates;if(OnUpdate)OnUpdate();return TRUE;}
+static BOOL OwnPostMessage(HWND,UINT,WPARAM,LPARAM){++FocusPosts;return TRUE;}
+static DWORD OwnAttributes(const wchar_t*){return RootExists?FILE_ATTRIBUTE_DIRECTORY:INVALID_FILE_ATTRIBUTES;}
+static BOOL OwnPriority(HANDLE,int priority){PriorityDepth+=priority==THREAD_PRIORITY_NORMAL?1:-1;++PriorityChanges;return TRUE;}
+static BOOL OwnDelete(const char*){++DeletedVolumes;if(OnDelete)OnDelete();return TRUE;}
+#undef UpdateWindow
+#define UpdateWindow OwnUpdateWindow
+#undef PostMessage
+#define PostMessage OwnPostMessage
+#define GetFileAttributesW OwnAttributes
+#define SetThreadPriority OwnPriority
+#undef DeleteFile
+#define DeleteFile OwnDelete
+#define CALL_STACK_MESSAGE4(...) ((void)0)
+#define CALL_STACK_MESSAGE5(...) ((void)0)
+#define CALL_STACK_MESSAGE7(...) ((void)0)
+#define TRACE_E(...) ((void)0)
+#define IDS_PATHISINVALID 1
+#define IDS_TOOLONGPATH 2
+#define IDS_ERRORUNPACK 3
+#define IDS_UNPACKARCHIVE 4
+#define IDS_PLUGINUNPACKERNOTFOUND 5
+#define IDS_EMPTYNAMENOTALLOWED 6
+#define IDS_ERRORDELETINGFILE 7
+#define WM_USER_DONEXTFOCUS (WM_APP+1)
+#define IDB_SKIPALL 201
+#define IDB_SKIP 202
+#define CUSTOMUNPACKER_EXTERNAL 0
+static const char* LoadStr(int){return "%s";}
+static const char* GetErrorText(DWORD){return "localized diagnostic";}
+static int SalMessageBox(HWND,const char*,const char*,UINT){++Messages;return IDOK;}
+static void BeginStopRefresh(){++StopDepth;++Begins;}
+static void EndStopRefresh(){--StopDepth;++Ends;}
+static void AlterFileName(char* out,const char* in,int,int,int,BOOL){strcpy(out,in);}
+static void ClearReadOnlyAttr(const char*){}
+static void CutDirectory(char* path){char* last=strrchr(path,char(92));if(last)*last=0;}
+static BOOL SalPathAppend(char* path,const char* part,int capacity){std::string full=std::string(path)+(path[0]?"\\":"")+part;if(full.size()>=(size_t)capacity)return FALSE;strcpy(path,full.c_str());return TRUE;}
+struct CPathBuffer {std::vector<char> Bytes;explicit CPathBuffer(int cap=SAL_MAX_PATH):Bytes(cap){}char* Data(){return Bytes.data();}int Capacity()const{return (int)Bytes.size();}};
+struct CTruncatedString {void SetW(const wchar_t*,const wchar_t*){}};
+struct CMaskGroup {void SetMasksString(const char*,BOOL){}void PrepareMasks(int&){}BOOL AgreeMasksW(const std::wstring&,void*){return TRUE;}BOOL AgreeMasks(const char*,const char*){return TRUE;}};
+static struct {BOOL UseAnotherPanelForUnpack=TRUE,UseSubdirNameByArchiveForUnpack=FALSE;int FileNameFormat=0;} Configuration;
+static BOOL SalGetFullName(char* path,int* error,const char* parent,char* focus,void*,int capacity){
+ ++Resolves;Check(parent!=nullptr&&std::string(parent)==ExpectedSource.substr(0,ExpectedSource.find_last_of('\\')+1),"relative resolution uses owned exact source parent");
+ if(!ResolveOK){ResolveOK=TRUE;*error=IDS_PATHISINVALID;return FALSE;}
+ std::string result=path;if(result.empty())result=parent;else if(result.size()<2||result[1]!=':')result=std::string(parent)+result;
+ if(result.size()>=(size_t)capacity){*error=IDS_TOOLONGPATH;return FALSE;}strcpy(path,result.c_str());strcpy(focus,"result");return TRUE;
+}
+static BOOL CheckAndCreateDirectoryW(const wchar_t*,HWND,BOOL,std::wstring* first,BOOL){++Creates;if(OnCreate)OnCreate();if(RecordNewDirectory)*first=L"C:\\target\\new";else first->clear();BOOL ok=CreateOK;CreateOK=TRUE;return ok;}
+static void RemoveEmptyUnpackDirectoriesW(const std::wstring&){++Cleanups;}
+void CMainWindow::PostChangeOnPathNotification(const char* path,BOOL recursive){NotificationPaths.emplace_back(path,recursive);++Notifications;if(OnNotify)OnNotify();}
+struct CDynamicString {};
+struct CDynamicStringImp:CDynamicString {char Storage[64]={};char* Text=Storage;int Length=0;};
+struct CFileErrorDlg {CFileErrorDlg(HWND,const char*,const char*,const char*){}int Execute(){return IDCANCEL;}};
+class CUnpackerConfig;
+@@ROW@@
+@@BACKEND@@
+struct Rows {std::vector<CUnpackerConfigData*> Data;int Count=0;CUnpackerConfigData* operator[](int i){return Data.at(i);}};
+class CUnpackerConfig {
+public:
+ int PreferedUnpacker=0;Rows Unpackers;
+ int GetUnpackersCount(){return Unpackers.Count;}
+ @@GET_PREFERRED@@
+ void SetPreferedUnpacker(int i){PreferedUnpacker=i;}
+ int GetUnpackerType(int i){return Unpackers[i]->Type;}
+ const char* GetUnpackerExt(int i){return Unpackers[i]->Ext;}
+ @@DISPATCH_DECL@@
+};
+static CUnpackerConfig UnpackerConfig;
+struct CSalamanderForOperations {explicit CSalamanderForOperations(CFilesWindow*){++OperationContexts;}};
+struct ArchiverFacade {
+ BOOL UnpackWholeArchive(CSalamanderForOperations*,const char* source,const char*,const char* target,BOOL del,CDynamicString* volumes){
+  ++SDKCalls;Check(ExpectedSource==source&&ExpectedTarget==target,"SDK receives exact owned source/destination bytes");
+  if(del&&volumes){auto* v=static_cast<CDynamicStringImp*>(volumes);memcpy(v->Storage,"first.zip\0second.zip\0",21);v->Length=21;}
+  if(OnBackend)OnBackend();return BackendOK;
+ }
+};
+struct CPluginData {
+ const char* DLLName="7zip\\7zip.spl";BOOL SupportCustomUnpack=TRUE;ArchiverFacade PluginIfaceForArchiver;
+ BOOL InitDLL(HWND){if(OnInit)OnInit();return TRUE;}
+ @@WRAPPER_DECL@@
+};
+static struct {std::vector<CPluginData*> Data;CPluginData* Get(int i){return i>=0&&i<(int)Data.size()?Data[i]:nullptr;}} Plugins;
+static char* DupStr(const char* s){return _strdup(s);}
+static void* PackEnumMask=nullptr;
+static BOOL PackUniversalUncompress(HWND,const char*,void*,const char*,BOOL,CFilesWindow* panel,BOOL,const char* source,const char* target,void*,void*,char**,BOOL,const CFilesActionDiskTarget* src,const CFilesActionDiskTarget* dst){
+ ++ExternalCalls;Check(src!=nullptr&&src->Panel==panel&&(dst!=nullptr||!ExpectedDiskTarget),"controller/dispatcher forward both external contexts");
+ Check(ExpectedSource==source&&ExpectedTarget==target,"external receives exact owned source/destination bytes");
+ if(src==nullptr){SetLastError(ERROR_RETRY);return FALSE;}
+ if(OnBackend)OnBackend();if(!src->IsCurrent(MainWindow)||(dst!=nullptr&&!dst->IsCurrent(MainWindow))){SetLastError(ERROR_RETRY);return FALSE;}
+ return panel->MoveFiles("own-extract-temp",target,"own-temp",source);
+}
+@@METHODS@@
+@@WRAPPER@@
+class CUnpackDialog {
+ char* Path;BOOL* Delete;CWholeArchiveUnpackerSnapshot Displayed;
+public:
+ CUnpackDialog(HWND,char* path,int,const char*,char*,CTruncatedString*,CUnpackerConfig*,BOOL* del):Path(path),Delete(del){Check(Displayed.Capture(&UnpackerConfig,TRUE),"capture displayed modal choice facade");}
+ int Execute(){++Dialogs;if(!ManualPath.empty())strcpy(Path,ManualPath.c_str());*Delete=RequestDelete;if(OnDialog)OnDialog();return DialogResult;}
+ bool IsSelectionCurrent() const{return Displayed.IsCurrent();}
+};
+@@SOURCE@@
+@@CONTROLLER@@
+static void Row(CUnpackerConfigData& row,bool external=false){row.Type=external?0:-1;row.Title=_strdup("selected");row.Ext=_strdup("7z");if(external){row.CmdExecExtract=_strdup("own-external");row.CmdArgsExtract=_strdup("args");row.SupportLongNames=TRUE;}}
+static void Reset(){
+ Check(StopDepth==0&&PriorityDepth==0,"prior controller invocation left no refresh/priority imbalance");
+ Begins=Ends=PriorityChanges=Creates=Cleanups=Resolves=Dialogs=Updates=Notifications=Messages=FocusPosts=0;
+ NotificationPaths.clear();SDKCalls=ExternalCalls=MoveCalls=OperationContexts=DeletedVolumes=CloseCalls=0;
+ ExpectedDiskTarget=TRUE;RootExists=CreateOK=ResolveOK=BackendOK=TRUE;RecordNewDirectory=FALSE;DetachedTransitions=0;RequestDelete=FALSE;DialogResult=IDOK;ManualPath.clear();
+ OnDialog=OnUpdate=OnCreate=OnInit=OnBackend=OnNotify=OnCheck=OnMove=OnDelete=nullptr;
+ Configuration.UseAnotherPanelForUnpack=TRUE;Configuration.UseSubdirNameByArchiveForUnpack=FALSE;
+}
+int main(){
+ for(int external=0;external<2;++external)for(int phase=0;phase<9;++phase)for(int mutation=0;mutation<19;++mutation){
+  if((external&&phase==3)||(!external&&phase>=7)||(mutation==18&&phase>2))continue;
+  Reset();CFilesWindow source,target,other;source.Root=L"C:\\source";source.Tab=2;target.Root=L"C:\\target";target.Tab=3;other.Tab=4;
+  CMainWindow main;MainWindow=&main;main.Left={&source};main.Right={&target};main.LeftPanel=&source;main.RightPanel=&target;
+  CUnpackerConfigData row,second;Row(row,external!=0);Row(second,external!=0);CPluginData plugin,foreign;foreign.DLLName="zip\\zip.spl";
+  UnpackerConfig.Unpackers.Data={&row,&second};UnpackerConfig.Unpackers.Count=2;UnpackerConfig.PreferedUnpacker=0;Plugins.Data={&plugin};
+  ExpectedSource="C:\\source\\archive.7z";ExpectedTarget="C:\\target";bool fired=false;
+  auto mutate=[&]{if(fired)return;fired=true;switch(mutation){
+   case 1:main.ClosePanelTab(&source);break;case 2:source.Root+=L"\\changed";break;case 3:++source.Tab;break;
+   case 4:main.Left.push_back(&other);main.LeftPanel=&other;break;case 5:source.Kind=ptPluginFS;break;case 6:source.Scanning=TRUE;break;
+   case 7:main.ClosePanelTab(&target);break;case 8:target.Root+=L"\\changed";break;case 9:++target.Tab;break;
+   case 10:main.Right.push_back(&other);main.RightPanel=&other;break;case 11:target.Scanning=TRUE;break;case 12:target.Kind=ptPluginFS;break;
+   case 13:source.Branch=TRUE;break;case 14:target.Branch=TRUE;break;case 15:UnpackerConfig.PreferedUnpacker=1;break;
+   case 16:free(row.Title);row.Title=_strdup("changed");break;
+   case 17:if(external){free(row.CmdArgsExtract);row.CmdArgsExtract=_strdup("changed args");}else Plugins.Data[0]=&foreign;break;
+   case 18:RootExists=FALSE;break;
+  }};
+  if(phase==0)OnDialog=mutate;else if(phase==1)OnUpdate=[&]{if(Updates==1)mutate();};else if(phase==2)OnCreate=mutate;
+  else if(phase==3)OnInit=mutate;else if(phase==4)OnBackend=mutate;else if(phase==5)OnNotify=mutate;
+  else if(phase==6)OnUpdate=[&]{if(Updates>=2)mutate();};else if(phase==7)OnMove=mutate;else OnCheck=mutate;
+  source.Unpack(&target,-1,nullptr,nullptr);
+  Check(StopDepth==0&&Begins==1&&Ends==1&&PriorityDepth==0,"all callback paths balance one refresh scope and thread priority");
+  Check(source.StaleReads==0&&target.StaleReads==0,"actual controller/snapshot never reads a retired panel getter");
+  Check(!source.FilesActionInProgress,"source busy lifetime restored before returning controller");
+  if(!NotificationPaths.empty())Check(NotificationPaths.front().first=="C:\\source","post-callback notification keeps original owned source root");
+  if(mutation!=0&&phase<=2)Check(SDKCalls==0&&ExternalCalls==0&&MoveCalls==0,"modal/update/create mutation refuses all backend I/O");
+  if(mutation!=0&&phase<=1)Check(Creates==0,"modal/update invalidation refuses before directory creation");
+  if(mutation!=0&&phase==3)Check(SDKCalls==0&&OperationContexts==0,"InitDLL mutation refuses before SDK context");
+  if(mutation==1&&((!external&&phase==4)||(external&&phase>=7)))Check(!source.Retired&&CloseCalls==0,"SDK/MoveFiles callback cannot close protected busy source tab");
+  if(mutation!=0&&phase<=4&&!(mutation==1&&!external&&phase==4))Check(FocusPosts==0&&DeletedVolumes==0,"invalid context cannot apply stale focus or delete archive volumes");
+  if(mutation==0)Check(SDKCalls+ExternalCalls==1&&FocusPosts==1,"unchanged context completes ordinary whole-archive operation");
+ }
+ // Additional independent failure/retry/cancel/detached and real path conversion cases.
+ for(int scenario=0;scenario<16;++scenario){
+  Reset();CFilesWindow source,target;source.Root=L"C:\\source";source.Tab=2;target.Root=L"C:\\target";target.Tab=3;
+  CMainWindow main;MainWindow=&main;main.Left={&source};main.Right={&target};main.LeftPanel=&source;main.RightPanel=&target;
+  CUnpackerConfigData row;Row(row);CPluginData plugin;UnpackerConfig.Unpackers.Data={&row};UnpackerConfig.Unpackers.Count=1;UnpackerConfig.PreferedUnpacker=0;Plugins.Data={&plugin};
+  ExpectedSource="C:\\source\\archive.7z";ExpectedTarget="C:\\target";
+  if(scenario==0)DialogResult=IDCANCEL;
+  if(scenario==1){DialogResult=IDCANCEL;OnDialog=[&]{main.ClosePanelTab(&source);};}
+  if(scenario==2)ResolveOK=FALSE;
+  if(scenario==3)CreateOK=FALSE;
+  if(scenario==4)BackendOK=FALSE;
+  if(scenario==5){ManualPath="C:\\manual";ExpectedTarget=ManualPath;RootExists=FALSE;}
+  if(scenario==6){main.Left.clear();main.Right.clear();main.LeftPanel=main.RightPanel=nullptr;main.Detached={&source,&target};}
+  if(scenario==7){main.Left.clear();main.Right.clear();main.LeftPanel=main.RightPanel=nullptr;main.Detached={&source,&target};OnDialog=[&]{main.CloseDetachedTab(&target);};}
+  if(scenario>=8&&scenario<=11){
+   source.Root=L"C:\\rodič-東京\\další-🙂";source.FileStore.Item.NameW=L"soubor-東京-🙂.7z";
+   if(scenario==9)target.Root=L"C:\\"+std::wstring(100,L'東');
+   if(scenario==10)target.Root=L"C:\\"+std::wstring(140,L'日')+L"\\"+std::wstring(140,L'本');
+   if(scenario==11){RequestDelete=TRUE;OnDelete=[&]{main.ClosePanelTab(&source);};}
+   source.FileStore.Item.Full=source.Root+L"\\"+source.FileStore.Item.NameW;
+   ExpectedSource=SalWideToMultiBytePath(source.FileStore.Item.Full.c_str(),CP_UTF8);ExpectedTarget=SalWideToMultiBytePath(target.Root.c_str(),CP_UTF8);
+  }
+  if(scenario==12){main.Left.clear();main.Right.clear();main.LeftPanel=main.RightPanel=nullptr;main.Detached={&source,&target};OnBackend=[&]{main.CloseDetachedTab(&source);};}
+  if(scenario==13){RecordNewDirectory=TRUE;BackendOK=FALSE;}
+  if(scenario==14){RecordNewDirectory=TRUE;CreateOK=FALSE;}
+  if(scenario==15){RecordNewDirectory=TRUE;OnCreate=[&]{main.ClosePanelTab(&source);};}
+  source.Unpack(&target,-1,nullptr,nullptr);
+  Check(StopDepth==0&&Begins==1&&Ends==1&&PriorityDepth==0&&!source.FilesActionInProgress,"cancel/retry/failure/detached/path cases balance all lifetimes");
+  Check(source.StaleReads==0&&target.StaleReads==0,"cancel/deletion callback avoids retired panel reads");
+  if(scenario<=1)Check(SDKCalls==0&&Creates==0,"cancel has no filesystem or backend work");
+  if(scenario==2||scenario==3)Check(Dialogs==2&&SDKCalls==1,"retry retains one refresh scope and revalidates new dialog choice");
+  if(scenario==4)Check(SDKCalls==1&&FocusPosts==0,"backend failure does not apply success focus");
+  if(scenario==5)Check(SDKCalls==1,"manual destination does not recreate or require unused implicit root");
+  if(scenario==6)Check(SDKCalls==1,"live detached source/target accepted");
+  if(scenario==7)Check(SDKCalls==0&&Creates==0,"closed detached target refuses before create");
+  if(scenario==11)Check(DeletedVolumes==1&&FocusPosts==0,"post-success deletion callback stops remaining volumes and stale focus");
+  if(scenario==12){Check(DetachedTransitions==0&&!source.Retired,"busy detached close does not reattach or destroy SDK source");main.CloseDetachedTab(&source);Check(DetachedTransitions==1&&source.Retired,"ordinary detached close works after SDK busy scope ends");}
+  if(scenario==13)Check(Cleanups==1&&SDKCalls==1,"backend failure cleans only scoped newly created directory");
+  if(scenario==14)Check(Creates==2&&SDKCalls==1&&Notifications==3,"directory creation retry reports owned path and revalidates dialog");
+  if(scenario==15)Check(Cleanups==1&&SDKCalls==0&&FocusPosts==0,"create callback invalidation cleans scoped directory before return");
+ }
+
+ {
+  Reset();CFilesWindow source,target;source.Root=L"C:\\source";source.Tab=2;target.Root=L"C:\\target";target.Tab=3;CMainWindow main;MainWindow=&main;main.Left={&source};main.Right={&target};main.LeftPanel=&source;main.RightPanel=&target;
+  CUnpackerConfigData row;Row(row);CPluginData plugin;UnpackerConfig.Unpackers.Data={&row};UnpackerConfig.Unpackers.Count=1;UnpackerConfig.PreferedUnpacker=-2;Plugins.Data={&plugin};ExpectedSource="C:\\source\\archive.7z";ExpectedTarget="C:\\target";
+  source.Unpack(&target,-1,nullptr,nullptr);Check(SDKCalls==1&&StopDepth==0,"actual preferred getter normalizes invalid negative index before extension lookup");
+  Reset();source.Unpack(&target,INT_MIN,nullptr,nullptr);Check(Begins==0&&Dialogs==0,"invalid plugin index refused before arithmetic or modal work");
+  Reset();free(row.Title);row.Title=_strdup("external");row.Type=0;row.CmdExecExtract=_strdup("external.exe");row.CmdArgsExtract=_strdup("args");UnpackerConfig.PreferedUnpacker=0;
+  target.Root=L"C:\\"+std::wstring(300,L'a');ExpectedTarget=SalWideToMultiBytePath(target.Root.c_str(),CP_UTF8);OnDialog=[&]{if(Dialogs>1)DialogResult=IDCANCEL;};
+  source.Unpack(&target,-1,nullptr,nullptr);Check(Creates==0&&ExternalCalls==0&&Dialogs==2&&StopDepth==0,"unsupported long external destination refused before create and allows cancel from retry dialog");
+ }
+
+ {
+  Reset();CFilesWindow source,target;source.Root=L"C:\\source";source.Tab=2;target.Tab=3;target.Kind=ptPluginFS;CMainWindow main;MainWindow=&main;main.Left={&source};main.Right={&target};main.LeftPanel=&source;main.RightPanel=&target;
+  CUnpackerConfigData row;Row(row);CPluginData plugin;UnpackerConfig.Unpackers.Data={&row};UnpackerConfig.Unpackers.Count=1;UnpackerConfig.PreferedUnpacker=0;Plugins.Data={&plugin};ExpectedSource="C:\\source\\archive.7z";ExpectedTarget="C:\\source\\";ExpectedDiskTarget=FALSE;
+  OnDialog=[&]{main.ClosePanelTab(&target);};source.Unpack(&target,-1,nullptr,nullptr);
+  Check(SDKCalls==1&&StopDepth==0&&target.StaleReads==0,"closed unused virtual target does not invalidate an owned ordinary source destination");
+  Reset();source.FilesActionInProgress=TRUE;source.Unpack(&source,-1,nullptr,nullptr);Check(Begins==0&&Dialogs==0&&source.FilesActionInProgress,"reentrant busy source refused without resetting another operation flag");source.FilesActionInProgress=FALSE;
+  main.Detached={nullptr};main.CloseDetachedTab(nullptr);Check(DetachedTransitions==0,"orphan null detached entry cannot be dereferenced by close guard");
+ }
+ printf("Actual whole-archive controller: %d checks, %d failures\n",Checks,Failures);return Failures?1:0;
+}

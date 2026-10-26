@@ -858,6 +858,7 @@ public:
                   BOOL* delArchiveWhenDone);
 
     virtual void Transfer(CTransferInfo& ti);
+    bool IsSelectionCurrent() const;
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -881,6 +882,7 @@ protected:
         BOOL SupportCustomUnpack = FALSE;
     };
     std::vector<CUnpackerChoice> UnpackerChoices;
+    int SelectedUnpacker = -1;
     bool CaptureUnpackerChoices();
     bool IsUnpackerChoiceCurrent(int index) const;
 

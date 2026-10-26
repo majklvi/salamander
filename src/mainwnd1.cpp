@@ -4004,7 +4004,7 @@ void CMainWindow::CloseDetachedTab()
 void CMainWindow::CloseDetachedTab(CFilesWindow* panel)
 {
     CDetachedTabInfo* info = FindDetachedTab(panel);
-    if (info == NULL)
+    if (info == NULL || info->Panel == NULL || info->Panel->FilesActionInProgress)
         return;
     CPanelSide side = info->OriginalSide;
     if (ReattachDetachedTab(panel, side, FALSE))

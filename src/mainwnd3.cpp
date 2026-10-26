@@ -631,7 +631,7 @@ void CMainWindow::SwitchPanelTab(CFilesWindow* panel, bool postRefreshMessage)
 void CMainWindow::ClosePanelTab(CFilesWindow* panel, bool storeForReopen)
 {
     CALL_STACK_MESSAGE1("CMainWindow::ClosePanelTab()");
-    if (panel == NULL)
+    if (panel == NULL || panel->FilesActionInProgress)
         return;
 
     CPanelSide side = panel->GetPanelSide();
@@ -1235,7 +1235,7 @@ void CMainWindow::OnPanelTabContextMenu(CPanelSide side, int index, const POINT&
     appendMenuItem(newCmd, newText, IDX_TB_TABSNEW, TRUE);
 
     CFilesWindow* targetPanel = (index >= 0 && index < tabs.Count) ? tabs[index] : NULL;
-    BOOL canClose = (index > 0 && targetPanel != NULL && !targetPanel->IsTabLocked());
+    BOOL canClose = (index > 0 && targetPanel != NULL && !targetPanel->IsTabLocked() && !targetPanel->FilesActionInProgress);
     appendMenuItem(closeCmd, closeText, IDX_TB_TABSCLOSE, canClose);
 
     int tabCount = GetPanelTabCount(side);
@@ -1246,7 +1246,7 @@ void CMainWindow::OnPanelTabContextMenu(CPanelSide side, int index, const POINT&
         for (int i = 1; i < tabCount; ++i)
         {
             CFilesWindow* candidate = tabs[i];
-            if (candidate == NULL || candidate->IsTabLocked())
+            if (candidate == NULL || candidate->IsTabLocked() || candidate->FilesActionInProgress)
                 continue;
             canCloseAll = TRUE;
             if (index <= 0 || i != index)

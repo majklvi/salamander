@@ -3064,6 +3064,12 @@ bool CUnpackDialog::IsUnpackerChoiceCurrent(int index) const
            choice.SupportCustomUnpack && live->SupportCustomUnpack == choice.SupportCustomUnpack;
 }
 
+bool CUnpackDialog::IsSelectionCurrent() const
+{
+    return UnpackerConfig != NULL && UnpackerConfig->GetPreferedUnpacker() == SelectedUnpacker &&
+           IsUnpackerChoiceCurrent(SelectedUnpacker);
+}
+
 void CUnpackDialog::EnableDelArcCheckbox()
 {
     int i = (int)SendDlgItemMessage(HWindow, IDC_PACKER, CB_GETCURSEL, 0, 0);
@@ -3094,6 +3100,7 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
     {
         if (ti.Type == ttDataToWindow)
         {
+            SelectedUnpacker = -1;
             SendMessage(combo, CB_RESETCONTENT, 0, 0);
             SetLastError(ERROR_RETRY);
             if (!CaptureUnpackerChoices())
@@ -3128,7 +3135,8 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
                 ti.ErrorOn(IDC_PACKER);
                 return;
             }
-            UnpackerConfig->SetPreferedUnpacker(i != CB_ERR ? i : -1);
+            SelectedUnpacker = i != CB_ERR ? i : -1;
+            UnpackerConfig->SetPreferedUnpacker(SelectedUnpacker);
         }
     }
     else

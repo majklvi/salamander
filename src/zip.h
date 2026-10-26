@@ -535,10 +535,12 @@ struct CWholeArchiveUnpackerSnapshot
     const CUnpackerConfigData* Entry = NULL;
     CPluginData* Plugin = NULL;
     int Index = -1, Type = 0;
-    std::string Title, Extensions, DLLName;
+    std::string Title, Extensions, DLLName, Command, Arguments;
+    BOOL SupportLongNames = FALSE, NeedANSIListFile = FALSE;
 
-    bool Capture(CUnpackerConfig* configuration);
+    bool Capture(CUnpackerConfig* configuration, BOOL allowExternal = FALSE);
     bool IsCurrent(const CPluginData* expectedPlugin = NULL) const;
+    bool ValidateExternalPaths(const char* source, const char* target) const;
 };
 
 class CUnpackerConfig
@@ -587,7 +589,7 @@ public:
 
     int GetPreferedUnpacker() // returns -1 if no preferred one exists
     {
-        return (PreferedUnpacker < Unpackers.Count) ? PreferedUnpacker : -1;
+        return (PreferedUnpacker >= 0 && PreferedUnpacker < Unpackers.Count) ? PreferedUnpacker : -1;
     }
     void SetPreferedUnpacker(int i) { PreferedUnpacker = i; }
 
