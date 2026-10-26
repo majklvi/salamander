@@ -4,6 +4,8 @@
 
 #pragma once
 
+struct CFilesActionDiskTarget; // internal host target identity; no SDK interface change
+
 #include <string>
 #include <vector>
 
@@ -2690,7 +2692,8 @@ public:
     BOOL UnpackArchive(CFilesWindow* panel, const char* archiveFileName,
                        CPluginDataInterfaceAbstract* pluginData,
                        const char* targetDir, const char* archiveRoot,
-                       SalEnumSelection nextName, void* param);
+                       SalEnumSelection nextName, void* param,
+                       const CFilesActionDiskTarget* diskTarget = NULL);
 
     // plugin call: UnpackOneFile
     BOOL UnpackOneFile(CFilesWindow* panel, const char* archiveFileName,

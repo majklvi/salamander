@@ -4,6 +4,8 @@
 
 #pragma once
 
+struct CFilesActionDiskTarget; // internal host target identity; no SDK interface change
+
 // ****************************************************************************
 // Constants
 //
@@ -739,7 +741,8 @@ CPluginData* PackGetPluginForArchiveFile(const char* archiveFileName, CFilesWind
 BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileName,
                     CPluginDataInterfaceAbstract* pluginData,
                     const char* targetDir, const char* archiveRoot,
-                    SalEnumSelection nextName, void* param);
+                    SalEnumSelection nextName, void* param,
+                    const CFilesActionDiskTarget* diskTarget = NULL);
 
 // universal archive extraction (for unpacking the entire archive)
 BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* const errorTable,

@@ -16,6 +16,8 @@
 #include <uxtheme.h>
 #include "dialogs.h"
 #include "configstorage.h"
+#include "common/widepath.h"
+#include "fileactiondisktarget.h"
 
 CPlugins Plugins;
 
@@ -3822,13 +3824,20 @@ BOOL CPluginData::ListArchive(CFilesWindow* panel, const char* archiveFileName, 
 BOOL CPluginData::UnpackArchive(CFilesWindow* panel, const char* archiveFileName,
                                 CPluginDataInterfaceAbstract* pluginData,
                                 const char* targetDir, const char* archiveRoot,
-                                SalEnumSelection nextName, void* param)
+                                SalEnumSelection nextName, void* param,
+                                const CFilesActionDiskTarget* diskTarget)
 {
     CALL_STACK_MESSAGE6("CPluginData::UnpackArchive(, %s, , %s, %s, ,) (%s v. %s)", archiveFileName,
                         targetDir, archiveRoot, DLLName, Version);
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
+        // InitDLL may dispatch callbacks; check the live registry again before plugin I/O.
+        if (diskTarget != NULL && !diskTarget->IsCurrent(MainWindow))
+        {
+            SetLastError(ERROR_RETRY);
+            return FALSE;
+        }
         CSalamanderForOperations sc(panel);
         ret = PluginIfaceForArchiver.UnpackArchive(&sc, archiveFileName, pluginData, targetDir,
                                                    archiveRoot, nextName, param);

@@ -1437,7 +1437,8 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
 BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileName,
                     CPluginDataInterfaceAbstract* pluginData,
                     const char* targetDir, const char* archiveRoot,
-                    SalEnumSelection nextName, void* param)
+                    SalEnumSelection nextName, void* param,
+                    const CFilesActionDiskTarget* diskTarget)
 {
     CALL_STACK_MESSAGE4("PackUncompress(, , %s, , %s, %s, ,)", archiveFileName, targetDir, archiveRoot);
     // The listing's private interface and per-entry data belong to its plugin.
@@ -1450,7 +1451,7 @@ BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileNam
         CPluginData* owner = panel->GetPluginDataForPluginIface();
         if (owner == NULL || !owner->SupportPanelView)
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_ARCNAME_UNSUP);
-        return owner->UnpackArchive(panel, archiveFileName, pluginData, targetDir, archiveRoot, nextName, param);
+        return owner->UnpackArchive(panel, archiveFileName, pluginData, targetDir, archiveRoot, nextName, param, diskTarget);
     }
     // find the correct one according to the table
     int format = PackerFormatConfig.PackIsArchive(archiveFileName);
@@ -1459,7 +1460,7 @@ BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileNam
         CPluginData* stored = PackGetPluginForArchiveFile(archiveFileName, panel);
         if (stored == NULL || !stored->SupportPanelView)
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_ARCNAME_UNSUP);
-        return stored->UnpackArchive(panel, archiveFileName, pluginData, targetDir, archiveRoot, nextName, param);
+        return stored->UnpackArchive(panel, archiveFileName, pluginData, targetDir, archiveRoot, nextName, param, diskTarget);
     }
 
     format--;
@@ -1473,7 +1474,7 @@ BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileNam
         {
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_ARCNAME_UNSUP);
         }
-        return plugin->UnpackArchive(panel, archiveFileName, pluginData, targetDir, archiveRoot, nextName, param);
+        return plugin->UnpackArchive(panel, archiveFileName, pluginData, targetDir, archiveRoot, nextName, param, diskTarget);
     }
     const SPackBrowseTable* browseTable = ArchiverConfig.GetUnpackerConfigTable(index);
 
