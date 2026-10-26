@@ -3830,13 +3830,19 @@ BOOL CPluginData::UnpackArchive(CFilesWindow* panel, const char* archiveFileName
     CALL_STACK_MESSAGE6("CPluginData::UnpackArchive(, %s, , %s, %s, ,) (%s v. %s)", archiveFileName,
                         targetDir, archiveRoot, DLLName, Version);
     BOOL ret = FALSE;
+    const BOOL branchTarget = diskTarget != NULL && diskTarget->Branch;
+    const BOOL branchOwnerQualified = !branchTarget ||
+        PackGetVerifiedBranchUnpacker(panel, archiveFileName, pluginData) == this;
+    // Both supported backends have private listing data: initialization cannot switch their kind.
+    const BOOL branchWasZip = branchTarget && branchOwnerQualified && _stricmp(DLLName, "zip\\zip.spl") == 0;
     if (InitDLL(MainWindow->HWindow))
     {
         // InitDLL may dispatch callbacks; check the live registry again before plugin I/O.
         if (diskTarget != NULL && (!diskTarget->IsCurrent(MainWindow) ||
-            diskTarget->Branch && (!diskTarget->DirectoryDefault || targetDir == NULL ||
+            diskTarget->Branch && (!branchOwnerQualified || !diskTarget->DirectoryDefault || targetDir == NULL ||
                 strcmp(targetDir, diskTarget->DefaultPath.c_str()) != 0 ||
-                PackGetVerifiedBranchUnpacker(panel, archiveFileName, pluginData) != this)))
+                PackGetVerifiedBranchUnpacker(panel, archiveFileName, pluginData) != this ||
+                branchWasZip != (_stricmp(DLLName, "zip\\zip.spl") == 0))))
         {
             SetLastError(ERROR_RETRY);
             return FALSE;
