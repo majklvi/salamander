@@ -855,7 +855,7 @@ class CUnpackDialog : public CCommonDialog
 public:
     CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
                   CTruncatedString* subject, CUnpackerConfig* config,
-                  BOOL* delArchiveWhenDone);
+                  BOOL* delArchiveWhenDone, BOOL allowDeleteArchive = TRUE);
 
     virtual void Transfer(CTransferInfo& ti);
     bool IsSelectionCurrent() const;
@@ -872,6 +872,7 @@ protected:
     CTruncatedString* Subject;
     CUnpackerConfig* UnpackerConfig;
     BOOL* DelArchiveWhenDone;
+    BOOL AllowDeleteArchive;
     // Own the choices actually displayed; live configuration can change during modal callbacks.
     struct CUnpackerChoice
     {

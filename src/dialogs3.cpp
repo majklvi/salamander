@@ -2971,7 +2971,7 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 CUnpackDialog::CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
                              CTruncatedString* subject, CUnpackerConfig* config,
-                             BOOL* delArchiveWhenDone)
+                             BOOL* delArchiveWhenDone, BOOL allowDeleteArchive)
     : CCommonDialog(HLanguage, IDD_UNPACK, IDD_UNPACK, parent)
 {
 #ifndef _UNICODE
@@ -2984,6 +2984,7 @@ CUnpackDialog::CUnpackDialog(HWND parent, char* path, int pathBufSize, const cha
     Mask = mask;
     UnpackerConfig = config;
     DelArchiveWhenDone = delArchiveWhenDone;
+    AllowDeleteArchive = allowDeleteArchive;
 }
 
 bool CUnpackDialog::CaptureUnpackerChoices()
@@ -3074,7 +3075,7 @@ void CUnpackDialog::EnableDelArcCheckbox()
 {
     int i = (int)SendDlgItemMessage(HWindow, IDC_PACKER, CB_GETCURSEL, 0, 0);
     EnableWindow(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES),
-                 IsUnpackerChoiceCurrent(i) && UnpackerChoices[i].Type != CUSTOMUNPACKER_EXTERNAL);
+                 AllowDeleteArchive && IsUnpackerChoiceCurrent(i) && UnpackerChoices[i].Type != CUSTOMUNPACKER_EXTERNAL);
 }
 
 void CUnpackDialog::Transfer(CTransferInfo& ti)
@@ -3156,12 +3157,13 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
         SendMessage(combo, CB_LIMITTEXT, PathBufSize > 0 ? PathBufSize - 1 : 0, 0);
         SendMessage(combo, CB_SETCURSEL, 0, 0);
         SetWindowTextW(combo, initial.c_str());
-        ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
+        BOOL showDelete = AllowDeleteArchive && *DelArchiveWhenDone;
+        ti.CheckBox(IDC_DELETEARCHIVEFILES, showDelete);
     }
     else
     {
         memcpy(Path, target.c_str(), target.size() + 1);
-        if (IsWindowEnabled(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES)))
+        if (AllowDeleteArchive && IsWindowEnabled(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES)))
             ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
         else
             *DelArchiveWhenDone = FALSE;
