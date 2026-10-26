@@ -1245,6 +1245,35 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
 // CCopyMoveMoreDialog
 //
 
+// Shared atomic path read for Copy/Move and Unpack; never turn a shortened edit value into an I/O path.
+static BOOL ReadUnpackDialogPath(HWND control, int capacity, std::string& path, int& errorTextID)
+{
+    path.clear();
+    errorTextID = IDS_PATHISINVALID;
+    if (capacity <= 0 || !IsWindow(control) || !IsWindowUnicode(control)) return FALSE;
+    const int length = GetWindowTextLengthW(control);
+    if (length >= SAL_MAX_PATH)
+    {
+        errorTextID = IDS_TOOLONGPATH;
+        return FALSE;
+    }
+    std::vector<wchar_t> text((size_t)length + 1, L'\0');
+    SetLastError(ERROR_SUCCESS);
+    const int copied = GetWindowTextW(control, text.data(), (int)text.size());
+    if (copied != length || (copied == 0 && GetLastError() != ERROR_SUCCESS) ||
+        GetWindowTextLengthW(control) != copied) return FALSE;
+    const std::wstring exact(text.data(), copied);
+    std::string encoded = SalWideToMultiBytePath(exact.c_str(), CP_UTF8);
+    if (SalMultiByteToWidePath(encoded.c_str(), CP_UTF8) != exact) return FALSE;
+    if (encoded.size() >= (size_t)capacity)
+    {
+        errorTextID = IDS_TOOLONGPATH;
+        return FALSE;
+    }
+    path.swap(encoded);
+    return TRUE;
+}
+
 CCopyMoveMoreDialog::CCopyMoveMoreDialog(HWND parent, char* path, int pathBufSize, char* title,
                                          CTruncatedString* subject, DWORD helpID,
                                          char* history[], int historyCount, CCriteriaData* criteriaInOut,
@@ -1258,6 +1287,9 @@ CCopyMoveMoreDialog::CCopyMoveMoreDialog(HWND parent, char* path, int pathBufSiz
                     targetPaths == NULL ? IDD_COPYMOVEMOREDIALOG : IDD_COPYTOSELECTEDDIRSDIALOG,
                     helpID, parent)
 {
+#ifndef _UNICODE
+    UnicodeWnd = TRUE;
+#endif
     if (history == NULL && targetPaths == NULL)
         TRACE_E("CCopyMoveMoreDialog without history is not supported.");
 
@@ -1294,6 +1326,22 @@ CCopyMoveMoreDialog::~CCopyMoveMoreDialog()
 void CCopyMoveMoreDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CCopyMoveMoreDialog::Transfer()");
+    std::string target;
+    if (ti.Type == ttDataFromWindow && TargetPaths == NULL)
+    {
+        HWND control;
+        int errorTextID = IDS_PATHISINVALID;
+        if (Path == NULL || !ti.GetControl(control, IDE_PATH) ||
+            !ReadUnpackDialogPath(ResolveComboEditControl(control), PathBufSize, target, errorTextID))
+        {
+            if (ti.IsGood())
+            {
+                SalMessageBox(HWindow, LoadStr(errorTextID), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                ti.ErrorOn(IDE_PATH);
+            }
+            return; // Do not approve a partial path or change history/options on failure.
+        }
+    }
     if (TargetPaths != NULL)
     {
         if (ti.Type == ttDataToWindow)
@@ -1314,20 +1362,37 @@ void CCopyMoveMoreDialog::Transfer(CTransferInfo& ti)
         {
             if (ti.Type == ttDataToWindow)
             {
-                LoadComboFromStdHistoryValues(hWnd, History, HistoryCount);
-                SendMessage(hWnd, CB_LIMITTEXT, PathBufSize - 1, 0);
-                SetControlTextUtf8(hWnd, Path);
+                SendMessage(hWnd, CB_RESETCONTENT, 0, 0);
+                for (int index = 0; index < HistoryCount; ++index)
+                {
+                    if (History[index] == NULL || History[index][0] == 0) continue;
+                    const std::wstring item = SalMultiByteToWidePath(History[index], IsValidPathUtf8Text(History[index]) ? CP_UTF8 : CP_ACP);
+                    if (!item.empty()) SendMessageW(hWnd, CB_ADDSTRING, 0, (LPARAM)item.c_str());
+                }
+                SendMessage(hWnd, CB_LIMITTEXT, PathBufSize > 0 ? PathBufSize - 1 : 0, 0);
+                const std::wstring initial = SalMultiByteToWidePath(Path, IsValidPathUtf8Text(Path) ? CP_UTF8 : CP_ACP);
+                SetWindowTextW(hWnd, initial.c_str());
             }
             else
             {
-                GetControlTextUtf8(hWnd, Path, PathBufSize);
+                memcpy(Path, target.c_str(), target.size() + 1);
                 AddValueToStdHistoryValues(History, HistoryCount, Path, FALSE);
             }
         }
     }
     else
     {
-        ti.EditLine(IDE_PATH, Path, PathBufSize);
+        if (ti.Type == ttDataFromWindow)
+            memcpy(Path, target.c_str(), target.size() + 1);
+        else
+        {
+            HWND control;
+            if (ti.GetControl(control, IDE_PATH))
+            {
+                const std::wstring initial = SalMultiByteToWidePath(Path, IsValidPathUtf8Text(Path) ? CP_UTF8 : CP_ACP);
+                SetWindowTextW(control, initial.c_str());
+            }
+        }
     }
     if (KeepBranchPathsInOut != NULL)
         ti.CheckBox(IDC_BRANCH_KEEP_PATHS, *KeepBranchPathsInOut);
@@ -2903,35 +2968,6 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // ****************************************************************************
 // CUnpackDialog
 //
-
-// Keep the Unpack target atomic: a shortened edit value must never become an I/O path.
-static BOOL ReadUnpackDialogPath(HWND control, int capacity, std::string& path, int& errorTextID)
-{
-    path.clear();
-    errorTextID = IDS_PATHISINVALID;
-    if (capacity <= 0 || !IsWindow(control) || !IsWindowUnicode(control)) return FALSE;
-    const int length = GetWindowTextLengthW(control);
-    if (length >= SAL_MAX_PATH)
-    {
-        errorTextID = IDS_TOOLONGPATH;
-        return FALSE;
-    }
-    std::vector<wchar_t> text((size_t)length + 1, L'\0');
-    SetLastError(ERROR_SUCCESS);
-    const int copied = GetWindowTextW(control, text.data(), (int)text.size());
-    if (copied != length || (copied == 0 && GetLastError() != ERROR_SUCCESS) ||
-        GetWindowTextLengthW(control) != copied) return FALSE;
-    const std::wstring exact(text.data(), copied);
-    std::string encoded = SalWideToMultiBytePath(exact.c_str(), CP_UTF8);
-    if (SalMultiByteToWidePath(encoded.c_str(), CP_UTF8) != exact) return FALSE;
-    if (encoded.size() >= (size_t)capacity)
-    {
-        errorTextID = IDS_TOOLONGPATH;
-        return FALSE;
-    }
-    path.swap(encoded);
-    return TRUE;
-}
 
 CUnpackDialog::CUnpackDialog(HWND parent, char* path, int pathBufSize, const char* pathAlt, char* mask,
                              CTruncatedString* subject, CUnpackerConfig* config,
