@@ -752,7 +752,9 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                              const char* initDir, BOOL expandInitDir, CFilesWindow* panel,
                              const BOOL supportLongNames, const char* archiveFileName,
                              const char* targetDir, const char* archiveRoot,
-                             SalEnumSelection nextName, void* param, BOOL needANSIListFile);
+                             SalEnumSelection nextName, void* param, BOOL needANSIListFile,
+                             const CFilesActionDiskTarget* sourceSnapshot = NULL,
+                             const CFilesActionDiskTarget* diskTarget = NULL);
 
 // extract a single file from the archive (for viewer)
 BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,

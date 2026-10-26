@@ -1537,11 +1537,22 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                              const char* initDir, BOOL expandInitDir, CFilesWindow* panel,
                              const BOOL supportLongNames, const char* archiveFileName,
                              const char* targetDir, const char* archiveRoot,
-                             SalEnumSelection nextName, void* param, BOOL needANSIListFile)
+                             SalEnumSelection nextName, void* param, BOOL needANSIListFile,
+                             const CFilesActionDiskTarget* sourceSnapshot, const CFilesActionDiskTarget* diskTarget)
 {
     CALL_STACK_MESSAGE9("PackUniversalUncompress(, %s, , %s, %d, , %d, %s, %s, %s, , , %d)",
                         command, initDir, expandInitDir, supportLongNames, archiveFileName,
                         targetDir, archiveRoot, needANSIListFile);
+
+    const auto contextIsCurrent = [&]() {
+        return (sourceSnapshot == NULL || (sourceSnapshot->Panel == panel && sourceSnapshot->IsCurrent(MainWindow))) &&
+               (diskTarget == NULL || diskTarget->IsCurrent(MainWindow));
+    };
+    if (!contextIsCurrent())
+    {
+        SetLastError(ERROR_RETRY);
+        return FALSE;
+    }
 
     //
     // We must adjust the directory in the archive to the required format
@@ -1690,6 +1701,15 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
         }
     }
 
+    // Free-space prompts and command expansion may dispatch callbacks.
+    if (!contextIsCurrent())
+    {
+        DeleteFile(tmpListNameBuf);
+        RemoveTemporaryDir(tmpDirNameBuf);
+        SetLastError(ERROR_RETRY);
+        return FALSE;
+    }
+
     // and run the external program
     if (!PackExecute(NULL, cmdLine, currentDir, errorTable))
     {
@@ -1756,6 +1776,13 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                 return FALSE;
             }
         }
+    }
+    // The external process wait can close, switch or retarget either panel.
+    if (!contextIsCurrent())
+    {
+        RemoveTemporaryDir(tmpDirNameBuf);
+        SetLastError(ERROR_RETRY);
+        return FALSE;
     }
     if (!panel->MoveFiles(srcDir, targetDir, tmpDirNameBuf, archiveFileName))
     {
