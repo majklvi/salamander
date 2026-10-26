@@ -2986,11 +2986,89 @@ CUnpackDialog::CUnpackDialog(HWND parent, char* path, int pathBufSize, const cha
     DelArchiveWhenDone = delArchiveWhenDone;
 }
 
+bool CUnpackDialog::CaptureUnpackerChoices()
+{
+    UnpackerChoices.clear();
+    if (UnpackerConfig == NULL)
+        return false;
+    try
+    {
+        std::vector<CUnpackerChoice> choices;
+        for (int i = 0; i < UnpackerConfig->GetUnpackersCount(); ++i)
+        {
+            CUnpackerChoice choice;
+            const char* title = UnpackerConfig->GetUnpackerTitle(i);
+            const char* ext = UnpackerConfig->GetUnpackerExt(i);
+            if (title == NULL || ext == NULL)
+                return false;
+            choice.Title = title;
+            choice.Extensions = ext;
+            choice.Type = UnpackerConfig->GetUnpackerType(i);
+            choice.OldType = UnpackerConfig->GetUnpackerOldType(i);
+            if (choice.OldType || choice.Type > CUSTOMUNPACKER_EXTERNAL)
+                return false;
+            if (choice.Type == CUSTOMUNPACKER_EXTERNAL)
+            {
+                const char* command = UnpackerConfig->GetUnpackerCmdExecExtract(i);
+                const char* arguments = UnpackerConfig->GetUnpackerCmdArgsExtract(i);
+                if (command == NULL || arguments == NULL)
+                    return false;
+                choice.Command = command;
+                choice.Arguments = arguments;
+                choice.SupportLongNames = UnpackerConfig->GetUnpackerSupLongNames(i);
+                choice.NeedANSIListFile = UnpackerConfig->GetUnpackerNeedANSIListFile(i);
+            }
+            else
+            {
+                choice.Plugin = Plugins.Get(-(choice.Type + 1));
+                if (choice.Plugin == NULL || choice.Plugin->DLLName == NULL)
+                    return false;
+                choice.DLLName = choice.Plugin->DLLName;
+                choice.SupportCustomUnpack = choice.Plugin->SupportCustomUnpack;
+            }
+            choices.push_back(std::move(choice));
+        }
+        UnpackerChoices.swap(choices);
+    }
+    catch (const std::bad_alloc&)
+    {
+        UnpackerChoices.clear();
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return false;
+    }
+    return true;
+}
+
+bool CUnpackDialog::IsUnpackerChoiceCurrent(int index) const
+{
+    if (UnpackerConfig == NULL || index < 0 || (size_t)index >= UnpackerChoices.size() ||
+        index >= UnpackerConfig->GetUnpackersCount())
+        return false;
+    const CUnpackerChoice& choice = UnpackerChoices[index];
+    const char* title = UnpackerConfig->GetUnpackerTitle(index);
+    const char* ext = UnpackerConfig->GetUnpackerExt(index);
+    if (title == NULL || ext == NULL || choice.Title != title || choice.Extensions != ext ||
+        choice.Type != UnpackerConfig->GetUnpackerType(index) || choice.OldType != UnpackerConfig->GetUnpackerOldType(index))
+        return false;
+    if (choice.Type == CUSTOMUNPACKER_EXTERNAL)
+    {
+        const char* command = UnpackerConfig->GetUnpackerCmdExecExtract(index);
+        const char* arguments = UnpackerConfig->GetUnpackerCmdArgsExtract(index);
+        return command != NULL && arguments != NULL && choice.Command == command && choice.Arguments == arguments &&
+               choice.SupportLongNames == UnpackerConfig->GetUnpackerSupLongNames(index) &&
+               choice.NeedANSIListFile == UnpackerConfig->GetUnpackerNeedANSIListFile(index);
+    }
+    CPluginData* live = Plugins.Get(-(choice.Type + 1));
+    return live != NULL && live == choice.Plugin && live->DLLName != NULL &&
+           _stricmp(live->DLLName, choice.DLLName.c_str()) == 0 &&
+           choice.SupportCustomUnpack && live->SupportCustomUnpack == choice.SupportCustomUnpack;
+}
+
 void CUnpackDialog::EnableDelArcCheckbox()
 {
     int i = (int)SendDlgItemMessage(HWindow, IDC_PACKER, CB_GETCURSEL, 0, 0);
     EnableWindow(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES),
-                 i != CB_ERR && UnpackerConfig->GetUnpackerType(i) != CUSTOMUNPACKER_EXTERNAL);
+                 IsUnpackerChoiceCurrent(i) && UnpackerChoices[i].Type != CUSTOMUNPACKER_EXTERNAL);
 }
 
 void CUnpackDialog::Transfer(CTransferInfo& ti)
@@ -3017,10 +3095,25 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
         if (ti.Type == ttDataToWindow)
         {
             SendMessage(combo, CB_RESETCONTENT, 0, 0);
-            int i;
-            for (i = 0; i < UnpackerConfig->GetUnpackersCount(); i++)
+            SetLastError(ERROR_RETRY);
+            if (!CaptureUnpackerChoices())
             {
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)UnpackerConfig->GetUnpackerTitle(i));
+                const DWORD error = GetLastError();
+                SalMessageBox(HWindow, GetErrorText(error), LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+                ti.ErrorOn(IDC_PACKER);
+                return;
+            }
+            for (size_t i = 0; i < UnpackerChoices.size(); ++i)
+            {
+                const LRESULT added = SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)UnpackerChoices[i].Title.c_str());
+                if (added == CB_ERR || added == CB_ERRSPACE)
+                {
+                    UnpackerChoices.clear();
+                    SendMessage(combo, CB_RESETCONTENT, 0, 0);
+                    SalMessageBox(HWindow, GetErrorText(ERROR_NOT_ENOUGH_MEMORY), LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+                    ti.ErrorOn(IDC_PACKER);
+                    return;
+                }
             }
             // set the position in the combo, preferredUnpacker == -1 -> no selection
             SendMessage(combo, CB_SETCURSEL, (WPARAM)UnpackerConfig->GetPreferedUnpacker(), 0);
@@ -3029,12 +3122,17 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
         else // ttDataFromWindow
         {
             int i = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
-            if (i != CB_ERR)
-                UnpackerConfig->SetPreferedUnpacker(i);
-            else
-                UnpackerConfig->SetPreferedUnpacker(-1);
+            if (i != CB_ERR && !IsUnpackerChoiceCurrent(i))
+            {
+                SalMessageBox(HWindow, GetErrorText(ERROR_RETRY), LoadStr(IDS_ERRORUNPACK), MB_OK | MB_ICONEXCLAMATION);
+                ti.ErrorOn(IDC_PACKER);
+                return;
+            }
+            UnpackerConfig->SetPreferedUnpacker(i != CB_ERR ? i : -1);
         }
     }
+    else
+        return; // Missing backend control must not commit any caller fields.
     if (ti.Type == ttDataToWindow)
     {
         ti.GetControl(combo, IDE_PATH);

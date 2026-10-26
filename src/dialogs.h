@@ -848,6 +848,7 @@ protected:
 // ****************************************************************************
 
 class CUnpackerConfig;
+struct CPluginData;
 
 class CUnpackDialog : public CCommonDialog
 {
@@ -870,6 +871,19 @@ protected:
     CTruncatedString* Subject;
     CUnpackerConfig* UnpackerConfig;
     BOOL* DelArchiveWhenDone;
+    // Own the choices actually displayed; live configuration can change during modal callbacks.
+    struct CUnpackerChoice
+    {
+        int Type = 0;
+        BOOL OldType = FALSE, SupportLongNames = FALSE, NeedANSIListFile = FALSE;
+        std::string Title, Extensions, Command, Arguments, DLLName;
+        CPluginData* Plugin = NULL;
+        BOOL SupportCustomUnpack = FALSE;
+    };
+    std::vector<CUnpackerChoice> UnpackerChoices;
+    bool CaptureUnpackerChoices();
+    bool IsUnpackerChoiceCurrent(int index) const;
+
 };
 
 //
