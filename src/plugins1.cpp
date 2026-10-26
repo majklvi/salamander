@@ -3904,13 +3904,21 @@ BOOL CPluginData::DeleteFromArchive(CFilesWindow* panel, const char* archiveFile
 }
 
 BOOL CPluginData::UnpackWholeArchive(CFilesWindow* panel, const char* archiveFileName, const char* mask,
-                                     const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes)
+                                     const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes,
+                                     const CFilesActionDiskTarget* sourceSnapshot, const CFilesActionDiskTarget* diskTarget)
 {
     CALL_STACK_MESSAGE7("CPluginData::UnpackWholeArchive(, %s, %s, %s, %d,) (%s v. %s)", archiveFileName,
                         mask, targetDir, delArchiveWhenDone, DLLName, Version);
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
+        // Initialization can dispatch callbacks: validate live panel identities before operation context or I/O.
+        if ((sourceSnapshot != NULL && (sourceSnapshot->Panel != panel || !sourceSnapshot->IsCurrent(MainWindow))) ||
+            (diskTarget != NULL && !diskTarget->IsCurrent(MainWindow)))
+        {
+            SetLastError(ERROR_RETRY);
+            return FALSE;
+        }
         CSalamanderForOperations sc(panel);
         ret = PluginIfaceForArchiver.UnpackWholeArchive(&sc, archiveFileName, mask, targetDir,
                                                         delArchiveWhenDone, archiveVolumes);
