@@ -798,6 +798,11 @@ static void RemoveEmptyUnpackDirectoriesW(const std::wstring& root)
 void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const char* tgtPath,
                                     BOOL* changeTargetRequested)
 {
+    if (!deleteOp && target != NULL && CFilesActionDiskTarget::FindLive(MainWindow, target) == NULL)
+    {
+        SalMessageBox(HWindow, GetErrorText(ERROR_RETRY), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+        return;
+    }
     if (IsBranchView() || target != NULL && target->IsBranchView()) return; // S26 read-only direct boundary.
 
     if (changeTargetRequested != NULL)
@@ -806,8 +811,23 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
     if (Files->Count + Dirs->Count == 0)
         return;
 
+    CFilesActionDiskTarget diskTarget;
+    const bool watchDiskTarget = !deleteOp && target != NULL && target->Is(ptDisk);
+    if (watchDiskTarget && !diskTarget.Capture(MainWindow, target, TRUE))
+    {
+        SalMessageBox(HWindow, LoadStr(IDS_PATHISINVALID), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+        return;
+    }
+    const auto validateDiskTarget = [&]() {
+        if (!watchDiskTarget || diskTarget.IsCurrent(MainWindow)) return true;
+        SalMessageBox(HWindow, GetErrorText(ERROR_RETRY), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+        return false;
+    };
+
     // restore DefaultDir
     MainWindow->UpdateDefaultDir(MainWindow->GetActivePanel() == this);
+
+    if (!validateDiskTarget()) return;
 
     BeginStopRefresh(); // the snooper takes a break
 
@@ -910,9 +930,15 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         int sourceDirs = data.IndexesCount - sourceFiles;
 
         //---  obtain the target directory
-        if (target != NULL && target->Is(ptDisk))
+        if (!validateDiskTarget())
         {
-            if (!ReadUnpackDiskDestination(target->GetPathW(), path, pathBuffer.Capacity()))
+            delete[] data.Indexes;
+            EndStopRefresh();
+            return;
+        }
+        if (watchDiskTarget)
+        {
+            if (!ReadUnpackDiskDestination(diskTarget.Root.c_str(), path, pathBuffer.Capacity()))
             {
                 SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
                 delete[] data.Indexes;
@@ -969,6 +995,12 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
 
     _DLG_AGAIN:
 
+        if (!validateDiskTarget())
+        {
+            delete[] data.Indexes;
+            EndStopRefresh();
+            return;
+        }
         int dialogResult = tgtPath != NULL ? IDOK : (int)dlg.Execute();
         if (dialogResult == ID_CHANGE_SELECTED_TARGET_TAB)
         {
@@ -977,6 +1009,13 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         }
         if (dialogResult == IDOK)
         {
+            if (!validateDiskTarget())
+            {
+                delete[] data.Indexes;
+                EndStopRefresh();
+                return;
+            }
+
             if (tgtPath != NULL && !CopyUnpackDestination(tgtPath, path, pathBuffer.Capacity()))
             {
                 SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
@@ -984,7 +1023,15 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                 EndStopRefresh();
                 return;
             }
+            const bool useDefaultDiskTarget = watchDiskTarget && tgtPath == NULL &&
+                                              diskTarget.HasDefaultText(path, pathBuffer.Capacity());
             UpdateWindow(MainWindow->HWindow);
+            if (!validateDiskTarget())
+            {
+                delete[] data.Indexes;
+                EndStopRefresh();
+                return;
+            }
             //---  for disk paths, convert '/' to '\\' and remove duplicate '\\'
             if (!IsPluginFSPath(path) &&
                 (path[0] != 0 && path[1] == ':' ||                                             // paths like X:...
@@ -1005,8 +1052,23 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
             char* secondPart;
             CPathBuffer textBuffer(2 * SAL_MAX_PATH + 200);
             char* textBuf = textBuffer.Data();
-            if (ParsePath(path, pathType, pathIsDir, secondPart, LoadStr(IDS_ERRORCOPY), NULL, NULL, pathBuffer.Capacity()))
+            const BOOL parsed = ParsePath(path, pathType, pathIsDir, secondPart, LoadStr(IDS_ERRORCOPY), NULL, NULL, pathBuffer.Capacity());
+            if (!validateDiskTarget())
             {
+                delete[] data.Indexes;
+                EndStopRefresh();
+                return;
+            }
+            if (parsed)
+            {
+                if (useDefaultDiskTarget &&
+                    !diskTarget.MatchesParsedDirectoryDefault(path, pathBuffer.Capacity(), secondPart, pathType, pathIsDir))
+                {
+                    SalMessageBox(HWindow, GetErrorText(ERROR_RETRY), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+                    delete[] data.Indexes;
+                    EndStopRefresh();
+                    return;
+                }
                 // instead of a 'switch', use 'if' so that 'break' and 'continue' work correctly
                 if (pathType == PATH_TYPE_WINDOWS) // Windows path (disk + UNC)
                 {
@@ -1064,11 +1126,33 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                 }
                             }
 
+                            if (!validateDiskTarget())
+                            {
+                                delete[] data.Indexes;
+                                EndStopRefresh();
+                                return;
+                            }
+                            // Compute notification root before any new directory is created.
+                            memcpy(changesRoot, path, secondPart - path);
+                            changesRoot[secondPart - path] = 0;
                             BOOL ok = TRUE;
+                            bool createdAny = false;
                             char* st = newDirs + (secondPart - path);
                             char* firstSlash = NULL;
                             while (1)
                             {
+                                if (!validateDiskTarget())
+                                {
+                                    if (createdAny)
+                                    {
+                                        if (firstSlash != NULL) *firstSlash = 0;
+                                        RemoveEmptyUnpackDirectoriesW(SalMultiByteToWidePath(newDirs, IsValidPathUtf8Text(newDirs) ? CP_UTF8 : CP_ACP));
+                                        MainWindow->PostChangeOnPathNotification(changesRoot, TRUE);
+                                    }
+                                    delete[] data.Indexes;
+                                    EndStopRefresh();
+                                    return;
+                                }
                                 char* slash = strchr(st, '\\');
                                 const size_t componentLength = slash != NULL ? (size_t)(slash - st) : strlen(st);
                                 const BOOL invalidPath = IsUnpackDirectoryComponentInvalid(st, componentLength);
@@ -1086,16 +1170,13 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                     ok = FALSE;
                                     break;
                                 }
+                                createdAny = true;
                                 if (slash != NULL)
                                     *slash = '\\';
                                 else
                                     break; // that was the last '\\'
                                 st = slash + 1;
                             }
-
-                            // determine the original path (from which new directories were created)
-                            memcpy(changesRoot, path, secondPart - path);
-                            changesRoot[secondPart - path] = 0;
 
                             if (!ok)
                             {
@@ -1139,9 +1220,21 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                         strcpy(changesRoot, path);
 
                     //---  actual unpacking
+                    if (!validateDiskTarget())
+                    {
+                        if (newDirs[0] != 0)
+                            RemoveEmptyUnpackDirectoriesW(SalMultiByteToWidePath(newDirs, IsValidPathUtf8Text(newDirs) ? CP_UTF8 : CP_ACP));
+                        if (changesRoot[0] != 0) MainWindow->PostChangeOnPathNotification(changesRoot, TRUE);
+                        delete[] data.Indexes;
+                        EndStopRefresh();
+                        return;
+                    }
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-                    if (PackUncompress(MainWindow->HWindow, this, GetZIPArchive(), PluginData.GetInterface(),
-                                       path, GetZIPPath(), PanelSalEnumSelection, &data))
+                    const BOOL unpacked = PackUncompress(MainWindow->HWindow, this, GetZIPArchive(), PluginData.GetInterface(),
+                                       path, GetZIPPath(), PanelSalEnumSelection, &data, watchDiskTarget ? &diskTarget : NULL);
+                    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+                    const bool targetCurrent = validateDiskTarget();
+                    if (unpacked && targetCurrent)
                     {                        // unpacking succeeded
                         if (tgtPath == NULL) // if it is not drag&drop (selection is not cleared there)
                         {
@@ -1149,12 +1242,11 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                             PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
                         }
                     }
-                    else
+                    else if (!unpacked)
                     {
                         if (newDirs[0] != 0)
                             RemoveEmptyUnpackDirectoriesW(SalMultiByteToWidePath(newDirs, IsValidPathUtf8Text(newDirs) ? CP_UTF8 : CP_ACP));
                     }
-                    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
                     if (GetForegroundWindow() == MainWindow->HWindow) // for unknown reasons focus disappears from the panel when dragging to Explorer; return it
                         RestoreFocusInSourcePanel();
