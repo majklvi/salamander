@@ -729,6 +729,71 @@ static BOOL UnpackArchiveToPluginFSViaTemp(CFilesWindow* source, CFilesWindow* t
 static BOOL UnpackArchiveToArchiveViaTemp(CFilesWindow* source, CPanelTmpEnumData* data,
                                          char* targetPath, BOOL& invalidPathOrCancel);
 
+// Validate ASCII restrictions as bytes; UTF-8 continuation bytes are not control characters.
+static BOOL IsUnpackDirectoryComponentInvalid(const char* component, size_t length)
+{
+    if (length == 0) return FALSE;
+    return (unsigned char)component[0] <= ' ' ||
+           (unsigned char)component[length - 1] <= ' ' || component[length - 1] == '.';
+}
+
+// The dialog and drop paths share byte capacity, but never a shortened identity.
+static BOOL CopyUnpackDestination(const char* source, char* destination, int capacity)
+{
+    if (source == NULL || destination == NULL || capacity <= 0) return FALSE;
+    const size_t length = strlen(source);
+    if (length >= (size_t)capacity) return FALSE;
+    memmove(destination, source, length + 1);
+    return TRUE;
+}
+
+static BOOL ReadUnpackDiskDestination(const wchar_t* source, char* destination, int capacity)
+{
+    if (source == NULL || *source == 0) return FALSE;
+    const std::string encoded = SalWideToMultiBytePath(source, CP_UTF8);
+    return !encoded.empty() && SalMultiByteToWidePath(encoded.c_str(), CP_UTF8) == source &&
+           CopyUnpackDestination(encoded.c_str(), destination, capacity);
+}
+
+// Best-effort cleanup of the exact newly-created tree: never delete files or follow reparse directories.
+static void RemoveEmptyUnpackDirectoriesW(const std::wstring& root)
+{
+    if (root.empty()) return;
+    std::vector<std::wstring> directories(1, root);
+    for (size_t index = 0; index < directories.size(); ++index)
+    {
+        const std::wstring directory = directories[index];
+        const std::wstring ioPath = SalPathAddExtendedPrefixW(directory.c_str());
+        const DWORD attributes = GetFileAttributesW(ioPath.c_str());
+        if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY) ||
+            (attributes & FILE_ATTRIBUTE_REPARSE_POINT)) continue;
+        std::wstring mask = directory;
+        SalPathAppendW(mask, L"*");
+        WIN32_FIND_DATAW data;
+        const std::wstring ioMask = SalPathAddExtendedPrefixW(mask.c_str());
+        HANDLE find = HANDLES_Q(FindFirstFileW(ioMask.c_str(), &data));
+        if (find == INVALID_HANDLE_VALUE) continue;
+        do
+        {
+            if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
+                (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ||
+                wcscmp(data.cFileName, L".") == 0 || wcscmp(data.cFileName, L"..") == 0) continue;
+            std::wstring child = directory;
+            SalPathAppendW(child, data.cFileName);
+            directories.push_back(child);
+        } while (FindNextFileW(find, &data));
+        HANDLES(FindClose(find));
+    }
+    for (size_t index = directories.size(); index > 0; --index)
+    {
+        const std::wstring ioPath = SalPathAddExtendedPrefixW(directories[index - 1].c_str());
+        const DWORD attributes = GetFileAttributesW(ioPath.c_str());
+        if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) &&
+            !(attributes & FILE_ATTRIBUTE_REPARSE_POINT))
+            RemoveDirectoryW(ioPath.c_str()); // succeeds only for an empty ordinary directory
+    }
+}
+
 void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const char* tgtPath,
                                     BOOL* changeTargetRequested)
 {
@@ -746,8 +811,9 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
     BeginStopRefresh(); // the snooper takes a break
 
     //---  obtain the files and directories to work with
-    char subject[SAL_MAX_PATH + 100]; // text for the Unpack dialog (which is being unpacked)
-    char path[SAL_MAX_PATH];
+    CPathBuffer subjectBuffer(SAL_MAX_PATH + 100), pathBuffer;
+    char* subject = subjectBuffer.Data(); // text for the Unpack dialog
+    char* path = pathBuffer.Data();
     char expanded[200];
     CPanelTmpEnumData data;
     BOOL subDir;
@@ -827,7 +893,8 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
     data.EnumLastDir = NULL;
     data.EnumLastIndex = -1;
 
-    char changesRoot[MAX_PATH]; // directory from which changes on disk are taken into account
+    CPathBuffer changesRootBuffer;
+    char* changesRoot = changesRootBuffer.Data(); // full notification prefix
     changesRoot[0] = 0;
 
     if (!deleteOp) // copy
@@ -844,7 +911,13 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         //---  obtain the target directory
         if (target != NULL && target->Is(ptDisk))
         {
-            strcpy(path, target->GetPath());
+            if (!ReadUnpackDiskDestination(target->GetPathW(), path, pathBuffer.Capacity()))
+            {
+                SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+                delete[] data.Indexes;
+                EndStopRefresh();
+                return;
+            }
 
             target->UserWorkedOnThisPath = TRUE; // default action = operate with the path in the target panel
         }
@@ -889,7 +962,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
             }
         }
 
-        CCopyMoveDialog dlg(HWindow, path, SAL_MAX_PATH, LoadStr(IDS_UNPACKCOPY), &str, IDD_COPYDIALOG,
+        CCopyMoveDialog dlg(HWindow, path, pathBuffer.Capacity(), LoadStr(IDS_UNPACKCOPY), &str, IDD_COPYDIALOG,
                             Configuration.CopyHistory, COPY_HISTORY_SIZE, TRUE,
                             changeTargetRequested != NULL);
 
@@ -903,8 +976,13 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         }
         if (dialogResult == IDOK)
         {
-            if (tgtPath != NULL)
-                lstrcpyn(path, tgtPath, MAX_PATH);
+            if (tgtPath != NULL && !CopyUnpackDestination(tgtPath, path, pathBuffer.Capacity()))
+            {
+                SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+                delete[] data.Indexes;
+                EndStopRefresh();
+                return;
+            }
             UpdateWindow(MainWindow->HWindow);
             //---  for disk paths, convert '/' to '\\' and remove duplicate '\\'
             if (!IsPluginFSPath(path) &&
@@ -924,13 +1002,15 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
             int pathType;
             BOOL pathIsDir;
             char* secondPart;
-            char textBuf[2 * MAX_PATH + 200];
-            if (ParsePath(path, pathType, pathIsDir, secondPart, LoadStr(IDS_ERRORCOPY), NULL, NULL, MAX_PATH))
+            CPathBuffer textBuffer(2 * SAL_MAX_PATH + 200);
+            char* textBuf = textBuffer.Data();
+            if (ParsePath(path, pathType, pathIsDir, secondPart, LoadStr(IDS_ERRORCOPY), NULL, NULL, pathBuffer.Capacity()))
             {
                 // instead of a 'switch', use 'if' so that 'break' and 'continue' work correctly
                 if (pathType == PATH_TYPE_WINDOWS) // Windows path (disk + UNC)
                 {
-                    char newDirs[MAX_PATH]; // if a directory is being created for the operation, remember its name (so we can delete it in case of an error)
+                    CPathBuffer newDirsBuffer;
+                    char* newDirs = newDirsBuffer.Data(); // first newly created directory for cleanup
                     newDirs[0] = 0;
 
                     if (pathIsDir) // the existing part of the path is a directory
@@ -957,7 +1037,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                             if (Configuration.CnfrmCreatePath) // ask whether the path should be created
                             {
                                 BOOL dontShow = FALSE;
-                                sprintf(textBuf, LoadStr(IDS_MOVECOPY_CREATEPATH), newDirs);
+                                sprintf_s(textBuf, textBuffer.Capacity(), LoadStr(IDS_MOVECOPY_CREATEPATH), newDirs);
 
                                 MSGBOXEX_PARAMS params;
                                 memset(&params, 0, sizeof(params));
@@ -971,7 +1051,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                 Configuration.CnfrmCreatePath = !dontShow;
                                 if (cont)
                                 {
-                                    SalPathAddBackslash(path, MAX_PATH + 200);
+                                    SalPathAddBackslash(path, pathBuffer.Capacity());
                                     if (tgtPath != NULL)
                                     {
                                         UpdateWindow(MainWindow->HWindow);
@@ -988,29 +1068,19 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                             char* firstSlash = NULL;
                             while (1)
                             {
-                                BOOL invalidPath = *st != 0 && *st <= ' ';
                                 char* slash = strchr(st, '\\');
+                                const size_t componentLength = slash != NULL ? (size_t)(slash - st) : strlen(st);
+                                const BOOL invalidPath = IsUnpackDirectoryComponentInvalid(st, componentLength);
                                 if (slash != NULL)
                                 {
-                                    if (slash > st && (*(slash - 1) <= ' ' || *(slash - 1) == '.'))
-                                        invalidPath = TRUE;
                                     *slash = 0;
                                     if (firstSlash == NULL)
                                         firstSlash = slash;
                                 }
-                                else
+                                std::wstring newDirsW = SalMultiByteToWidePath(newDirs, IsValidPathUtf8Text(newDirs) ? CP_UTF8 : CP_ACP);
+                                if (invalidPath || (newDirsW.empty() || !SalCreateDirectoryExW(newDirsW.c_str(), NULL)))
                                 {
-                                    if (*st != 0)
-                                    {
-                                        char* end = st + strlen(st) - 1;
-                                        if (*end <= ' ' || *end == '.')
-                                            invalidPath = TRUE;
-                                    }
-                                }
-                                std::wstring newDirsW = SalMultiByteToWidePath(newDirs, GetACP() == CP_UTF8 ? CP_UTF8 : CP_ACP);
-                                if (invalidPath || !(GetACP() == CP_UTF8 && !newDirsW.empty() ? SalCreateDirectoryExW(newDirsW.c_str(), NULL) : CreateDirectory(newDirs, NULL)))
-                                {
-                                    sprintf(textBuf, LoadStr(IDS_CREATEDIRFAILED), newDirs);
+                                    sprintf_s(textBuf, textBuffer.Capacity(), LoadStr(IDS_CREATEDIRFAILED), newDirs);
                                     SalMessageBox(HWindow, textBuf, LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
                                     ok = FALSE;
                                     break;
@@ -1033,7 +1103,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                 // choose a completely different path next time); the new path is kept (almost dead code)
                                 MainWindow->PostChangeOnPathNotification(changesRoot, TRUE);
 
-                                SalPathAddBackslash(path, MAX_PATH + 200);
+                                SalPathAddBackslash(path, pathBuffer.Capacity());
                                 if (tgtPath != NULL)
                                 {
                                     UpdateWindow(MainWindow->HWindow);
@@ -1052,7 +1122,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                         SalMessageBox(HWindow, LoadStr(IDS_UNPACK_OPMASKSNOTSUP), LoadStr(IDS_ERRORCOPY),
                                       MB_OK | MB_ICONEXCLAMATION);
                         if (backslashAtEnd || mustBePath)
-                            SalPathAddBackslash(path, MAX_PATH + 200);
+                            SalPathAddBackslash(path, pathBuffer.Capacity());
                         if (tgtPath != NULL)
                         {
                             UpdateWindow(MainWindow->HWindow);
@@ -1081,7 +1151,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                     else
                     {
                         if (newDirs[0] != 0)
-                            RemoveEmptyDirs(newDirs);
+                            RemoveEmptyUnpackDirectoriesW(SalMultiByteToWidePath(newDirs, IsValidPathUtf8Text(newDirs) ? CP_UTF8 : CP_ACP));
                     }
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
@@ -1090,6 +1160,17 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                 }
                 else
                 {
+                    if (strlen(path) >= MAX_PATH)
+                    {
+                        SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+                        if (tgtPath != NULL)
+                        {
+                            delete[] data.Indexes;
+                            EndStopRefresh();
+                            return;
+                        }
+                        goto _DLG_AGAIN;
+                    }
                     BOOL invalidPathOrCancel = FALSE;
                     if ((pathType == PATH_TYPE_FS && target != NULL && target->Is(ptPluginFS) &&
                          UnpackArchiveToPluginFSViaTemp(this, target, &data, sourceFiles, sourceDirs,
@@ -1111,7 +1192,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                           MB_OK | MB_ICONEXCLAMATION);
                             if (pathType == PATH_TYPE_ARCHIVE && (backslashAtEnd || mustBePath))
                             {
-                                SalPathAddBackslash(path, MAX_PATH + 200);
+                                SalPathAddBackslash(path, pathBuffer.Capacity());
                             }
                         }
                         if (tgtPath != NULL)
@@ -2428,44 +2509,6 @@ static BOOL PrepareUnpackArchiveSource(CFilesWindow* panel, const CFileData& fil
     return TRUE;
 }
 
-// Best-effort cleanup of the exact newly-created tree: never delete files or follow reparse directories.
-static void RemoveEmptyUnpackDirectoriesW(const std::wstring& root)
-{
-    if (root.empty()) return;
-    std::vector<std::wstring> directories(1, root);
-    for (size_t index = 0; index < directories.size(); ++index)
-    {
-        const std::wstring directory = directories[index];
-        const std::wstring ioPath = SalPathAddExtendedPrefixW(directory.c_str());
-        const DWORD attributes = GetFileAttributesW(ioPath.c_str());
-        if (attributes == INVALID_FILE_ATTRIBUTES || !(attributes & FILE_ATTRIBUTE_DIRECTORY) ||
-            (attributes & FILE_ATTRIBUTE_REPARSE_POINT)) continue;
-        std::wstring mask = directory;
-        SalPathAppendW(mask, L"*");
-        WIN32_FIND_DATAW data;
-        const std::wstring ioMask = SalPathAddExtendedPrefixW(mask.c_str());
-        HANDLE find = HANDLES_Q(FindFirstFileW(ioMask.c_str(), &data));
-        if (find == INVALID_HANDLE_VALUE) continue;
-        do
-        {
-            if (!(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ||
-                (data.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) ||
-                wcscmp(data.cFileName, L".") == 0 || wcscmp(data.cFileName, L"..") == 0) continue;
-            std::wstring child = directory;
-            SalPathAppendW(child, data.cFileName);
-            directories.push_back(child);
-        } while (FindNextFileW(find, &data));
-        HANDLES(FindClose(find));
-    }
-    for (size_t index = directories.size(); index > 0; --index)
-    {
-        const std::wstring ioPath = SalPathAddExtendedPrefixW(directories[index - 1].c_str());
-        const DWORD attributes = GetFileAttributesW(ioPath.c_str());
-        if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) &&
-            !(attributes & FILE_ATTRIBUTE_REPARSE_POINT))
-            RemoveDirectoryW(ioPath.c_str()); // succeeds only for an empty ordinary directory
-    }
-}
 
 void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* pluginName, const char* unpackMask)
 {
