@@ -5,6 +5,7 @@
 #pragma once
 
 struct CFilesActionDiskTarget; // internal host target identity; no SDK interface change
+struct CWholeArchiveUnpackerSnapshot;
 
 #include <string>
 #include <vector>
@@ -2715,7 +2716,8 @@ public:
     BOOL UnpackWholeArchive(CFilesWindow* panel, const char* archiveFileName, const char* mask,
                             const char* targetDir, BOOL delArchiveWhenDone,
                             CDynamicString* archiveVolumes, const CFilesActionDiskTarget* sourceSnapshot = NULL,
-                            const CFilesActionDiskTarget* diskTarget = NULL);
+                            const CFilesActionDiskTarget* diskTarget = NULL,
+                            const CWholeArchiveUnpackerSnapshot* backendSnapshot = NULL);
 
     // plugin call: CanCloseArchive
     BOOL CanCloseArchive(CFilesWindow* panel, const char* archiveFileName, BOOL force);

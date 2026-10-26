@@ -1417,11 +1417,89 @@ BOOL CUnpackerConfig::SetUnpackerTitle(int index, const char* title)
     return data->Title != NULL;
 }
 
+bool CWholeArchiveUnpackerSnapshot::Capture(CUnpackerConfig* configuration)
+{
+    Configuration = NULL;
+    Entry = NULL;
+    Plugin = NULL;
+    Index = -1;
+    Type = 0;
+    Title.clear();
+    Extensions.clear();
+    DLLName.clear();
+    // This object has process lifetime; never dereference an arbitrary saved configuration pointer.
+    if (configuration != &UnpackerConfig)
+    {
+        SetLastError(ERROR_RETRY);
+        return false;
+    }
+    const int index = configuration->PreferedUnpacker;
+    if (index < 0 || index >= configuration->Unpackers.Count)
+    {
+        SetLastError(ERROR_RETRY);
+        return false;
+    }
+    const CUnpackerConfigData* entry = configuration->Unpackers[index];
+    if (entry == NULL || entry->OldType || entry->Type >= 0 || entry->Title == NULL || entry->Ext == NULL)
+    {
+        SetLastError(ERROR_RETRY);
+        return false;
+    }
+    const int pluginIndex = -(entry->Type + 1); // avoid negating INT_MIN before bounds validation
+    CPluginData* plugin = Plugins.Get(pluginIndex);
+    if (plugin == NULL || !plugin->SupportCustomUnpack || plugin->DLLName == NULL || plugin->DLLName[0] == 0)
+    {
+        SetLastError(ERROR_RETRY);
+        return false;
+    }
+    try
+    {
+        Title = entry->Title;
+        Extensions = entry->Ext;
+        DLLName = plugin->DLLName;
+    }
+    catch (const std::bad_alloc&)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return false;
+    }
+    Entry = entry;
+    Plugin = plugin;
+    Index = index;
+    Type = entry->Type;
+    Configuration = configuration;
+    return true;
+}
+
+bool CWholeArchiveUnpackerSnapshot::IsCurrent(const CPluginData* expectedPlugin) const
+{
+    if (Configuration != &UnpackerConfig || Index < 0 ||
+        UnpackerConfig.PreferedUnpacker != Index || Index >= UnpackerConfig.Unpackers.Count ||
+        UnpackerConfig.Unpackers[Index] != Entry || Entry == NULL)
+        return false;
+    // MoveUnpacker copies row contents, so pointer equality alone does not preserve the choice.
+    const CUnpackerConfigData* entry = UnpackerConfig.Unpackers[Index];
+    if (entry->OldType || entry->Type != Type || Type >= 0 || entry->Title == NULL || entry->Ext == NULL ||
+        Title != entry->Title || Extensions != entry->Ext)
+        return false;
+    CPluginData* live = Plugins.Get(-(Type + 1));
+    return live != NULL && live == Plugin && (expectedPlugin == NULL || live == expectedPlugin) &&
+           live->SupportCustomUnpack && live->DLLName != NULL && _stricmp(live->DLLName, DLLName.c_str()) == 0;
+}
+
 BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const char* zipFile, const char* mask,
-                                      const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes)
+                                      const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes,
+                                      const CWholeArchiveUnpackerSnapshot* backendSnapshot,
+                                      const CFilesActionDiskTarget* sourceSnapshot, const CFilesActionDiskTarget* diskTarget)
 {
     CALL_STACK_MESSAGE5("CUnpackerConfig::ExecuteUnpacker(, %s, %s, %s, %d, )",
                         zipFile, mask, targetDir, delArchiveWhenDone);
+    if ((backendSnapshot == NULL && (sourceSnapshot != NULL || diskTarget != NULL)) ||
+        (backendSnapshot != NULL && (backendSnapshot->Configuration != this || !backendSnapshot->IsCurrent())))
+    {
+        SetLastError(ERROR_RETRY);
+        return FALSE;
+    }
     if (PreferedUnpacker != -1 && PreferedUnpacker < Unpackers.Count)
     {
         CUnpackerConfigData* data = Unpackers[PreferedUnpacker];
@@ -1454,7 +1532,7 @@ BOOL CUnpackerConfig::ExecuteUnpacker(HWND parent, CFilesWindow* panel, const ch
             CPluginData* plugin = Plugins.Get(-data->Type - 1);
             if (plugin != NULL && plugin->SupportCustomUnpack)
             {
-                return plugin->UnpackWholeArchive(panel, zipFile, mask, targetDir, delArchiveWhenDone, archiveVolumes);
+                return plugin->UnpackWholeArchive(panel, zipFile, mask, targetDir, delArchiveWhenDone, archiveVolumes, sourceSnapshot, diskTarget, backendSnapshot);
             }
             else
                 TRACE_E("Unexpected situation in CUnpackerConfig::ExecuteUnpacker().");

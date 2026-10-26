@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <string>
+
 extern HWND ProgressDialogActivateDrop;
 
 //
@@ -522,8 +524,26 @@ public:
     }
 };
 
+class CUnpackerConfig;
+struct CPluginData;
+struct CFilesActionDiskTarget;
+
+// Internal binding for direct whole-archive extraction; not a plugin capability.
+struct CWholeArchiveUnpackerSnapshot
+{
+    const CUnpackerConfig* Configuration = NULL;
+    const CUnpackerConfigData* Entry = NULL;
+    CPluginData* Plugin = NULL;
+    int Index = -1, Type = 0;
+    std::string Title, Extensions, DLLName;
+
+    bool Capture(CUnpackerConfig* configuration);
+    bool IsCurrent(const CPluginData* expectedPlugin = NULL) const;
+};
+
 class CUnpackerConfig
 {
+    friend struct CWholeArchiveUnpackerSnapshot;
 protected:
     int PreferedUnpacker;
     TIndirectArray<CUnpackerConfigData> Unpackers; // array of packer information, elements of type (CUnpackerConfigData *)
@@ -572,7 +592,9 @@ public:
     void SetPreferedUnpacker(int i) { PreferedUnpacker = i; }
 
     BOOL ExecuteUnpacker(HWND parent, CFilesWindow* panel, const char* zipFile, const char* mask,
-                         const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes);
+                         const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes,
+                         const CWholeArchiveUnpackerSnapshot* backendSnapshot = NULL,
+                         const CFilesActionDiskTarget* sourceSnapshot = NULL, const CFilesActionDiskTarget* diskTarget = NULL);
 };
 
 extern CPackerConfig PackerConfig;
