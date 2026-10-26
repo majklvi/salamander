@@ -738,6 +738,9 @@ CPluginData* PackProbeArchivePlugin(const char* archiveFileName, CFilesWindow* p
 CPluginData* PackGetPluginForArchiveFile(const char* archiveFileName, CFilesWindow* panel);
 
 // extract the selected files from the archive (calls UniversalUncompress)
+CPluginData* PackGetVerifiedBranchUnpacker(CFilesWindow* panel, const char* archiveFileName,
+                                               CPluginDataInterfaceAbstract* pluginData);
+
 BOOL PackUncompress(HWND parent, CFilesWindow* panel, const char* archiveFileName,
                     CPluginDataInterfaceAbstract* pluginData,
                     const char* targetDir, const char* archiveRoot,
