@@ -484,16 +484,21 @@ void GetInfo(char* buffer, const FILETIME* lastWrite, UINT64 size)
 
 BOOL SafeDeleteFile(const char* fileName, BOOL& silent)
 {
+    return SafeDeleteFileW(GetSalamanderUnicodeString(fileName).Ptr(), fileName, silent);
+}
+
+BOOL SafeDeleteFileW(const wchar_t* fileName, const char* displayName, BOOL& silent)
+{
     int mbRet;
 
     do
     {
         mbRet = DIALOG_OK;
-        if (!::DeleteFileW(GetSalamanderLongPath(GetSalamanderUnicodeString(fileName)).Ptr()) && !silent)
+        if (!::DeleteFileW(GetSalamanderLongPath(UString(fileName)).Ptr()) && !silent)
         {
             DWORD err = ::GetLastError();
             mbRet = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL,
-                                                   fileName, SalamanderGeneral->GetErrorText(err), LoadStr(IDS_DELETE_ERROR));
+                                                   displayName, SalamanderGeneral->GetErrorText(err), LoadStr(IDS_DELETE_ERROR));
         }
     } while (mbRet == DIALOG_RETRY);
 

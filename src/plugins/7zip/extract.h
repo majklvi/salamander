@@ -115,6 +115,7 @@ private:
     BOOL OverwriteCancel;
 
     BOOL WholeFile;
+    BOOL OutputCreated; // only the current successfully created output can be cleaned up
 
     HWND hProgWnd;
 
