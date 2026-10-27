@@ -1096,8 +1096,12 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
     CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %s, %s, %s, %d,)",
                         fileName, mask, targetDir, delArchiveWhenDone);
 
-    if (delArchiveWhenDone)
-        archiveVolumes->Add(fileName, -2); // FIXME: once the 7-zip plugin learns multi-volume archives (.7z.001, .7z.002, etc.), we must add all archive volumes here (so the entire archive is deleted)
+    if (delArchiveWhenDone && archiveVolumes == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
     CSalamanderDirectoryAbstract* dir = SalamanderGeneral->AllocSalamanderDirectory(FALSE);
     if (dir == NULL)
         return Error(IDS_INSUFFICIENT_MEMORY);
@@ -1118,7 +1122,6 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                 CalcSize(dir, mask, totalSize, itemCount);
 
                 //
-                BOOL delTempDir = TRUE;
                 if (SalamanderGeneral->TestFreeSpace(SalamanderGeneral->GetMsgBoxParent(),
                                                      targetDir, totalSize, LoadStr(IDS_UNPACKING_ARCHIVE)))
                 {
@@ -1172,6 +1175,10 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
 
     SalamanderGeneral->FreeSalamanderDirectory(dir);
 
+    // Hand off the single supported volume only after extraction and cleanup.
+    // FIXME: multi-volume archives need complete volume discovery before deletion can be qualified.
+    if (ret && delArchiveWhenDone && !archiveVolumes->Add(fileName, -2))
+        return Error(IDS_INSUFFICIENT_MEMORY);
     return ret;
 }
 

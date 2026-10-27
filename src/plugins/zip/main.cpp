@@ -1240,6 +1240,12 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
     CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %s, %s, %s, %d,)",
                         fileName, mask, targetDir, delArchiveWhenDone);
 
+    if (delArchiveWhenDone && archiveVolumes == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
     CRT_MEM_CHECKPOINT
 
     {
@@ -1270,7 +1276,11 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                 if (lastVolume == NULL || strcmp(lastVolume, arcVolumes[i]) != 0)
                 {
                     lastVolume = arcVolumes[i];
-                    archiveVolumes->Add(lastVolume, -2);
+                    if (!archiveVolumes->Add(lastVolume, -2))
+                    {
+                        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOWMEM), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                        return FALSE;
+                    }
                 }
             }
         }
