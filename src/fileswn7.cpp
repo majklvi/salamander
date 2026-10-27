@@ -2522,7 +2522,7 @@ try
                                                           //  if (data.Indexes[0] < Dirs->Count || ext == NULL || ext == itemName)
         {                                                 // subdirectory or no extension
             lstrcpyn(fileBuf, itemName, fileBufBuffer.Capacity());
-            if (strlen(fileBuf) + 1 < fileBufBuffer.Capacity())
+            if (strlen(fileBuf) + 1 < static_cast<size_t>(fileBufBuffer.Capacity()))
                 strcat(fileBuf, ".");
         }
         else
