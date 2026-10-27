@@ -3881,13 +3881,18 @@ BOOL CPluginData::UnpackOneFile(CFilesWindow* panel, const char* archiveFileName
 
 BOOL CPluginData::PackToArchive(CFilesWindow* panel, const char* archiveFileName,
                                 const char* archiveRoot, BOOL move, const char* sourceDir,
-                                SalEnumSelection2 nextName, void* param)
+                                SalEnumSelection2 nextName, void* param,
+                                BOOL (*validateContext)(void*), void* context)
 {
+    if (validateContext != NULL && !validateContext(context))
+    { SetLastError(ERROR_RETRY); return FALSE; }
     CALL_STACK_MESSAGE7("CPluginData::PackToArchive(, %s, %s, %d, %s, ,) (%s v. %s)", archiveFileName,
                         archiveRoot, move, sourceDir, DLLName, Version);
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
+        if (validateContext != NULL && !validateContext(context))
+        { SetLastError(ERROR_RETRY); return FALSE; }
         CSalamanderForOperations sc(panel);
         ret = PluginIfaceForArchiver.PackToArchive(&sc, archiveFileName, archiveRoot, move, sourceDir, nextName, param);
     }

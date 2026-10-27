@@ -2706,7 +2706,8 @@ public:
     // plugin call: PackToArchive
     BOOL PackToArchive(CFilesWindow* panel, const char* archiveFileName,
                        const char* archiveRoot, BOOL move, const char* sourceDir,
-                       SalEnumSelection2 nextName, void* param);
+                       SalEnumSelection2 nextName, void* param,
+                       BOOL (*validateContext)(void*) = NULL, void* context = NULL);
 
     // plugin call: DeleteFromArchive
     BOOL DeleteFromArchive(CFilesWindow* panel, const char* archiveFileName,

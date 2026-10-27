@@ -389,6 +389,11 @@ int CZipPack::LoadExPackOptions(unsigned flags)
 
     if (!LoadDefaults())
         return IDS_NODISPLAY;
+    // Defaults can select SFX/multi-volume even when the dialog is hidden.
+    // Return the existing localized error before preview or output creation.
+    if (!ZipPackAdvancedPathFits(ZipName) &&
+        (Options.Action & (PA_MULTIVOL | PA_SELFEXTRACT)))
+        return ErrorID = IDS_TOOLONGZIPNAME;
     if (Config.ShowExOptions)
     {
         if (PackDialog(SalamanderGeneral->GetMainWindowHWND(), this, &Config, &Options, ZipName, flags) != IDOK)

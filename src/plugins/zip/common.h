@@ -311,6 +311,14 @@ void ZipUtf8ToOemBuffer(char* name, int nameMax);
 int InflateBuffer(char* sour, int sourSize, char* dest, int* destSize);
 int LoadSfxFileData(char* fileName, CSfxLang** lang);
 void GetInfo(char* buffer, FILETIME* lastWrite, QWORD size);
+// Multi-volume/SFX still use legacy path scratch buffers. Normal ZIP packing
+// uses the qualified wide path and is not subject to this limit. Check bytes,
+// since UTF-8 can exceed the legacy capacity before its UTF-16 path is long.
+inline bool ZipPackAdvancedPathFits(const char* archive)
+{
+    return archive != NULL && strlen(archive) < MAX_PATH;
+}
+
 int MakeFileName(int number, bool seqNames, const char* archive, char* name,
                  BOOL winZipNames);
 

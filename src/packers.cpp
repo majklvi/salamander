@@ -779,8 +779,11 @@ BOOL CPackerConfig::SetPackerTitle(int index, const char* title)
 }
 
 BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL move,
-                                  const char* sourcePath, SalEnumSelection2 next, void* param)
+                                  const char* sourcePath, SalEnumSelection2 next, void* param,
+                                  BOOL (*validateContext)(void*), void* context)
 {
+    if (validateContext != NULL && !validateContext(context))
+    { SetLastError(ERROR_RETRY); return FALSE; }
     CALL_STACK_MESSAGE4("CPackerConfig::ExecutePacker(, %s, %d, %s, , ,)",
                         zipFile, move, sourcePath);
     if (PreferedPacker >= 0 && PreferedPacker < Packers.Count)
@@ -803,7 +806,7 @@ BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL
                     TRACE_E(LOW_MEMORY);
                     return FALSE;
                 }
-                sprintf(command, "%s %s", data->CmdExecMove, data->CmdArgsMove);
+                sprintf_s(command, strlen(data->CmdExecMove) + strlen(data->CmdArgsMove) + 2, "%s %s", data->CmdExecMove, data->CmdArgsMove);
             }
             else
             {
@@ -814,7 +817,7 @@ BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL
                     TRACE_E(LOW_MEMORY);
                     return FALSE;
                 }
-                sprintf(command, "%s %s", data->CmdExecCopy, data->CmdArgsCopy);
+                sprintf_s(command, strlen(data->CmdExecCopy) + strlen(data->CmdArgsCopy) + 2, "%s %s", data->CmdExecCopy, data->CmdArgsCopy);
             }
             BOOL ret = PackUniversalCompress(NULL, command, NULL, sourcePath, FALSE,
                                              data->SupportLongNames, zipFile, sourcePath, NULL,
@@ -827,7 +830,7 @@ BOOL CPackerConfig::ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL
             CPluginData* plugin = Plugins.Get(-data->Type - 1);
             if (plugin != NULL && plugin->SupportCustomPack)
             {
-                return plugin->PackToArchive(panel, zipFile, "", move, sourcePath, next, param);
+                return plugin->PackToArchive(panel, zipFile, "", move, sourcePath, next, param, validateContext, context);
             }
             else
                 TRACE_E("Unexpected situation in CPackerConfig::ExecutePacker().");

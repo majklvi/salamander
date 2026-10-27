@@ -378,6 +378,19 @@ BOOL CPackDialog::OnInit(WPARAM wParam, LPARAM lParam)
 BOOL CPackDialog::OnMultiVol(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CPackDialog::OnMultiVol(0x%X, 0x%X, )", wNotifyCode, wID);
+    (void)hwndCtl;
+    if (!ZipPackAdvancedPathFits(ZipFile))
+    {
+        // Reject before preview helpers can copy a long target into legacy
+        // scratch buffers. A normal ZIP at this same target remains available.
+        if (wNotifyCode == BN_CLICKED)
+        {
+            SendDlgItemMessage(Dlg, IDC_MULTIVOL, BM_SETCHECK, BST_UNCHECKED, 0);
+            SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_SETCHECK, BST_UNCHECKED, 0);
+            SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_TOOLONGZIPNAME), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+        }
+        return TRUE;
+    }
     char name[MAX_PATH];
 
     switch (wNotifyCode)
@@ -424,6 +437,19 @@ BOOL CPackDialog::OnMultiVol(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 BOOL CPackDialog::OnSeqName(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CPackDialog::OnSeqName(0x%X, 0x%X, )", wNotifyCode, wID);
+    (void)hwndCtl;
+    if (!ZipPackAdvancedPathFits(ZipFile))
+    {
+        // Reject before preview helpers can copy a long target into legacy
+        // scratch buffers. A normal ZIP at this same target remains available.
+        if (wNotifyCode == BN_CLICKED)
+        {
+            SendDlgItemMessage(Dlg, IDC_MULTIVOL, BM_SETCHECK, BST_UNCHECKED, 0);
+            SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_SETCHECK, BST_UNCHECKED, 0);
+            SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_TOOLONGZIPNAME), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+        }
+        return TRUE;
+    }
     char name[MAX_PATH];
 
     switch (wNotifyCode)
@@ -445,6 +471,19 @@ BOOL CPackDialog::OnSeqName(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 BOOL CPackDialog::OnSelfExtr(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CPackDialog::OnSelfExtr(0x%X, 0x%X, )", wNotifyCode, wID);
+    (void)hwndCtl;
+    if (!ZipPackAdvancedPathFits(ZipFile))
+    {
+        // Reject before preview helpers can copy a long target into legacy
+        // scratch buffers. A normal ZIP at this same target remains available.
+        if (wNotifyCode == BN_CLICKED)
+        {
+            SendDlgItemMessage(Dlg, IDC_MULTIVOL, BM_SETCHECK, BST_UNCHECKED, 0);
+            SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_SETCHECK, BST_UNCHECKED, 0);
+            SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_TOOLONGZIPNAME), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+        }
+        return TRUE;
+    }
     char name[MAX_PATH];
     switch (wNotifyCode)
     {
@@ -454,8 +493,8 @@ BOOL CPackDialog::OnSelfExtr(WORD wNotifyCode, WORD wID, HWND hwndCtl)
             EnableWindow(GetDlgItem(Dlg, IDC_ADVANCED), TRUE);
             char path[MAX_PATH + 4], ext[MAX_PATH];
             SplitPath2(ZipFile, path, name, ext);
-            strcat(path, name);
-            strcat(path, ".exe");
+            strcat_s(path, sizeof(path), name);
+            strcat_s(path, sizeof(path), ".exe");
             *(path + MAX_PATH - 1) = 0; // just to be sure
             SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)path);
             InvalidateRect(GetDlgItem(Dlg, IDC_ARCHIVE), NULL, TRUE);
@@ -581,6 +620,13 @@ BOOL CPackDialog::OnConfig(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 BOOL CPackDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CPackDialog::OnOK(0x%X, 0x%X, )", wNotifyCode, wID);
+    if (!ZipPackAdvancedPathFits(ZipFile) &&
+        (SendDlgItemMessage(Dlg, IDC_MULTIVOL, BM_GETCHECK, 0, 0) == BST_CHECKED ||
+         SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_GETCHECK, 0, 0) == BST_CHECKED))
+    {
+        SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_TOOLONGZIPNAME), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+        return TRUE;
+    }
     PackOptions->Action = PA_NORMAL;
     if (SendDlgItemMessage(Dlg, IDC_MULTIVOL, BM_GETCHECK, 0, 0) == BST_CHECKED)
     {
@@ -744,9 +790,22 @@ BOOL CPackDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 }
 
 void CPackDialog::ResetControls()
+try
 {
     CALL_STACK_MESSAGE1("CPackDialog::ResetControls()");
-    char archive[MAX_PATH + 4]; // leave room so the self-extractor suffix does not overflow the buffer
+    // Persisted options must be checked before MakeFileName/SplitPath2 too.
+    if (!ZipPackAdvancedPathFits(ZipFile) &&
+        (PackOptions->Action & (PA_MULTIVOL | PA_SELFEXTRACT)))
+    {
+        PackObject->ErrorID = IDS_TOOLONGZIPNAME;
+        EndDialog(Dlg, IDCANCEL);
+        return;
+    }
+    // ZipFile can contain a full SAL_MAX_PATH UTF-8 path. Keep the
+    // preview on the heap; the old MAX_PATH scratch buffer overflowed
+    // before the dialog could be displayed for a long archive target.
+    std::vector<char> archiveStorage(SAL_MAX_PATH + 4);
+    char* archive = archiveStorage.data();
 
     if (PackOptions->Action & PA_MULTIVOL)
         SendDlgItemMessage(Dlg, IDC_MULTIVOL, BM_SETCHECK, (WPARAM)BST_CHECKED, 0);
@@ -768,13 +827,19 @@ void CPackDialog::ResetControls()
     }
     if (PackOptions->Action & PA_SELFEXTRACT)
     {
-        char name[MAX_PATH], ext[MAX_PATH];
+        std::vector<char> nameStorage(SAL_MAX_PATH), extStorage(SAL_MAX_PATH);
+        char* name = nameStorage.data();
+        char* ext = extStorage.data();
         SplitPath2(ZipFile, archive, name, ext);
         lstrcat(archive, name);
         lstrcat(archive, ".exe");
-        *(archive + MAX_PATH - 1) = 0; // just to be sure
     }
     SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)archive);
+}
+catch (const std::bad_alloc&)
+{
+    PackObject->ErrorID = IDS_LOWMEM;
+    EndDialog(Dlg, IDCANCEL);
 }
 
 INT_PTR PackDialog(HWND parent, CZipPack* packObject, CConfiguration* config,

@@ -446,7 +446,8 @@ public:
     void SetPreferedPacker(int i) { PreferedPacker = i; }
 
     BOOL ExecutePacker(CFilesWindow* panel, const char* zipFile, BOOL move,
-                       const char* sourcePath, SalEnumSelection2 next, void* param);
+                       const char* sourcePath, SalEnumSelection2 next, void* param,
+                       BOOL (*validateContext)(void*) = NULL, void* context = NULL);
 };
 
 //

@@ -2489,7 +2489,7 @@ int MakeFileName(int number, bool seqNames, const char* archive,
         sprintf(buf + namelen, ext > archive && isdigit(ext[-1]) ? "_%02d%s" : "%02d%s", number, ext);
 
     int ret = (int)strlen(buf);
-    if (ret > MAX_PATH)
+    if (ret >= MAX_PATH)
     {
         TRACE_I("archive name is too long to add file numbers:" << buf);
         return (int)strlen(strcpy(name, archive));
