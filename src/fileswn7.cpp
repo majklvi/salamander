@@ -15,6 +15,7 @@
 #include "pack.h"
 #include "common/widepath.h"
 #include "fileactiondisktarget.h"
+#include "fileactionarchivesource.h"
 #include "unpackvolumes.h"
 
 //
@@ -26,6 +27,8 @@ CPanelTmpEnumData::CPanelTmpEnumData()
 {
     ExactFileSelection = FALSE;
     SourcePanel = NULL;
+    ContextIsCurrent = NULL;
+    Context = NULL;
     ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
     Indexes = NULL;
     CurrentIndex = 0;
@@ -92,6 +95,12 @@ const char* _PanelSalEnumSelection(int enumFiles, const char** dosName, BOOL* is
 
 ENUM_NEXT:
 
+    if (!data->HasCurrentContext())
+    {
+        SetLastError(ERROR_RETRY);
+        if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+        return NULL;
+    }
     if (data->CurrentIndex >= data->IndexesCount)
         return NULL;
     if (enumFiles == 0)
@@ -149,10 +158,10 @@ ENUM_NEXT:
                     memcpy(data->EnumLastPath, curZIPPath, zipPathLen);
                     if (zipPathLen > 0)
                         data->EnumLastPath[zipPathLen++] = '\\';
-                    strcpy(data->EnumLastPath + zipPathLen, f->Name);
+                    strcpy_s(data->EnumLastPath + zipPathLen, _countof(data->EnumLastPath) - zipPathLen, f->Name);
                     if (data->DiskDirectoryTree != NULL)
                     { // if EnumLastDosPath is used, zipPathLen will be 0
-                        strcpy(data->EnumLastDosPath, (f->DosName == NULL) ? f->Name : f->DosName);
+                        strcpy_s(data->EnumLastDosPath, _countof(data->EnumLastDosPath), (f->DosName == NULL) ? f->Name : f->DosName);
                     }
                     if (data->DiskDirectoryTree == NULL)
                         data->EnumLastDir = data->ArchiveDir;
@@ -201,6 +210,12 @@ ENUM_NEXT:
 
             while (1)
             {
+                if (!data->HasCurrentContext())
+                {
+                    SetLastError(ERROR_RETRY);
+                    if (errorOccured != NULL) *errorOccured = SALENUM_CANCEL;
+                    return NULL;
+                }
                 if (data->EnumLastDir->IsDirectory(data->EnumLastIndex)) // directory -> descend
                 {
                     CFileData* f = data->EnumLastDir->GetDirEx(data->EnumLastIndex);
@@ -227,12 +242,12 @@ ENUM_NEXT:
                     }
                     else
                     {
-                        strcat(data->EnumLastPath, "\\");
-                        strcat(data->EnumLastPath, f->Name);
+                        strcat_s(data->EnumLastPath, _countof(data->EnumLastPath), "\\");
+                        strcat_s(data->EnumLastPath, _countof(data->EnumLastPath), f->Name);
                         if (data->DiskDirectoryTree != NULL)
                         {
-                            strcat(data->EnumLastDosPath, "\\");
-                            strcat(data->EnumLastDosPath, (f->DosName == NULL) ? f->Name : f->DosName);
+                            strcat_s(data->EnumLastDosPath, _countof(data->EnumLastDosPath), "\\");
+                            strcat_s(data->EnumLastDosPath, _countof(data->EnumLastDosPath), (f->DosName == NULL) ? f->Name : f->DosName);
                         }
                         data->EnumLastDir = data->EnumLastDir->GetSalamanderDir(data->EnumLastIndex);
                         data->EnumLastIndex = 0;
@@ -276,14 +291,14 @@ ENUM_NEXT:
                                 *isDir = FALSE;
                             if (size != NULL)
                                 *size = f->Size;
-                            strcpy(data->EnumTmpFileName, data->EnumLastPath + zipPathLen + (zipPathLen > 0 ? 1 : 0));
-                            strcat(data->EnumTmpFileName, "\\");
-                            strcat(data->EnumTmpFileName, f->Name);
+                            strcpy_s(data->EnumTmpFileName, _countof(data->EnumTmpFileName), data->EnumLastPath + zipPathLen + (zipPathLen > 0 ? 1 : 0));
+                            strcat_s(data->EnumTmpFileName, _countof(data->EnumTmpFileName), "\\");
+                            strcat_s(data->EnumTmpFileName, _countof(data->EnumTmpFileName), f->Name);
                             if (data->DiskDirectoryTree != NULL)
                             {
-                                strcpy(data->EnumTmpDosFileName, data->EnumLastDosPath); // if used, zipPathLen == 0
-                                strcat(data->EnumTmpDosFileName, "\\");
-                                strcat(data->EnumTmpDosFileName, (f->DosName == NULL) ? f->Name : f->DosName);
+                                strcpy_s(data->EnumTmpDosFileName, _countof(data->EnumTmpDosFileName), data->EnumLastDosPath); // if used, zipPathLen == 0
+                                strcat_s(data->EnumTmpDosFileName, _countof(data->EnumTmpDosFileName), "\\");
+                                strcat_s(data->EnumTmpDosFileName, _countof(data->EnumTmpDosFileName), (f->DosName == NULL) ? f->Name : f->DosName);
                                 if (dosName != NULL)
                                     *dosName = data->EnumTmpDosFileName;
                             }
@@ -359,14 +374,14 @@ ENUM_NEXT:
                         if (size != NULL)
                             *size = CQuadWord(0, 0);
                         int zipPathLen = (int)strlen(curZIPPath);
-                        strcpy(data->EnumTmpFileName, data->EnumLastPath + zipPathLen + (zipPathLen > 0 ? 1 : 0));
-                        strcat(data->EnumTmpFileName, "\\");
-                        strcat(data->EnumTmpFileName, subDir);
+                        strcpy_s(data->EnumTmpFileName, _countof(data->EnumTmpFileName), data->EnumLastPath + zipPathLen + (zipPathLen > 0 ? 1 : 0));
+                        strcat_s(data->EnumTmpFileName, _countof(data->EnumTmpFileName), "\\");
+                        strcat_s(data->EnumTmpFileName, _countof(data->EnumTmpFileName), subDir);
                         if (data->DiskDirectoryTree != NULL)
                         {
-                            strcpy(data->EnumTmpDosFileName, data->EnumLastDosPath); // if used, zipPathLen == 0
-                            strcat(data->EnumTmpDosFileName, "\\");
-                            strcat(data->EnumTmpDosFileName, subDirDos);
+                            strcpy_s(data->EnumTmpDosFileName, _countof(data->EnumTmpDosFileName), data->EnumLastDosPath); // if used, zipPathLen == 0
+                            strcat_s(data->EnumTmpDosFileName, _countof(data->EnumTmpDosFileName), "\\");
+                            strcat_s(data->EnumTmpDosFileName, _countof(data->EnumTmpDosFileName), subDirDos);
                             if (dosName != NULL)
                                 *dosName = data->EnumTmpDosFileName;
                         }
@@ -804,6 +819,33 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         SalMessageBox(HWindow, GetErrorText(ERROR_RETRY), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
         return;
     }
+    const HWND operationParent = MainWindow != NULL ? MainWindow->HWindow : NULL;
+    CFilesActionArchiveSource archiveSource;
+    if (!deleteOp && !archiveSource.Capture(MainWindow, this))
+    {
+        SalMessageBox(operationParent, GetErrorText(ERROR_RETRY), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+        return;
+    }
+    // Keep the source tab alive through modal and plugin callbacks. Existing
+    // callers may already own the busy flag; restore their exact previous state.
+    struct CArchiveSourceBusyScope
+    {
+        CFilesActionArchiveSource* Source;
+        BOOL Previous;
+        CArchiveSourceBusyScope(CFilesActionArchiveSource* source) : Source(source), Previous(FALSE)
+        {
+            if (Source != NULL) { Previous = Source->Panel->FilesActionInProgress; Source->Panel->FilesActionInProgress = TRUE; }
+        }
+        ~CArchiveSourceBusyScope()
+        {
+            if (Source != NULL)
+            {
+                CFilesWindow* live = CFilesActionDiskTarget::FindLive(MainWindow, Source->Panel);
+                if (live != NULL && live->GetPanelTabId() == Source->Tab) live->FilesActionInProgress = Previous;
+            }
+        }
+    } sourceBusy(deleteOp ? NULL : &archiveSource);
+
     if (IsBranchView() || target != NULL && target->IsBranchView() &&
         (deleteOp || !target->Is(ptDisk) ||
          PackGetVerifiedBranchUnpacker(this, GetZIPArchive(), PluginData.GetInterface()) == NULL)) return; // Only a qualified archive listing can copy to a Branch root.
@@ -822,6 +864,11 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         return;
     }
     const auto validateDiskTarget = [&]() {
+        if (!deleteOp && !archiveSource.IsCurrent(MainWindow))
+        {
+            SalMessageBox(operationParent, GetErrorText(ERROR_RETRY), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+            return false;
+        }
         if (!watchDiskTarget || (diskTarget.IsCurrent(MainWindow) &&
             (!diskTarget.Branch || PackGetVerifiedBranchUnpacker(this, GetZIPArchive(), PluginData.GetInterface()) != NULL))) return true;
         SalMessageBox(HWindow, GetErrorText(ERROR_RETRY), LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
@@ -911,7 +958,14 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
     str.Set(subject, data.IndexesCount > 1 ? NULL : path);
 
     data.CurrentIndex = 0;
-    data.ZIPPath = GetZIPPath();
+    data.ZIPPath = deleteOp ? GetZIPPath() : archiveSource.ArchiveRoot.c_str();
+    if (!deleteOp)
+    {
+        data.Context = &archiveSource;
+        data.ContextIsCurrent = [](void* context) -> BOOL {
+            return static_cast<CFilesActionArchiveSource*>(context)->IsCurrent(MainWindow);
+        };
+    }
     data.Dirs = Dirs;
     data.Files = Files;
     data.ArchiveDir = GetArchiveDir();
@@ -1241,13 +1295,14 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                         return;
                     }
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-                    const BOOL unpacked = PackUncompress(MainWindow->HWindow, this, GetZIPArchive(), PluginData.GetInterface(),
-                                       path, GetZIPPath(), PanelSalEnumSelection, &data, watchDiskTarget ? &diskTarget : NULL);
+                    const BOOL unpacked = PackUncompress(MainWindow->HWindow, this, archiveSource.ArchiveFile.c_str(), archiveSource.PluginData,
+                                       path, archiveSource.ArchiveRoot.c_str(), PanelSalEnumSelection, &data,
+                                       watchDiskTarget ? &diskTarget : NULL, data.ContextIsCurrent, data.Context);
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
                     const bool targetCurrent = validateDiskTarget();
                     if (unpacked && targetCurrent)
                     {                        // unpacking succeeded
-                        if (tgtPath == NULL) // if it is not drag&drop (selection is not cleared there)
+                        if (tgtPath == NULL && archiveSource.IsCurrent(MainWindow)) // if it is not drag&drop (selection is not cleared there)
                         {
                             SetSel(FALSE, -1, TRUE);                        // explicit redraw
                             PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
@@ -1259,7 +1314,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                             RemoveEmptyUnpackDirectoriesW(SalMultiByteToWidePath(newDirs, IsValidPathUtf8Text(newDirs) ? CP_UTF8 : CP_ACP));
                     }
 
-                    if (GetForegroundWindow() == MainWindow->HWindow) // for unknown reasons focus disappears from the panel when dragging to Explorer; return it
+                    if (archiveSource.IsCurrent(MainWindow) && GetForegroundWindow() == MainWindow->HWindow) // restore focus only to the original source
                         RestoreFocusInSourcePanel();
                 }
                 else
@@ -1282,7 +1337,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                         (pathType == PATH_TYPE_ARCHIVE &&
                          UnpackArchiveToArchiveViaTemp(this, &data, path, invalidPathOrCancel)))
                     {
-                        if (tgtPath == NULL) // if it is not drag&drop (selection is not cleared there)
+                        if (tgtPath == NULL && archiveSource.IsCurrent(MainWindow)) // if it is not drag&drop (selection is not cleared there)
                         {
                             SetSel(FALSE, -1, TRUE);                        // explicit redraw
                             PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
@@ -1328,7 +1383,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
             if (changesRoot[0] != 0)
                 MainWindow->PostChangeOnPathNotification(changesRoot, TRUE);
             // change in the directory containing the archive (should not occur during unpack, but refresh just in case it does)
-            MainWindow->PostChangeOnPathNotification(GetPath(), FALSE);
+            MainWindow->PostChangeOnPathNotification(archiveSource.Directory.c_str(), FALSE);
         }
     }
     else // delete
@@ -1970,6 +2025,8 @@ static BOOL UnpackArchiveToPluginFSViaTemp(CFilesWindow* source, CFilesWindow* t
     CALL_STACK_MESSAGE2("UnpackArchiveToPluginFSViaTemp(, , , , , %s,)", targetPath);
 
     invalidPathOrCancel = FALSE;
+    if (!data->HasCurrentContext())
+    { SetLastError(ERROR_RETRY); invalidPathOrCancel = TRUE; return FALSE; }
 
     if (target == NULL || !target->Is(ptPluginFS) || !target->GetPluginFS()->NotEmpty() ||
         !target->GetPluginFS()->IsServiceSupported(FS_SERVICE_COPYFROMDISKTOFS))
@@ -2014,8 +2071,8 @@ static BOOL UnpackArchiveToPluginFSViaTemp(CFilesWindow* source, CFilesWindow* t
     data->WorkPath[0] = 0;
 
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-    if (PackUncompress(MainWindow->HWindow, source, source->GetZIPArchive(), source->PluginData.GetInterface(),
-                       tempRoot, source->GetZIPPath(), PanelSalEnumSelection, data))
+    if (data->HasCurrentContext() && PackUncompress(MainWindow->HWindow, source, source->GetZIPArchive(), source->PluginData.GetInterface(),
+                       tempRoot, source->GetZIPPath(), PanelSalEnumSelection, data, NULL, data->ContextIsCurrent, data->Context) && data->HasCurrentContext())
     {
         data->Reset();
         lstrcpyn(data->WorkPath, tempRoot, _countof(data->WorkPath));
@@ -2027,7 +2084,7 @@ static BOOL UnpackArchiveToPluginFSViaTemp(CFilesWindow* source, CFilesWindow* t
 
         BOOL moveTempToTarget = target->GetPluginFS()->IsServiceSupported(FS_SERVICE_MOVEFROMDISKTOFS);
         BOOL pluginInvalidPathOrCancel = FALSE;
-        if (target->GetPluginFS()->CopyOrMoveFromDiskToFS(!moveTempToTarget, 3, target->GetPluginFS()->GetPluginFSName(),
+        if (data->HasCurrentContext() && target->GetPluginFS()->CopyOrMoveFromDiskToFS(!moveTempToTarget, 3, target->GetPluginFS()->GetPluginFSName(),
                                                           source->HWindow, tempRoot, PanelEnumDiskSelection, data,
                                                           sourceFiles, sourceDirs, internalTargetPath,
                                                           &pluginInvalidPathOrCancel))
@@ -2059,6 +2116,8 @@ static BOOL UnpackArchiveToArchiveViaTemp(CFilesWindow* source, CPanelTmpEnumDat
     CALL_STACK_MESSAGE2("UnpackArchiveToArchiveViaTemp(, , %s,)", targetPath);
 
     invalidPathOrCancel = FALSE;
+    if (!data->HasCurrentContext())
+    { SetLastError(ERROR_RETRY); invalidPathOrCancel = TRUE; return FALSE; }
 
     char archivePath[2 * MAX_PATH];
     lstrcpyn(archivePath, targetPath, 2 * MAX_PATH);
@@ -2134,8 +2193,8 @@ static BOOL UnpackArchiveToArchiveViaTemp(CFilesWindow* source, CPanelTmpEnumDat
     data->WorkPath[0] = 0;
 
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-    if (PackUncompress(MainWindow->HWindow, source, source->GetZIPArchive(), source->PluginData.GetInterface(),
-                       tempRoot, source->GetZIPPath(), PanelSalEnumSelection, data))
+    if (data->HasCurrentContext() && PackUncompress(MainWindow->HWindow, source, source->GetZIPArchive(), source->PluginData.GetInterface(),
+                       tempRoot, source->GetZIPPath(), PanelSalEnumSelection, data, NULL, data->ContextIsCurrent, data->Context) && data->HasCurrentContext())
     {
         data->Reset();
         lstrcpyn(data->WorkPath, tempRoot, _countof(data->WorkPath));

@@ -1099,6 +1099,7 @@ CFilesWindowAncestor::CheckPath(BOOL echo, const char* path, DWORD err, BOOL pos
 void CFilesWindowAncestor::ReleaseListing()
 {
     CALL_STACK_MESSAGE_NONE
+    AdvanceListingIdentity(); // Invalidate borrowers before any plugin release callback.
 
         ((CFilesWindow*)this)
             ->VisibleItemsArray.InvalidateArr();
@@ -1662,6 +1663,7 @@ CFilesWindowAncestor::GetPluginDataForPluginIface()
 
 void CFilesWindowAncestor::SetZIPPath(const char* path)
 {
+    AdvanceListingIdentity();
     CALL_STACK_MESSAGE_NONE
     if (*path == '\\')
         path++; // ZIPPath will not start with '\\'
@@ -1676,6 +1678,7 @@ void CFilesWindowAncestor::SetZIPPath(const char* path)
 
 void CFilesWindowAncestor::SetZIPArchive(const char* archive)
 {
+    AdvanceListingIdentity();
     CALL_STACK_MESSAGE_NONE
     lstrcpyn(ZIPArchive, archive, SAL_MAX_PATH);
 }

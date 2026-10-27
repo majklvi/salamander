@@ -502,6 +502,7 @@ private:
     BOOL SuppressAutoRefresh; // TRUE if the user canceled directory listing during reading and chose temporary auto-refresh suppression
 
     CPanelType PanelType; // type of panel (disk, archive, plugin FS)
+    ULONGLONG ListingIdentityGeneration = 1; // Internal host epoch; not an SDK/CFileData field.
 
     BOOL MonitorChanges; // should changes be monitored (auto refresh)?
     UINT DriveType;      // disk+archive: drive type of Path (see MyGetDriveType())
@@ -563,6 +564,8 @@ public:
     //          before destroying PluginFSDir and PluginData because icons are
     //          retrieved using PluginFSDir and PluginData ...
     void ReleaseListing();
+    ULONGLONG GetListingIdentityGeneration() const { return ListingIdentityGeneration; }
+    void AdvanceListingIdentity() { if (++ListingIdentityGeneration == 0) ++ListingIdentityGeneration; }
 
     // returns the path shown in the panel (disk, archive, or FS);
     // if convertFSPathToExternal is TRUE and the panel holds an FS path,
@@ -587,10 +590,10 @@ public:
 
     void SetPath(const char* path);
     void SetMonitorChanges(BOOL monitorChanges) { MonitorChanges = monitorChanges; }
-    void SetPanelType(CPanelType type) { PanelType = type; }
+    void SetPanelType(CPanelType type) { if (PanelType != type) AdvanceListingIdentity(); PanelType = type; }
     void SetZIPPath(const char* path);
     void SetZIPArchive(const char* archive);
-    void SetArchiveDir(CSalamanderDirectory* dir) { ArchiveDir = dir; }
+    void SetArchiveDir(CSalamanderDirectory* dir) { if (ArchiveDir != dir) AdvanceListingIdentity(); ArchiveDir = dir; }
     void SetZIPArchiveDate(FILETIME& time) { ZIPArchiveDate = time; }
     void SetZIPArchiveSize(const CQuadWord& size) { ZIPArchiveSize = size; }
     void SetSuppressAutoRefresh(BOOL suppress) { SuppressAutoRefresh = suppress; }
@@ -1892,6 +1895,9 @@ struct CPanelTmpEnumData
 {
     BOOL ExactFileSelection; // S22: file-only disk route; recursive selections keep their tree.
     CFilesWindow* SourcePanel;
+    BOOL (*ContextIsCurrent)(void* context); // Optional internal archive listing guard.
+    void* Context;
+    bool HasCurrentContext() const { return ContextIsCurrent == NULL || ContextIsCurrent(Context); }
     std::string BranchEnumName;
     BOOL ErrGetFileSizeOfLnkTgtIgnAll;
     std::vector<CQuadWord> BranchEnumLinkSizes;

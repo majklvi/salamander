@@ -2894,6 +2894,7 @@ void CFilesWindow::RemoveCurrentPathFromHistory()
 
 void CFilesWindow::InvalidateChangesInPanelWeHaveNewListing()
 {
+    AdvanceListingIdentity(); // Includes replacement listings that reuse array addresses.
     NeedRefreshAfterEndOfSM = FALSE;
     NeedRefreshAfterIconsReading = FALSE;
     HANDLES(EnterCriticalSection(&TimeCounterSection));
