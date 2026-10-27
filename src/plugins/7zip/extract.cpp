@@ -83,6 +83,10 @@ CExtractCallbackImp::CExtractCallbackImp(HWND _hProgWnd, UString& password,
     WholeFile = TRUE;
     OutputCreated = FALSE;
     hProgWnd = _hProgWnd;
+    NumErrors = 0;
+    ExpectedItems = CompletedItems = 0;
+    PendingItem = false;
+    ExtractionIncomplete = true;
 }
 
 CExtractCallbackImp::~CExtractCallbackImp()
@@ -96,6 +100,10 @@ BOOL CExtractCallbackImp::Init(IInArchive* archive, const char* outDir,
                                const FILETIME& utcLastWriteTimeDefault, DWORD attributesDefault, BOOL silentDelete /* = FALSE*/)
 {
     NumErrors = 0;
+    ExpectedItems = ItemsToExtract.size();
+    CompletedItems = 0;
+    PendingItem = false;
+    ExtractionIncomplete = false;
 
     UTCLastWriteTimeDefault = utcLastWriteTimeDefault;
     AttributesDefault = attributesDefault;
@@ -208,18 +216,26 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
         OutFileStream.Release();
         OutFileStreamSpec = NULL;
         OutputCreated = FALSE;
+        if (PendingItem) ExtractionIncomplete = true; // a requested result never arrived
+        PendingItem = false;
+        ExtractMode = false;
+        OverwriteSkip = FALSE;
 
         // if we are extracting a file
         if (askExtractMode == NArchive::NExtract::NAskMode::kExtract)
         {
 
-            const CArchiveItemInfo* aii = ItemsToExtract[index];
+            const auto requested = ItemsToExtract.find(index);
+            const CArchiveItemInfo* aii = requested == ItemsToExtract.end() ? NULL : requested->second;
             if (!aii)
             {
+                // Do not insert an unrequested/duplicate index into the pending map.
+                ExtractionIncomplete = true;
                 // Already extracted??? Not to be extracted?
                 throw S_OK;
             }
-            ItemsToExtract.erase(index);
+            PendingItem = true;
+            ItemsToExtract.erase(requested);
             const CFileData* fd = aii->FileData;
             // fd is certainly not NULL
 
@@ -289,7 +305,10 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
 
                     *outStream = NULL;
                     if (OverwriteSkip)
+                    {
+                        ExtractionIncomplete = true;
                         throw S_OK;
+                    }
                     // the overall operation cannot continue (cancel)
                     if (OverwriteCancel)
                         throw E_ABORT;
@@ -330,6 +349,7 @@ STDMETHODIMP CExtractCallbackImp::GetStream(UINT32 index, ISequentialOutStream**
             {
                 *outStream = NULL;
 
+                NumErrors++;
                 char errText[1000];
                 _snprintf_s(errText, _TRUNCATE, LoadStr(IDS_NAMEISTOOLONG), (const char*)(aii->NameInArchive), TargetFileName);
                 SalamanderGeneral->ShowMessageBox(errText, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
@@ -506,6 +526,16 @@ STDMETHODIMP CExtractCallbackImp::SetOperationResult(INT32 resultEOperationResul
     //  TRACE_I("CExtractCallbackImp::SetOperationResult: result = " << resultEOperationResult);
 
     WholeFile = TRUE;
+
+    if (PendingItem)
+    {
+        if (resultEOperationResult == NArchive::NExtract::NOperationResult::kOK &&
+            ExtractMode && OutputCreated)
+            ++CompletedItems;
+        else
+            ExtractionIncomplete = true;
+        PendingItem = false;
+    }
 
     switch (resultEOperationResult)
     {
