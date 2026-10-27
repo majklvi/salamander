@@ -499,6 +499,7 @@ CZipCommon::CZipCommon(const char* zipName, const char* zipRoot,
     Comment = NULL;
     Unix = FALSE;
     ArchiveVolumes = archiveVolumes;
+    ArchiveVolumesComplete = true;
 
     DWORD ret = GetCurrentDirectory(SAL_MAX_PATH, OriginalCurrentDir);
     if (!ret || ret >= SAL_MAX_PATH)

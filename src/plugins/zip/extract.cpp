@@ -320,8 +320,8 @@ int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
     Salamander->OpenProgressDialog(title, TRUE, NULL, FALSE);
     Salamander->ProgressDialogAddText(LoadStr(IDS_PREPAREDATA), FALSE);
     ErrorID = CheckZip();
-    if (!ErrorID && ArchiveVolumes != NULL)
-        ArchiveVolumes->Add(_strdup(ZipName));
+    if (!ErrorID)
+        ErrorID = RecordArchiveVolume();
     if (!ErrorID && !ZeroZip)
     {
         MatchedTotalSize = CQuadWord(0, 0);

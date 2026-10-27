@@ -206,6 +206,8 @@ public:
     BOOL AESContextValid; // is it necessary to call fcrypt_end?
 
     TIndirectArray2<char>* ArchiveVolumes;
+    bool ArchiveVolumesComplete; // sticky: a dropped internal volume must never reach deletion
+    int RecordArchiveVolume();
 
     CZipCommon(const char* zipName, const char* zipRoot,
                CSalamanderForOperationsAbstract* salamander,
