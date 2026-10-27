@@ -147,6 +147,7 @@ CZipUnpack::CZipUnpack(const char* zipName, const char* zipRoot, CSalamanderForO
     Extract = true;
     Unshrinking = false;
     Test = false;
+    WholeArchiveExtracted = false;
     AllocateWholeFile = true;
     TestAllocateWholeFile = true;
 }
@@ -304,6 +305,7 @@ int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, 
 int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
 {
     CALL_STACK_MESSAGE3("CZipUnpack::UnpackWholeArchive(%s, %s)", mask, targetDir);
+    WholeArchiveExtracted = true;
     TIndirectArray2<char> maskArray(16);
     TIndirectArray2<CFileInfo> extrFiles(256); //file header of files to be extracted
 
@@ -333,10 +335,13 @@ int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
             ErrorID = MatchFilesToMask(maskArray);
             if (ErrorID && extrFiles.Count)
             {
+                WholeArchiveExtracted = false; // preserving a usable subset is not full extraction
                 if (ErrorID != IDS_NODISPLAY)
                     SalamanderGeneral->ShowMessageBox(LoadStr(ErrorID), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
                 ErrorID = 0;
             }
+            if (extrFiles.Count == 0)
+                WholeArchiveExtracted = false; // nonempty archive with no selected entries
             ProgressTotalSize = MatchedTotalSize;
             if (!ErrorID && extrFiles.Count)
             {
@@ -368,6 +373,8 @@ int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
                 ErrorID = ExtractFiles(targetDir);
             }
         }
+        else
+            WholeArchiveExtracted = false;
     }
     Salamander->CloseProgressDialog();
     return ErrorID;
@@ -572,11 +579,13 @@ int CZipUnpack::MatchFilesToMask(TIndirectArray2<char>& maskArray)
                     delete fileInfo;
                     errorID = IDS_LOWMEM;
                 };
-                if (!ErrorID)
+                if (!errorID) // failed Add already released fileInfo
                     MatchedTotalSize += CQuadWord().SetUI64(fileInfo->Size);
                 break;
             }
         }
+        if (j == maskArray.Count)
+            WholeArchiveExtracted = false; // excluded archive entry must survive in the source
     }
     free(centralHeader);
     free(tempName);
@@ -1342,6 +1351,9 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                             case ERR_RETRY:
                                 retry = true;
                                 break;
+                            case ERR_SKIP:
+                                WholeArchiveExtracted = false;
+                                break;
                             case ERR_CANCEL:
                                 errorID = IDS_NODISPLAY;
                             }
@@ -1378,6 +1390,9 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                             {
                             case ERR_RETRY:
                                 retry = true;
+                                break;
+                            case ERR_SKIP:
+                                WholeArchiveExtracted = false;
                                 break;
                             case ERR_CANCEL:
                                 errorID = IDS_NODISPLAY;
@@ -1828,6 +1843,8 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
                                      PE_NORETRY | DialogFlags, &SkipAllLongNames))
                 {
                 case ERR_SKIP:
+                    WholeArchiveExtracted = false;
+                    AllFilesOK = FALSE;
                     UserBreak = !ProgressAddSize(fileInfo->Size + 1);
                     continue;
                 case ERR_CANCEL:
@@ -1843,7 +1860,10 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
                 BOOL ok;
                 errorID = ExtractSingleFile(tempDir, tempDirLen, fileInfo, &ok);
                 if (!ok)
+                {
                     AllFilesOK = FALSE; // for archive testing
+                    WholeArchiveExtracted = false;
+                }
                 UserBreak = !Salamander->ProgressAddSize(1, TRUE);
             }
             else
