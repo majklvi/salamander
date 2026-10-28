@@ -7241,8 +7241,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             CFilesWindow* panel = LOWORD(wParam) == CM_LEFT_BRANCHVIEW ? LeftPanel :
                                   LOWORD(wParam) == CM_RIGHT_BRANCHVIEW ? RightPanel : activePanel;
-            if (panel != NULL && panel->Is(ptDisk) &&
-                (panel->IsBranchView() || Salamander::BranchView::ExperimentEnabled()))
+            if (panel != NULL && panel->Is(ptDisk))
                 panel->ToggleBranchView();
             return 0;
         }
@@ -9483,7 +9482,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             CFilesWindow* branchPanel = left ? LeftPanel : RightPanel;
             popup->CheckItem(left ? CM_LEFT_BRANCHVIEW : CM_RIGHT_BRANCHVIEW, FALSE, branchPanel->IsBranchView());
             popup->EnableItem(left ? CM_LEFT_BRANCHVIEW : CM_RIGHT_BRANCHVIEW, FALSE,
-                branchPanel->Is(ptDisk) && (branchPanel->IsBranchView() || Salamander::BranchView::ExperimentEnabled()));
+                branchPanel->Is(ptDisk));
 
 
             popup->CheckItem(left ? CM_LCHANGEFILTER : CM_RCHANGEFILTER, FALSE,
