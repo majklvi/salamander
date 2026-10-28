@@ -5,7 +5,7 @@
 #include "precomp.h"
 
 static void SetDPIAwareWindowIcon(HWND hWindow, int resID);
-static void ReleaseDPIAwareWindowIcons(HWND hWindow);
+void ReleaseDPIAwareWindowIcons(HWND hWindow);
 
 #include <string>
 #include <shlwapi.h>
@@ -318,7 +318,7 @@ public:
 };
 
 CMainWindow::CMainWindow()
-    : ChangeNotifArray(3, 5), LeftPanelTabs(1, 1, dtNoDelete), RightPanelTabs(1, 1, dtNoDelete)
+    : LeftPanelTabs(1, 1, dtNoDelete), RightPanelTabs(1, 1, dtNoDelete)
 {
     HANDLES(InitializeCriticalSection(&DispachChangeNotifCS));
     HANDLES(InitializeCriticalSection(&DetachedTabsCS));
@@ -4004,7 +4004,7 @@ void CMainWindow::CloseDetachedTab()
 void CMainWindow::CloseDetachedTab(CFilesWindow* panel)
 {
     CDetachedTabInfo* info = FindDetachedTab(panel);
-    if (info == NULL)
+    if (info == NULL || info->Panel == NULL || info->Panel->FilesActionInProgress)
         return;
     CPanelSide side = info->OriginalSide;
     if (ReattachDetachedTab(panel, side, FALSE))
@@ -5538,7 +5538,7 @@ void CMainWindow::UpdateDetachedMenuLabels()
 static const char* OWNED_BIG_WINDOW_ICON = "SalamanderOwnedBigWindowIcon";
 static const char* OWNED_SMALL_WINDOW_ICON = "SalamanderOwnedSmallWindowIcon";
 
-static void ReleaseDPIAwareWindowIcons(HWND hWindow)
+void ReleaseDPIAwareWindowIcons(HWND hWindow)
 {
     HICON bigIcon = (HICON)RemoveProp(hWindow, OWNED_BIG_WINDOW_ICON);
     HICON smallIcon = (HICON)RemoveProp(hWindow, OWNED_SMALL_WINDOW_ICON);

@@ -4,6 +4,9 @@
 
 #pragma once
 
+struct CFilesActionDiskTarget; // internal host target identity; no SDK interface change
+struct CWholeArchiveUnpackerSnapshot;
+
 #include <string>
 #include <vector>
 
@@ -2623,6 +2626,8 @@ public:
     // 'parent' is the parent window for message boxes; if 'ask' is FALSE it saves without asking,
     // returns TRUE if the DLL was unloaded
     BOOL Unload(HWND parent, BOOL ask);
+    // Optional Samandarin native exit hook; readiness does not release resources.
+    BOOL PrepareNativeProcessExit(BOOL finalize);
 
     // checks if the plugin can be removed; 'parent' is the parent message box window,
     // 'index' is this plugin index in Plugins; returns TRUE if the plugin can be removed
@@ -2655,6 +2660,9 @@ public:
     // 'parent' is the parent message box window, 'index' is this plugin index in Plugins,
     // returns TRUE if 'suid' was found among the plugin's menu items,
     // returns 'unselect' = the return value of the plugin ExecuteMenuItem call
+    // Private host policy; no plugin SDK/vtable change. Only individually verified commands.
+    BOOL IsBranchCommandAllowed(int id);
+    BOOL ExecutePostedMenuItem(CFilesWindow* panel, HWND parent, int id, BOOL useOperationContext);
     BOOL ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, int suid, BOOL& unselect);
     // 'id' is the internal command ID; ExecuteMenuItem2 is used for Last Command
     BOOL ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, int id, BOOL& unselect);
@@ -2685,7 +2693,9 @@ public:
     BOOL UnpackArchive(CFilesWindow* panel, const char* archiveFileName,
                        CPluginDataInterfaceAbstract* pluginData,
                        const char* targetDir, const char* archiveRoot,
-                       SalEnumSelection nextName, void* param);
+                       SalEnumSelection nextName, void* param,
+                       const CFilesActionDiskTarget* diskTarget = NULL,
+                       BOOL (*validateSource)(void*) = NULL, void* sourceContext = NULL);
 
     // plugin call: UnpackOneFile
     BOOL UnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
@@ -2696,7 +2706,8 @@ public:
     // plugin call: PackToArchive
     BOOL PackToArchive(CFilesWindow* panel, const char* archiveFileName,
                        const char* archiveRoot, BOOL move, const char* sourceDir,
-                       SalEnumSelection2 nextName, void* param);
+                       SalEnumSelection2 nextName, void* param,
+                       BOOL (*validateContext)(void*) = NULL, void* context = NULL);
 
     // plugin call: DeleteFromArchive
     BOOL DeleteFromArchive(CFilesWindow* panel, const char* archiveFileName,
@@ -2706,7 +2717,9 @@ public:
     // plugin call: UnpackWholeArchive
     BOOL UnpackWholeArchive(CFilesWindow* panel, const char* archiveFileName, const char* mask,
                             const char* targetDir, BOOL delArchiveWhenDone,
-                            CDynamicString* archiveVolumes);
+                            CDynamicString* archiveVolumes, const CFilesActionDiskTarget* sourceSnapshot = NULL,
+                            const CFilesActionDiskTarget* diskTarget = NULL,
+                            const CWholeArchiveUnpackerSnapshot* backendSnapshot = NULL);
 
     // plugin call: CanCloseArchive
     BOOL CanCloseArchive(CFilesWindow* panel, const char* archiveFileName, BOOL force);
