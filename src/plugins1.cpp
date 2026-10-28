@@ -16,6 +16,8 @@
 #include <uxtheme.h>
 #include "dialogs.h"
 #include "configstorage.h"
+#include "common/widepath.h"
+#include "fileactiondisktarget.h"
 
 CPlugins Plugins;
 
@@ -3148,6 +3150,17 @@ static BOOL IsSamandarinPlugin(const char* dllName)
     return fileName != NULL && StrNICmp(fileName, "samandarin", 10) == 0;
 }
 
+BOOL CPluginData::PrepareNativeProcessExit(BOOL finalize)
+{
+    if (!UnloadingPluginsForMainWindowClose || DLL == NULL || !IsSamandarinPlugin(DLLName))
+        return TRUE;
+    typedef BOOL(WINAPI* FPrepareForProcessExit)(DWORD, BOOL);
+    FPrepareForProcessExit prepare = reinterpret_cast<FPrepareForProcessExit>(
+        GetProcAddress(DLL, "Samandarin_PrepareForProcessExit"));
+    // Older binaries keep the existing process-close behavior.
+    return prepare == NULL || prepare(2000, finalize);
+}
+
 BOOL CPluginData::Unload(HWND parent, BOOL ask)
 {
     CALL_STACK_MESSAGE5("CPluginData::Unload(0x%p, %d) (%s v. %s)", parent, ask, DLLName, Version);
@@ -3230,6 +3243,18 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
             if (!skipUnload && PluginIface.NotEmpty())
             {
                 // the plugin may unload: let it delete any remaining temp files from the disk cache
+                // New Samandarin builds can drain native initialization without
+                // invoking the managed callbacks skipped on process close.
+                // A timeout leaves interfaces/module ownership intact.
+                if (skipSamandarinShutdown)
+                {
+                    if (!PrepareNativeProcessExit(TRUE))
+                    {
+                        TRACE_E("Samandarin native initialization is still active; close deferred.");
+                        ThumbnailMasksDisabled = FALSE;
+                        return FALSE;
+                    }
+                }
                 CPluginInterfaceAbstract* unloadedPlugin = PluginIface.GetInterface();
                 DeleteManager.PluginMayBeUnloaded(parent, this);
 
@@ -3604,6 +3629,59 @@ void CPluginData::InitMenuItems(HWND parent, int index, CMenuPopup* menu)
     }
 }
 
+// S27f.01-.11: Verified plugin commands use accepted owned snapshots.
+BOOL CPluginData::IsBranchCommandAllowed(int id)
+{
+    const BOOL automation = DLLName != NULL &&
+        _stricmp(DLLName, "automation\\automation.spl") == 0;
+    // OpenPopup3 is an internal deferred continuation, not a registered menu item.
+    if (automation && (id == 1 || id == 2 || id == 3))
+        return TRUE;
+    // Package and loaded script commands must still exist in the current menu.
+    // The framework retains runtime, enabled state and manifest capability checks.
+    if ((automation && id > 3) ||
+        (DLLName != NULL && _stricmp(DLLName, "salamatrix\\salamatrix.spl") == 0 &&
+         (id == 0x61ffffff || id >= 0x62000001)))
+    {
+        for (int i = 0; i < MenuItems.Count; ++i)
+        {
+            CPluginMenuItem* item = MenuItems[i];
+            if (item != NULL && item->Type == pmitItemOrSeparator &&
+                item->Name != NULL && item->ID == id)
+                return TRUE;
+        }
+        return FALSE;
+    }
+    return DLLName != NULL &&
+        (((id == 1 || id == 3 || id == 4) && _stricmp(DLLName, "zip\\zip.spl") == 0) ||
+         (id == 99 && _stricmp(DLLName, "checksum\\checksum.spl") == 0) ||
+         ((id == 188 || id == 197) && _stricmp(DLLName, "pictview\\pictview.spl") == 0) ||
+         (id == 1 && (_stricmp(DLLName, "7zip\\7zip.spl") == 0 ||
+                      _stricmp(DLLName, "filecomp\\filecomp.spl") == 0 ||
+                      _stricmp(DLLName, "renamer\\renamer.spl") == 0)) ||
+         ((id == 1 || id == 2) && (_stricmp(DLLName, "checksum\\checksum.spl") == 0 ||
+                                 _stricmp(DLLName, "splitcbn\\splitcbn.spl") == 0 ||
+                                 _stricmp(DLLName, "undelete\\undelete.spl") == 0)));
+}
+
+// Both posted paths retain their original operation-context choice and event mask.
+BOOL CPluginData::ExecutePostedMenuItem(CFilesWindow* panel, HWND parent,
+                                       int id, BOOL useOperationContext)
+{
+    if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id))
+        return FALSE;
+    if (!PluginIfaceForMenuExt.NotEmpty())
+        return FALSE;
+    if (useOperationContext)
+    {
+        CSalamanderForOperations operation(panel);
+        PluginIfaceForMenuExt.ExecuteMenuItem(&operation, parent, id, 0);
+    }
+    else
+        PluginIfaceForMenuExt.ExecuteMenuItem(NULL, parent, id, 0);
+    return TRUE;
+}
+
 BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, int suid, BOOL& unselect)
 {
     CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem(, , %d, %d, ) (%s v. %s)", index, suid, DLLName, Version);
@@ -3615,6 +3693,7 @@ BOOL CPluginData::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int index, i
         if (MenuItems[i]->SUID == suid) // comparing the menu item's SUID with the executed command
         {
             id = MenuItems[i]->ID;
+            if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return TRUE;
             if (InitDLL(parent) && PluginIfaceForMenuExt.NotEmpty())
             {
                 DWORD mask = GetMaskForMenuItems(index);
@@ -3632,6 +3711,7 @@ BOOL CPluginData::ExecuteMenuItem2(CFilesWindow* panel, HWND parent, int index, 
 {
     CALL_STACK_MESSAGE5("CPluginData::ExecuteMenuItem2(, , %d, %d, ) (%s v. %s)", index, id, DLLName, Version);
     unselect = FALSE;
+    if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return FALSE;
     int i;
     for (i = 0; i < MenuItems.Count; i++)
     {
@@ -3658,6 +3738,7 @@ BOOL CPluginData::ExecuteToolbarCommand(CFilesWindow* panel, HWND parent,
     CALL_STACK_MESSAGE5("CPluginData::ExecuteToolbarCommand(, , %d, %d, ) (%s v. %s)",
                         index, id, DLLName, Version);
     unselect = FALSE;
+    if (panel != NULL && panel->IsBranchView() && !IsBranchCommandAllowed(id)) return FALSE;
     if (PluginIfaceForMenuExt.NotEmpty())
     {
         const DWORD mask = GetMaskForMenuItems(index);
@@ -3743,13 +3824,35 @@ BOOL CPluginData::ListArchive(CFilesWindow* panel, const char* archiveFileName, 
 BOOL CPluginData::UnpackArchive(CFilesWindow* panel, const char* archiveFileName,
                                 CPluginDataInterfaceAbstract* pluginData,
                                 const char* targetDir, const char* archiveRoot,
-                                SalEnumSelection nextName, void* param)
+                                SalEnumSelection nextName, void* param,
+                                const CFilesActionDiskTarget* diskTarget,
+                                BOOL (*validateSource)(void*), void* sourceContext)
 {
+    if (validateSource != NULL && !validateSource(sourceContext))
+    { SetLastError(ERROR_RETRY); return FALSE; }
     CALL_STACK_MESSAGE6("CPluginData::UnpackArchive(, %s, , %s, %s, ,) (%s v. %s)", archiveFileName,
                         targetDir, archiveRoot, DLLName, Version);
     BOOL ret = FALSE;
+    const BOOL branchTarget = diskTarget != NULL && diskTarget->Branch;
+    const BOOL branchOwnerQualified = !branchTarget ||
+        PackGetVerifiedBranchUnpacker(panel, archiveFileName, pluginData) == this;
+    // Both supported backends have private listing data: initialization cannot switch their kind.
+    const BOOL branchWasZip = branchTarget && branchOwnerQualified && _stricmp(DLLName, "zip\\zip.spl") == 0;
     if (InitDLL(MainWindow->HWindow))
     {
+        // InitDLL may dispatch callbacks; validate the source before any panel getter.
+        if (validateSource != NULL && !validateSource(sourceContext))
+        { SetLastError(ERROR_RETRY); return FALSE; }
+        // Check the live destination registry again before plugin I/O.
+        if (diskTarget != NULL && (!diskTarget->IsCurrent(MainWindow) ||
+            diskTarget->Branch && (!branchOwnerQualified || !diskTarget->DirectoryDefault || targetDir == NULL ||
+                strcmp(targetDir, diskTarget->DefaultPath.c_str()) != 0 ||
+                PackGetVerifiedBranchUnpacker(panel, archiveFileName, pluginData) != this ||
+                branchWasZip != (_stricmp(DLLName, "zip\\zip.spl") == 0))))
+        {
+            SetLastError(ERROR_RETRY);
+            return FALSE;
+        }
         CSalamanderForOperations sc(panel);
         ret = PluginIfaceForArchiver.UnpackArchive(&sc, archiveFileName, pluginData, targetDir,
                                                    archiveRoot, nextName, param);
@@ -3778,13 +3881,18 @@ BOOL CPluginData::UnpackOneFile(CFilesWindow* panel, const char* archiveFileName
 
 BOOL CPluginData::PackToArchive(CFilesWindow* panel, const char* archiveFileName,
                                 const char* archiveRoot, BOOL move, const char* sourceDir,
-                                SalEnumSelection2 nextName, void* param)
+                                SalEnumSelection2 nextName, void* param,
+                                BOOL (*validateContext)(void*), void* context)
 {
+    if (validateContext != NULL && !validateContext(context))
+    { SetLastError(ERROR_RETRY); return FALSE; }
     CALL_STACK_MESSAGE7("CPluginData::PackToArchive(, %s, %s, %d, %s, ,) (%s v. %s)", archiveFileName,
                         archiveRoot, move, sourceDir, DLLName, Version);
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {
+        if (validateContext != NULL && !validateContext(context))
+        { SetLastError(ERROR_RETRY); return FALSE; }
         CSalamanderForOperations sc(panel);
         ret = PluginIfaceForArchiver.PackToArchive(&sc, archiveFileName, archiveRoot, move, sourceDir, nextName, param);
     }
@@ -3807,13 +3915,58 @@ BOOL CPluginData::DeleteFromArchive(CFilesWindow* panel, const char* archiveFile
 }
 
 BOOL CPluginData::UnpackWholeArchive(CFilesWindow* panel, const char* archiveFileName, const char* mask,
-                                     const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes)
+                                     const char* targetDir, BOOL delArchiveWhenDone, CDynamicString* archiveVolumes,
+                                     const CFilesActionDiskTarget* sourceSnapshot, const CFilesActionDiskTarget* diskTarget,
+                                     const CWholeArchiveUnpackerSnapshot* backendSnapshot)
 {
     CALL_STACK_MESSAGE7("CPluginData::UnpackWholeArchive(, %s, %s, %s, %d,) (%s v. %s)", archiveFileName,
                         mask, targetDir, delArchiveWhenDone, DLLName, Version);
     BOOL ret = FALSE;
+    if (backendSnapshot != NULL && !backendSnapshot->IsCurrent(this))
+    {
+        SetLastError(ERROR_RETRY);
+        return FALSE;
+    }
     if (InitDLL(MainWindow->HWindow))
     {
+        // Initialization can dispatch callbacks: validate live panel identities before operation context or I/O.
+        if ((backendSnapshot != NULL && !backendSnapshot->IsCurrent(this)) ||
+            (sourceSnapshot != NULL && (sourceSnapshot->Panel != panel || !sourceSnapshot->IsCurrent(MainWindow))) ||
+            (diskTarget != NULL && !diskTarget->IsCurrent(MainWindow)))
+        {
+            SetLastError(ERROR_RETRY);
+            return FALSE;
+        }
+        // Independent post-init admission before the SDK operation context.
+        CFilesWindow* liveSource = CFilesActionDiskTarget::FindLive(MainWindow, panel);
+        if ((sourceSnapshot != NULL && sourceSnapshot->Branch) || (liveSource != NULL && liveSource->IsBranchView()) || (diskTarget != NULL && diskTarget->Branch))
+        {
+            if (sourceSnapshot == NULL || sourceSnapshot->Panel != panel || !sourceSnapshot->IsCurrent(MainWindow) ||
+                diskTarget == NULL || !diskTarget->IsCurrent(MainWindow) ||
+                (delArchiveWhenDone && archiveVolumes == NULL) || backendSnapshot == NULL || !backendSnapshot->IsVerifiedBranchSourceUnpacker())
+            {
+                SetLastError(ERROR_NOT_SUPPORTED);
+                return FALSE;
+            }
+        }
+        if (backendSnapshot != NULL && !backendSnapshot->ValidateBranchTarget(diskTarget, targetDir))
+        {
+            SetLastError(ERROR_RETRY);
+            return FALSE;
+        }
+        // A supplied source was just resolved in the live registry. Keep it alive during SDK callbacks.
+        BOOL* busy = sourceSnapshot != NULL ? &panel->FilesActionInProgress : NULL;
+        if (busy != NULL && *busy)
+        {
+            SetLastError(ERROR_RETRY);
+            return FALSE;
+        }
+        struct CUnpackPanelBusyScope
+        {
+            BOOL* Flag;
+            explicit CUnpackPanelBusyScope(BOOL* flag) : Flag(flag) { if (Flag != NULL) *Flag = TRUE; }
+            ~CUnpackPanelBusyScope() { if (Flag != NULL) *Flag = FALSE; }
+        } panelBusy(busy);
         CSalamanderForOperations sc(panel);
         ret = PluginIfaceForArchiver.UnpackWholeArchive(&sc, archiveFileName, mask, targetDir,
                                                         delArchiveWhenDone, archiveVolumes);

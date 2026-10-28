@@ -1135,7 +1135,7 @@ SLGINCOMPLETE,""
 1157,175,238,36,8,1,"Elemente."
 
 [DIALOG 1105]
-299,243,1,"Dateifenster"
+299,263,1,"Dateifenster"
 599,1,3,125,12,1,"&Bedienfelder mit Tabs verwenden"
 596,1,16,279,12,1,"Dateien/Verzeichnisse mit &Versteckt- oder System-Attribut ausblenden (Strg+H)"
 302,1,28,198,12,1,"Verzeich&nisse bei Auswahl-Operationen mit einbeziehen"
@@ -1161,6 +1161,7 @@ SLGINCOMPLETE,""
 391,10,203,191,12,1,"Bei Sor&tierung nach Zeit: neuere Einträge nach oben"
 395,10,215,220,12,1,"Bei Sortierung nach Ze&it: Verzeichnisse nach Namen sortieren"
 392,10,227,289,12,1,"Verzeichnisse wie Er&weiterungen behandeln (Erweiterungen in Erw-Spalte anzeigen)"
+14528,1,247,295,12,1,"Relative Pfade in der Spalte Path der Branch View verwenden"
 
 [DIALOG 1106]
 299,104,1,"Tabs"
@@ -4139,9 +4140,41 @@ SLGINCOMPLETE,""
 14493,1,"Datei/Verzeichnis-Typ stimmt nicht überein"
 
 [STRINGTABLE 182]
-14991,1,"Lese Dateizuordnungen aus dem Dateispeicher, bitte warten..."
+14500,1,"Zweigansicht"
+14501,1,"&Zweigansicht\tCtrl+B"
+14502,1,"Pfad"
+14503,1,"Tatsächlicher übergeordneter Ordner"
+14504,1,"Enthaltenden &Ordner öffnen"
+14505,1,"Suche in der Zweigansicht stoppen"
+14506,1,"Zweigansicht - Suche läuft... %I64u Dateien"
+14507,1,"Zweigansicht - %I64u Dateien"
+14508,1,"Zweigansicht - gestoppt; %I64u Dateien (unvollständig)"
+14509,1,"Zweigansicht - %I64u Dateien; %I64u Ordner konnten nicht gelesen werden"
+14510,1,"Unterordnerpfade relativ zum Stamm der Zweigansicht beibehalten"
+14511,1,"Pfad: "
 
 [STRINGTABLE 183]
+14512,1,"Der Ordnerbaum konnte nicht gelesen werden. Aktualisieren Sie die Ansicht, um es erneut zu versuchen."
+14513,1,"Zweigansicht - Aktualisierung läuft... %I64u Dateien beibehalten"
+14514,1,"Zweigansicht - Aktualisierung gestoppt; vorherige Ergebnisse beibehalten (%I64u Dateien)"
+14515,1,"Zweigansicht - %I64u Dateien werden vorbereitet; %I64u vorherige Ergebnisse beibehalten"
+14516,0,"The program could not be started safely through Windows. It was not retried using another launch method."
+14517,0,"The item could not be opened through Windows Shell. The selected item was not retried using another launch method."
+14518,0,"Windows long-path setting: disabled."
+14519,0,"Windows long-path setting: enabled. Running processes may still use an earlier cached setting."
+14520,0,"Windows long-path setting: not configured (default behavior)."
+14521,0,"Windows long-path setting could not be determined."
+14522,0,"This setting is diagnostic information, not the established cause of this failure. Enabling it does not guarantee support by Shell, security services or the target application."
+14523,0,"Close"
+14524,0,"Windows settings guide"
+14525,0,"Windows long-path support"
+14526,0,"An administrator can enable the Windows policy:\nComputer Configuration > Administrative Templates > System > Filesystem > Enable Win32 long paths.\n\nIts registry equivalent is REG_DWORD LongPathsEnabled = 1 under:\nHKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\FileSystem\n\nRestart affected applications; restarting Windows may also be necessary. Applications must support long paths themselves. This is not a way to override a security denial, and Shell or the target program may still reject the path. Salamander does not change this setting."
+14527,0,"Windows error:"
+
+[STRINGTABLE 184]
+14991,1,"Lese Dateizuordnungen aus dem Dateispeicher, bitte warten..."
+
+[STRINGTABLE 185]
 14992,1,"Konfiguration wird im Dateispeicher gespeichert, bitte warten..."
 14993,1,"Alte Konfiguration wird aus dem Dateispeicher gelöscht, bitte warten..."
 14994,1,"Lese Dateizuordnungen aus dem Dateispeicher..."
@@ -4150,4 +4183,3 @@ SLGINCOMPLETE,""
 14997,1,"Lese Benutzermenüoptionen aus dem Dateispeicher..."
 14998,1,"Standardschrift &UI verwenden"
 14999,1,"&UI-Schrift verwenden"
-
