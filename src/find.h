@@ -2,6 +2,16 @@
 // SPDX-FileCopyrightText: 2026 Open Samandarin Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // | Date | Summary | Reason | Ticket | Model |
+// | 2026-11-10 | Expose bounded legacy path checks and full focused paths. | Avoid passing long results to legacy fixed buffers. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Retain the identity of a protected Find result. | Permit a later exact-file viewer request after the search ends. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Pass the protected Find root by value. | Keep search lifetime independent of panel and broker teardown. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Separate protected consent from Find heartbeat | Integrate UAC with current upstream behavior. | #731 | Codex |
+// | 2026-11-09 | Cancel the protected Find broker handshake on Stop. | Release the read-only pipe while preserving the transfer cancellation contract. | | Codex |
+// | 2026-11-09 | Bind queued Find notifications to the originating search. | Ignore old refresh and completion messages after a restart. | | Codex |
+// | 2026-11-08 | Distinguish exact-file Find consent. | Report the scope explicitly in the dialog. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Bind duplicate candidates to a specific consented scope. | Distinguish independent protected roots. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Identify protected duplicate candidates. | Keep later content reads on the session that authorized the candidate. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Route protected Find consent separately from traversal. | Keep cancellation visible to both search threads. | | GPT-6.1 Sol (Codex) |
 // | 2026-11-07 | Expose the Find activity cursor to the native list. | Keep the indication local to the Find dialog. | https://github.com/KRtkovo-eu-AI/salamander/issues/819 | GPT-6 (Codex) |
 // | 2026-11-07 | Give Find a lifetime-safe UI Automation model. | Keep offscreen rows discoverable without expanding the complete native list. | https://github.com/KRtkovo-eu-AI/salamander/issues/819 | GPT-6 (Codex) |
 // | 2026-11-07 | Distinguish Find finalization from completion. | Report when the worker is done and the dialog is still preparing results. | https://github.com/KRtkovo-eu-AI/salamander/issues/819 | GPT-6 (Codex) |
@@ -37,6 +47,9 @@ struct FIND_LOG_ITEM
 #define WM_USER_FLASHICON WM_APP + 214  // after activating the find, flash the status icon
 #define WM_USER_FIND_HEARTBEAT (WM_APP + 215) // [request, 0] - acknowledge actual Find message handling
 #define IDT_FIND_WATCHDOG 955
+
+#define WM_USER_FIND_PROTECTED_CONSENT (WM_APP + 216) // synchronous [const std::wstring* path, FindConsentScope]
+enum class FindConsentScope : LPARAM { Metadata, Content, File };
 
 extern BOOL IsNotAlpha[256];
 
@@ -87,7 +100,7 @@ class CMenuBar;
 
 struct CSearchForData
 {
-    char Dir[MAX_PATH];
+    std::string Dir;
     CMaskGroup MasksGroup;
     BOOL IncludeSubDirs;
 
@@ -104,7 +117,7 @@ struct CSearchForData
         case 0:
             return MasksGroup.GetMasksString();
         case 1:
-            return Dir;
+            return Dir.c_str();
         default:
             return IncludeSubDirs ? LoadStr(IDS_INCLUDESUBDIRSYES) : LoadStr(IDS_INCLUDESUBDIRSNO);
         }
@@ -175,6 +188,7 @@ void CloseFindWatchdog(CFindWatchdog* watchdog);
 std::wstring PollFindWatchdogs(HWND mainWindow);
 
 class CFindLog;
+namespace UacF7 { struct FindRootIdentity; class PreparedLeaf; }
 
 struct CGrepData
 {
@@ -196,7 +210,10 @@ struct CGrepData
     DWORD AttributesValue; // then compare
     CFilterCriteria Criteria;
     // control and data
-    std::atomic<bool> StopSearch{false}; // cancellation shared by the dialog and search worker
+    std::shared_ptr<const UacF7::FindRootIdentity> ProtectedRoot;
+    HWND ConsentWindow = nullptr; // owner of protected access prompts
+    HANDLE StopEvent = nullptr; // owned by the dialog until the search worker has joined
+    std::atomic_bool StopSearch{false}; // the dialog requests cancellation of the search
     BOOL SearchStopped; // has it been terminated or not?
     CFindLog* Log;      // dialog-owned storage; worker copies messages without calling the UI
     CFindWatchdog* Watchdog; // optional scalar telemetry; retained by the Find dialog
@@ -549,6 +566,7 @@ struct CFoundFilesData
     CQuadWord Size;
     DWORD Attr;
     FILETIME LastWrite;
+    std::shared_ptr<const UacF7::PreparedLeaf> FoundView; // exact file identity from a protected search
 
     // 'Group' is used in two ways:
     // 1) while searching for duplicate files, when contents are compared,
@@ -559,6 +577,7 @@ struct CFoundFilesData
 
     bool IsDir;          // immutable after publication and read by the sort worker
     unsigned Selected : 1; // temporary selection state during order publication
+    unsigned ProtectedScope : 6; // one-based Find session for a protected duplicate
     // 'Different' is used to distinguish file groups during duplicate search
     unsigned Different : 1; // 0 - item has standard white background, 1 - item uses a different one (for difference highlighting)
 
@@ -570,6 +589,7 @@ struct CFoundFilesData
         ZeroMemory(&LastWrite, sizeof(LastWrite));
         Group = 0;
         IsDir = false;
+        ProtectedScope = 0;
         Selected = 0;
         Different = 0;
 #ifdef _DEBUG
@@ -611,6 +631,7 @@ public:
     BOOL SetW(const wchar_t* path, const wchar_t* name, const CQuadWord& size, DWORD attr,
               const FILETIME* lastWrite, BOOL isDir);
     std::wstring GetFullNameW() const;
+    bool CanUseLegacyShellPath() const;
     // if 'i' refers to Name or Path, returns a pointer to the corresponding variable
     // otherwise fills the buffer 'text' (must be at least 50 characters long) with the appropriate value
     // and returns a pointer to 'text'
@@ -890,7 +911,8 @@ public:
     std::atomic<CStateOfFindCloseQueryEnum> StateOfFindCloseQuery; // main thread asks the Find thread whether the window can close; unsynchronized, used only during shutdown, more than enough...
 
 public:
-    CFindDialog(HWND hCenterAgainst, const char* initPath);
+    CFindDialog(HWND hCenterAgainst, const char* initPath,
+                std::shared_ptr<const UacF7::FindRootIdentity> protectedRoot);
     ~CFindDialog();
     void SetWatchdog(const std::shared_ptr<CFindWatchdog>& watchdog) { Watchdog = watchdog; }
 
@@ -901,7 +923,7 @@ public:
 
     void SetZeroOnDestroy(CFindDialog** zeroOnDestroy) { ZeroOnDestroy = zeroOnDestroy; }
 
-    BOOL GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex /* can be NULL */);
+    std::string GetFocusedFile(int* viewedIndex = nullptr);
     const char* GetName(int index);
     const char* GetPath(int index);
     BOOL UpdateInternalViewerData();
@@ -1024,7 +1046,8 @@ public:
 // externs
 //
 
-BOOL OpenFindDialog(HWND hCenterAgainst, const char* initPath);
+BOOL OpenFindDialog(HWND hCenterAgainst, const char* initPath,
+                    std::shared_ptr<const UacF7::FindRootIdentity> protectedRoot = {});
 
 extern CFindOptions FindOptions;
 extern CFindIgnore FindIgnore;

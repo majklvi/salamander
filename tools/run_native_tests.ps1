@@ -1,4 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Open Salamander Authors
+# | 2026-11-07 | Run the handle-relative directory creation fixture. | Verify parent substitution, reparse rejection and long paths in CI. | | GPT-6.1 Sol (Codex) |
+# | 2026-11-07 | Run the UAC broker transport fixture. | Exercise real peer rejection and disconnect in CI. | | GPT-6.1 Sol (Codex) |
 # SPDX-FileCopyrightText: 2026 Open Samandarin Authors
 # SPDX-License-Identifier: GPL-2.0-or-later
 # | Date | Summary | Reason | Ticket | Model |
@@ -654,6 +656,16 @@ try {
             Name = 'branch_rename_fallback_tests'
             ClassName = 'native-generated'
             Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\branch_rename_fallback_tests.py'), '--configuration', $Configuration)
+        },
+        @{
+            Name = 'uac_directory_leaf_tests'
+            ClassName = 'native-generated'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\uac_directory_leaf_tests.py'), '--configuration', $Configuration)
+        },
+        @{
+            Name = 'uacbroker_transport_tests'
+            ClassName = 'native-generated'
+            Arguments = @('-B', (Join-Path $repositoryRoot 'src\tests\uacbroker_transport_tests.py'), '--configuration', $Configuration)
         },
         @{
             Name = 'create_directory_wrapper_tests'

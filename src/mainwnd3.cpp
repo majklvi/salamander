@@ -1,8 +1,12 @@
 // SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-FileCopyrightText: 2026 Open Samandarin Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// | 2026-11-08 | Route explicit Refresh to protected archives. | Leave background refresh noninteractive. | | GPT-6.1 Sol (Codex) |
 // | Date | Summary | Reason | Ticket | Model |
+// | 2026-11-10 | Return to the invoking window when admin shell consent is cancelled. | Keep a successful visible shell in the foreground. | #731 | GPT-6.1 Sol |
 // | 2026-11-10 | Enable clipboard copy from plugin file systems. | The staged-file clipboard path supports plugin FS sources with copy-from-FS service. | https://github.com/KRtkovo-eu-AI/salamander/issues/741 | GPT-6 |
+// | 2026-11-08 | Remove the standalone ZIP recovery command route. | Limit UAC to existing ZIP commands. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Dispatch explicit ZIP recovery from a disk panel. | Use the normal guarded command route for attached and detached panels. | | GPT-6.1 Sol (Codex) |
 // | 2026-11-07 | Pump main-window messages while Find closes. | Let Find defer destruction until its workers release their data. | https://github.com/KRtkovo-eu-AI/salamander/issues/819 | GPT-6 (Codex) |
 // | 2026-11-07 | Check Find responsiveness on the main window timer. | Use the independent main message loop during a Find stall. | https://github.com/KRtkovo-eu-AI/salamander/issues/819 | GPT-6 (Codex) |
 // | 2026-11-07 | Allow Ctrl+H in Branch View. | Send the hidden and system file toggle through its existing panel refresh. | | GPT-6 (Codex) |
@@ -442,7 +446,7 @@ bool CMainWindow::InsertPanelTabInstance(CPanelSide side, int index, CFilesWindo
 }
 
 void CMainWindow::RequestPanelRefresh(CFilesWindow* panel, bool rebuildDriveBars,
-                                      bool postRefreshMessage)
+                                      bool postRefreshMessage, bool explicitRefresh)
 {
     if (panel == NULL || panel->HWindow == NULL)
         return;
@@ -460,7 +464,9 @@ void CMainWindow::RequestPanelRefresh(CFilesWindow* panel, bool rebuildDriveBars
     int refreshId = MyTimeCounter++;
     HANDLES(LeaveCriticalSection(&TimeCounterSection));
 
-    if (postRefreshMessage)
+    if (explicitRefresh && panel->IsProtectedZip())
+        panel->RefreshDirectory(FALSE, FALSE, FALSE, true);
+    else if (postRefreshMessage)
         PostMessage(panel->HWindow, WM_USER_REFRESH_DIR, 0, (LPARAM)refreshId);
     else
         SendMessage(panel->HWindow, WM_USER_REFRESH_DIR, 0, (LPARAM)refreshId);
@@ -7436,13 +7442,13 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_LEFTREFRESH: // refresh the left panel
         {
-            RequestPanelRefresh(LeftPanel, true); // maybe the user refreshed to update the drives list?
+            RequestPanelRefresh(LeftPanel, true, false, true); // maybe the user refreshed to update the drives list?
             return 0;
         }
 
         case CM_RIGHTREFRESH: // refresh the right panel
         {
-            RequestPanelRefresh(RightPanel, true); // maybe the user refreshed to update the drives list?
+            RequestPanelRefresh(RightPanel, true, false, true); // maybe the user refreshed to update the drives list?
             return 0;
         }
 
@@ -7640,7 +7646,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_ACTIVEREFRESH: // refresh praveho panelu
         {
-            RequestPanelRefresh(activePanel, true); // maybe the user refreshed to update the drives list?
+            RequestPanelRefresh(activePanel, true, false, true); // maybe the user refreshed to update the drives list?
             return 0;
         }
 
@@ -8741,8 +8747,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 SHELLEXECUTEINFO sei;
                 memset(&sei, 0, sizeof(sei));
                 sei.cbSize = sizeof(sei);
-                sei.fMask = SEE_MASK_NOCLOSEPROCESS;
-                sei.hwnd = HWindow;
+                sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+                const UacF7::ConsentForeground foreground(HWindow);
+                sei.hwnd = foreground.Owner();
                 sei.lpVerb = "runas";
                 sei.lpFile = elevatedApplication;
                 sei.lpParameters = elevatedArguments;
@@ -8752,7 +8759,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 if (!ShellExecuteEx(&sei))
                 {
                     DWORD err = GetLastError();
-                    if (err != ERROR_CANCELLED)
+                    if (err == ERROR_CANCELLED)
+                        foreground.Restore();
+                    else
                     {
                         SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERROREXECPROMPT),
                                       MB_OK | MB_ICONEXCLAMATION);

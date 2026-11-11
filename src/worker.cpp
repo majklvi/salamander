@@ -2,7 +2,76 @@
 // SPDX-FileCopyrightText: 2026 Open Samandarin Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // | Date | Summary | Reason | Ticket | Model |
+// | 2026-11-10 | Pass explicit retry to the leaf consent dialog. | Allow the user to reconsider a previous refusal from the usual error dialog. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Use prepared delete identities for all direct selection types. | Keep a failed identity preparation in the error flow and allow only exact verified retry. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Remove a permanent-delete directory by its owned wide name. | Keep Unicode and long paths through the normal attempt and elevated retry. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Create the missing approved tree root through the worker. | Keep collisions in the normal error flow and do not merge a newly appeared root. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Honor a declined tree copy in the transfer worker. | Return to the normal error flow without a second consent prompt. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Reuse the broker opened during F5 source analysis. | Keep exact listed identities, one consent and session cleanup through the worker. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Start scoped F5 merge on the first denied child. | Capture the confirmed root identity and retain normal merge and overwrite choices. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Retry denied tree entries within one broker job. | Create a verified root and preserve ordinary file progress and conflict handling. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Route deferred directory moves through the transfer broker. | Create the protected target before the atomic rename. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Offer UAC for denied whole-directory moves on the same volume. | Reuse the verified transfer dialog and keep conflict handling in the worker. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Execute deferred target file jobs through the scoped broker. | Use the same destination identity and consent for single-file and sequential batch requests. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Use the listed source only on the matching transfer operation. | Preserve the ordinary worker for other rows and keep F5 overwrite confirmation. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Retry Branch View deletion only after an actual access denial. | Preserve ordinary deletion and sharing-error recovery. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Report an unverified Branch View row through the delete error flow. | Allow Skip or Cancel while keeping that file untouched. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Use the exact prepared Branch View file during permanent deletion. | Keep the existing local check, consent and skip handling in the worker. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Run verified panel transfers in the existing worker path. | Preserve job consent, progress and cancellation while refusing an occupied destination. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Integrate clipboard lease cleanup with UAC worker teardown. | Release staged sources in the existing out-of-line destructor. | #731 | GPT-6.1 Sol |
 // | 2026-11-10 | Keep staged clipboard sources alive for async disk copies. | Worker operations need their temp source after clipboard replacement. | https://github.com/KRtkovo-eu-AI/salamander/issues/741 | GPT-6 |
+// | 2026-11-10 | Distinguish transfer retries caused by the destination. | Preserve separate consent for a protected source and F6 completion. | #731 | GPT-6 (Codex) |
+// | 2026-11-10 | Reuse shielded Yes only for the exact selected delete. | Ask for protected descendants during the operation and stop before child changes on cancellation. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Forward the metadata shield on the first verified access denial. | Preserve local execution and ordinary retry behavior. | #731 | GPT-6.1 Sol (Codex) |
+// | 2026-11-10 | Execute protected panel metadata through the existing verified worker flow. | Preserve exact choices, confirmation, cancellation and error handling. | #731 | GPT-6.1 Sol (Codex) |
+// | 2026-11-10 | Keep EFS diagnostics and upstream lock recovery in the copy worker | Integrate UAC with current upstream behavior. | #731 | Codex |
+// | 2026-11-09 | Signal Scan Ahead on terminal worker failure. | Stop the scanner when a protected transfer is cancelled. | | Codex |
+// | 2026-11-09 | Reopen the native overwrite dialog for a broker collision. | Require a fresh decision for a file that appeared during elevated F5. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Calculate native transfer progress without overflowing. | Keep the exact bar value for large F6 operations and batch totals. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Mark active elevated transfers in the progress caption. | Keep ordinary transfers on the existing icon. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Show tree and EFS import progress. | Reuse the native transfer bars with an explicit broker total. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Show broker byte counts in the existing progress dialog. | Count completed work only after the terminal result. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Pin the exact copied files before local F6 source retirement. | Detect a substituted source or destination before trying either local or elevated deletion. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Release a closed transfer session immediately. | Avoid keeping dead scope paths during long-running batches. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Route combined compression and permissions to protected F5. | Keep both existing copy options active in the worker retry. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Use item eligibility for protected transfer in the worker. | Keep mixed selections serial on denied direct items and preserve recursive behavior. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Admit named streams to verified F5 overwrite. | Allow the broker to preserve eligible source streams before publication. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Allow verified overwrite when F5 cannot open the source. | Keep the ordinary conflict decision and retry tied to the prepared target. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Bind protected Scan Ahead overwrites to the scanned revision. | Requeue changed targets before the protected retry and leave reviewed overwrites to the serial worker. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Complete Scan Ahead transfer admission and cancellation. | Keep protected retries serial, separate from scanned conflicts, and admit compressed streams to guarded F6. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Keep F6 source retirement retries on the verified path. | Never retry a denied protected delete by name after copying. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Allow large F6 completions after ordinary copying. | Apply the same F6 byte limit before capturing the copy identity. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Allow cross-volume F6 to retain known named streams. | Keep the normal attribute option and same-volume retry within their existing scopes. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Keep preflight-denied F6 requests cross-volume only. | Bind the deferred source read to a verified move between distinct volumes. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Retry exact compressed F6 with the scoped broker. | Honor the existing Copy attributes option before retiring the source. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Offer brokered cross-volume F6 for sparse files. | Limit the new route to a guarded copy that preserves sparse ranges. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Capture the handles used by an ordinary F6 copy. | Complete denied source deletion only for that exact copy. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Route denied cross-volume F6 to the broker. | Avoid removing the source twice after a confirmed move. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Preserve and verify EFS alternate data streams. | Keep the source stream inventory consistent through encrypted export and publication. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Cancel active protected transfers. | Keep the progress dialog responsive and wait for the actual broker outcome. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Preserve worker error choices for leaf mutations. | Return cancelled elevation to the ordinary retry and skip dialog. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Resume the ordinary transfer error flow after known UAC outcomes. | Preserve skipped items, progress and confirmed overwrite revisions. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Allow protected EFS in the serial transfer batch. | Keep one authorization per compatible scope. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Route eligible encrypted F5 failures to the broker. | Preserve ciphertext and release the normal copy handle before elevation. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Process approved leaves in the existing worker sequence. | Preserve progress and stop the batch on a canceled or unconfirmed elevated operation. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Offer the verified F5 replacement after ordinary access is denied. | Capture the conflict before consent and exclude locally modified targets. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Explain denied protected EFS copies. | Keep ordinary EFS success and existing retry choices available. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Route the explicit F5 security option to the broker. | Keep security copy independent of move and other copy options. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Offer the verified delete path for one eligible junction. | Use the classified request for permanent deletion only. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Route one permanent directory symbolic-link delete to the verified worker. | Keep the recycling policy and unsupported object types on their established paths. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Use the verified delete flow for one file symbolic link. | Keep recycling and directory links on their existing paths. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Allow F5 to preserve supported compressed-file attributes through UAC. | Use a distinct request only with the copy attributes option. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Admit sparse files to the default F5 broker path. | Retain existing eligibility for move and explicit ADS omission. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Admit one-file F5 with planned named streams. | Keep the planned ADS bytes in the copy progress total. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Select the typed main-stream-only copy request. | Keep default copy and move strict about named streams. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Allow a basic attribute update for a selected directory. | Preserve the item type and the existing single-item limits. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Route directory timestamps through the basic metadata worker. | Use the broker only for a single nonrecursive time-only request. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Execute consented tree transfers on the worker thread. | Keep the dialog available for cancellation until the broker replies. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Dispatch the protected tree copy after queue admission. | Count one completion only when the broker confirms publication. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-07 | Run eligible permanent deletion with the verified file executor. | Preserve the original file identity across ordinary attempts and elevated consent. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-07 | Run one-file basic metadata changes through the verified executor. | Offer elevation only after an ordinary access denial and retain worker accounting. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Offer one verified broker copy after ordinary access is denied. | Keep the existing worker lease and only count an acknowledged copy. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Offer a verified same-volume move after access denial. | Complete the existing F6 item only after an authenticated result. | | GPT-6.1 Sol (Codex) |
 // | 2026-11-09 | Send typed file-lock recovery dialog data. | Remove the unsafe narrow-to-wide pointer cast reported by CodeQL. | https://github.com/KRtkovo-eu-AI/salamander/pull/842 | GPT-6 (Codex) |
 // | 2026-11-09 | Offer lock-process recovery after delete and overwrite failures. | Make the issue #836 workflow available in core file operations. | https://github.com/KRtkovo-eu-AI/salamander/issues/836 | GPT-6 (Codex) |
 // CommentsTranslationProject: TRANSLATED
@@ -14,7 +83,10 @@
 #include "workerpath.h"
 #include "filelock.h"
 #include "operationrecycle.h"
+
+#include <list>
 #include "common/widepath.h"
+#include "uacbroker/f7pilot.h"
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
@@ -494,6 +566,9 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
     BytesPerCluster = 0;
     ClearReadonlyMask = 0xFFFFFFFF;
     InvertRecycleBin = FALSE;
+    AllowPermanentDeletePilot = FALSE;
+    AllowTransferPilot = FALSE;
+    IgnoreTransferAds = FALSE;
     CanUseRecycleBin = TRUE;
     SameRootButDiffVolume = FALSE;
     TargetPathSupADS = FALSE;
@@ -563,6 +638,14 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
     LastProgBufLimTestTime = GetTickCount() - 1000;
     LastFileBlockCount = 0;
     LastFileStartTime = GetTickCount();
+}
+
+COperations::~COperations()
+{
+    if (ClipboardLease != NULL)
+        ClipboardLease->Release();
+    HANDLES(DeleteCriticalSection(&ConflictCS));
+    HANDLES(DeleteCriticalSection(&StatusCS));
 }
 
 void COperations::AddStoragePath(const char* path, int access)
@@ -1251,7 +1334,7 @@ BOOL COperations::TransitionConflictItem(int index, CCopyMoveItemState from, CCo
 
 void COperations::PublishConflictScanResult(int index, CCopyMoveConflictType type, DWORD attributes,
                                             ULONGLONG size, const FILETIME& writeTime, DWORD volumeSerial,
-                                            ULONGLONG fileIndex, BOOL identityValid, BOOL existed)
+                                            ULONGLONG fileIndex, BOOL identityValid, BOOL existed, const UacF7::ArchiveRevision& revision)
 {
     HANDLES(EnterCriticalSection(&ConflictCS));
     if (index >= 0 && index < Count)
@@ -1271,6 +1354,7 @@ void COperations::PublishConflictScanResult(int index, CCopyMoveConflictType typ
         op.ScannedTargetFileIndex = fileIndex;
         op.ScannedTargetIdentityValid = identityValid;
         op.ScannedTargetExisted = existed;
+        op.ScannedTargetRevision = revision;
         op.ConflictProbe.Type = type;
         op.ConflictProbe.Attributes = attributes;
         op.ConflictProbe.Size = size;
@@ -1454,7 +1538,7 @@ BOOL COperations::LeaseNextParallelCopy(int& index, ULONGLONG& leaseToken, int s
         // startIndex is only a fairness hint; it must never exclude an older ready item.
         if (*item < 0 || *item >= Count) continue;
         COperation& op = At(*item);
-        if (op.Opcode != ocCopyFile || op.ConflictIsFinalizer ||
+        if (op.Opcode != ocCopyFile || op.ConflictIsFinalizer || op.ScannedTargetRevision.attributes ||
             (op.ConflictState != cmisReady && op.ConflictState != cmisOverwrite)) continue;
         op.ConflictState = cmisRunning;
         op.ConflictItemState = ccipLeased;
@@ -1603,11 +1687,33 @@ void COperations::CompleteConflictItem(int index, BOOL skipped, int throughIndex
     HANDLES(LeaveCriticalSection(&ConflictCS));
 }
 
+// The ordinary scan may follow a link. Only capture a broker revision from
+// the exact, no-follow object, and bind it to the item the scan displayed.
+static void CaptureScannedOverwriteRevision(const std::wstring& path, const BY_HANDLE_FILE_INFORMATION& observed,
+                                            UacF7::ArchiveRevision& revision)
+{
+    HANDLE file = HANDLES_Q(CreateFileW(path.c_str(), FILE_READ_ATTRIBUTES,
+                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                        OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+    if (file == INVALID_HANDLE_VALUE)
+        return;
+    BY_HANDLE_FILE_INFORMATION current;
+    if (GetFileInformationByHandle(file, &current) &&
+        current.dwVolumeSerialNumber == observed.dwVolumeSerialNumber &&
+        current.nFileIndexHigh == observed.nFileIndexHigh && current.nFileIndexLow == observed.nFileIndexLow &&
+        current.dwFileAttributes == observed.dwFileAttributes &&
+        current.nFileSizeHigh == observed.nFileSizeHigh && current.nFileSizeLow == observed.nFileSizeLow &&
+        CompareFileTime(&current.ftLastWriteTime, &observed.ftLastWriteTime) == 0)
+        UacF7::CaptureOverwriteRevision(file, revision);
+    HANDLES(CloseHandle(file));
+}
+
 BOOL COperations::RevalidateConflictItem(int index, CCopyMoveConflictType& conflictType)
 {
     conflictType = cmctNone;
     HANDLES(EnterCriticalSection(&ConflictCS));
     BOOL valid = FALSE;
+    bool refreshRevision = false;
     if (index >= 0 && index < Count)
     {
         COperation& op = At(index);
@@ -1619,6 +1725,7 @@ BOOL COperations::RevalidateConflictItem(int index, CCopyMoveConflictType& confl
             HANDLE file = HANDLES_Q(CreateFileW(target.c_str(), FILE_READ_ATTRIBUTES,
                                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
                                                 NULL, OPEN_EXISTING,
+                                                op.ScannedTargetRevision.attributes ? FILE_FLAG_OPEN_REPARSE_POINT :
                                                 op.ConflictType == cmctDirectoryExists ? FILE_FLAG_BACKUP_SEMANTICS : 0, NULL));
             if (file != INVALID_HANDLE_VALUE)
             {
@@ -1630,17 +1737,26 @@ BOOL COperations::RevalidateConflictItem(int index, CCopyMoveConflictType& confl
                         info.dwFileAttributes == op.ScannedTargetAttributes &&
                         (((ULONGLONG)info.nFileSizeHigh << 32) | info.nFileSizeLow) == op.ScannedTargetSize &&
                         CompareFileTime(&info.ftLastWriteTime, &op.ScannedTargetWriteTime) == 0;
+                if (valid && op.ScannedTargetRevision.attributes)
+                {
+                    UacF7::ArchiveRevision current;
+                    valid = UacF7::CaptureOverwriteRevision(file, current) &&
+                            UacF7::SameFileRevision(op.ScannedTargetRevision, current);
+                }
                 HANDLES(CloseHandle(file));
             }
             else if (GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND)
             {
                 op.ConflictDecision = cmcdNone;
                 op.ConflictType = cmctNone;
+                conflictType = cmctNone;
+                op.ScannedTargetRevision = {};
                 op.ConflictState = cmisRunning;
                 valid = TRUE;
             }
         }
-        if (!valid)
+        refreshRevision = !valid && op.ScannedTargetRevision.attributes;
+        if (!valid && !refreshRevision)
         {
             op.ConflictDecision = cmcdNone;
             op.ConflictState = cmisConflict;
@@ -1651,6 +1767,8 @@ BOOL COperations::RevalidateConflictItem(int index, CCopyMoveConflictType& confl
         ConflictListVersion++;
     }
     HANDLES(LeaveCriticalSection(&ConflictCS));
+    if (refreshRevision)
+        RequeueChangedConflictItem(index);
     return valid;
 }
 
@@ -1718,6 +1836,7 @@ void COperations::RequeueChangedConflictItem(int index)
     DWORD volumeSerial = 0;
     ULONGLONG fileIndex = 0;
     BOOL identityValid = FALSE;
+    UacF7::ArchiveRevision revision;
     HANDLE targetHandle = target.empty() ? INVALID_HANDLE_VALUE :
         HANDLES_Q(CreateFileW(target.c_str(), FILE_READ_ATTRIBUTES,
                               FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -1733,6 +1852,8 @@ void COperations::RequeueChangedConflictItem(int index)
             volumeSerial = info.dwVolumeSerialNumber;
             fileIndex = ((ULONGLONG)info.nFileIndexHigh << 32) | info.nFileIndexLow;
             identityValid = TRUE;
+            if ((operation.OpFlags & OPFL_UAC_TRANSFER_ELIGIBLE) && operation.Opcode == ocCopyFile)
+                CaptureScannedOverwriteRevision(target, info, revision);
         }
         HANDLES(CloseHandle(targetHandle));
     }
@@ -1749,6 +1870,7 @@ void COperations::RequeueChangedConflictItem(int index)
     op.ScannedTargetFileIndex = fileIndex;
     op.ScannedTargetIdentityValid = identityValid;
     op.ScannedTargetExisted = identityValid;
+    op.ScannedTargetRevision = revision;
     if (!identityValid)
     {
         op.ConflictType = cmctNone;
@@ -1869,7 +1991,7 @@ BOOL COperations::HasReadySerialConflictWork()
     for (int index = 0; index < Count && !found; ++index)
         if (IsConflictItemReadyLocked(index) &&
             (At(index).Opcode != ocCopyFile || At(index).ConflictState == cmisSkip ||
-             At(index).ConflictIsFinalizer || !CanUseParallelCopy(this, &At(index))))
+             At(index).ConflictIsFinalizer || At(index).ScannedTargetRevision.attributes || !CanUseParallelCopy(this, &At(index))))
             found = TRUE;
     HANDLES(LeaveCriticalSection(&ConflictCS));
     return found;
@@ -2100,6 +2222,14 @@ struct CProgressDlgData
 {
     HANDLE WorkerNotSuspended;
     BOOL* CancelWorker;
+    HANDLE CancelWorkerEvent;
+    std::list<UacF7::TransferJobSession> TransferJobs;
+    struct TreeMerge
+    {
+        UacF7::PreparedTransfer Request;
+        std::string Source, Target;
+    };
+    std::optional<TreeMerge> PendingTreeMerge;
     int* OperationProgress;
     int* SummaryProgress;
     BOOL AsyncProgressPublication;
@@ -2241,7 +2371,31 @@ void SetProgressDialog(HWND hProgressDlg, CProgressData* data, CProgressDlgData&
 
 int CaclProg(const CQuadWord& progressCurrent, const CQuadWord& progressTotal)
 {
-    return progressCurrent >= progressTotal ? (progressTotal.Value == 0 ? 0 : 1000) : (int)((progressCurrent * CQuadWord(1000, 0)) / progressTotal).Value;
+    constexpr ULONGLONG scale = 1000;
+    const ULONGLONG current = progressCurrent.Value;
+    const ULONGLONG total = progressTotal.Value;
+    if (!total)
+        return 0;
+    if (current >= total)
+        return static_cast<int>(scale);
+    if (current <= MAXULONGLONG / scale)
+        return static_cast<int>(current * scale / total);
+
+    // Find the greatest bar value whose rounded-up byte threshold has been reached.
+    const ULONGLONG quotient = total / scale;
+    const ULONGLONG remainder = total % scale;
+    ULONGLONG low = 0;
+    ULONGLONG high = scale;
+    while (high - low > 1)
+    {
+        const ULONGLONG middle = (low + high) / 2;
+        const ULONGLONG threshold = quotient * middle + (remainder * middle + scale - 1) / scale;
+        if (current >= threshold)
+            low = middle;
+        else
+            high = middle;
+    }
+    return static_cast<int>(low);
 }
 
 void SetProgress(HWND hProgressDlg, int operation, int summary, CProgressDlgData& dlgData)
@@ -5608,12 +5762,375 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
     }
 }
 
+static UacF7::Result ExecuteWithNativeTransferProgress(const UacF7::PreparedTransfer& request, HWND progress,
+                                                       HANDLE cancel, UacF7::TransferJobSession* job,
+                                                       const COperation& op, COperations& script,
+                                                       CProgressDlgData& dlgData, const CQuadWord& totalDone)
+{
+    struct NativeTransferProgress
+    {
+        HWND dialog;
+        const COperation& operation;
+        COperations& script;
+        CProgressDlgData& data;
+        CQuadWord completed;
+        bool verifyingMove;
+        CQuadWord transferred{0, 0};
+        bool shown = false;
+    } state{progress, op, script, dlgData, totalDone, request.IsMoveCompletion()};
+    script.GetTFS(&state.transferred);
+    const auto updateProgress = [](void* context, ULONGLONG bytes, ULONGLONG total) {
+        auto& state = *static_cast<NativeTransferProgress*>(context);
+        if (state.verifyingMove)
+        {
+            // The normal copy already contributed these bytes to the job.
+            const auto& size = state.operation.FileSize;
+            const auto checked = CQuadWord().SetUI64((std::min)(bytes, size.Value));
+            SetProgressWithoutSuspend(state.dialog, (std::min)(999, CaclProg(checked, size)),
+                                      CaclProg(state.completed, state.script.TotalSize), state.data);
+            state.shown = true;
+            return;
+        }
+        const ULONGLONG operationSize = state.operation.Size.Value;
+        CQuadWord current = CQuadWord().SetUI64((std::min)(bytes, operationSize));
+        int item = CaclProg(current, state.operation.Size);
+        if (total)
+        {
+            // A tree's work unit and the raw encrypted stream's byte count
+            // differ from the ordinary logical byte counter.
+            const double fraction = static_cast<double>(bytes) / static_cast<double>(total);
+            item = static_cast<int>(1000 * fraction);
+            current.SetUI64(static_cast<ULONGLONG>(operationSize * fraction));
+        }
+        else
+            state.script.SetTFSandProgressSize(state.transferred + current, state.completed + current);
+        item = (std::min)(999, item);
+        const int summary = state.operation.Opcode == ocCopyProtectedTree ? item
+            : (std::min)(999, CaclProg(state.completed + current, state.script.TotalSize));
+        SetProgressWithoutSuspend(state.dialog, item, summary, state.data);
+        state.shown = true;
+    };
+    const auto result = request.Execute(progress, cancel, job, updateProgress, &state, NotifyNativeBrokerActivity);
+    if (state.shown)
+    {
+        // Advisory progress must not count as completed work or be added twice.
+        if (!state.verifyingMove)
+            script.SetTFSandProgressSize(state.transferred, totalDone);
+        if (state.verifyingMove || result.error != ERROR_SUCCESS || result.unknown)
+            SetProgressWithoutSuspend(progress, 0, CaclProg(totalDone, script.TotalSize), dlgData);
+    }
+    return result;
+}
+
+static bool ExecuteWorkerTransfer(HWND progress, const COperation& op, COperations& script,
+                                  CQuadWord& totalDone, CProgressDlgData& dlgData, BOOL& success,
+                                  UacF7::PreparedTransfer& request, DWORD& error, bool targetDenied = false)
+{
+    const bool moving = request.IsMove();
+    success = FALSE;
+    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+    if (*dlgData.CancelWorker)
+        return true;
+    if (script.CopySource && script.CopySource->ElevationDeclined)
+        return false; // Keep the original error after Windows refused this copy job.
+    const auto sourceDisplay = SalPathRemoveExtendedPrefixW(op.SourceNameW.c_str());
+    const auto targetDisplay = SalPathRemoveExtendedPrefixW(op.TargetNameW.c_str());
+    const auto sourceText = SalWideToMultiBytePath(sourceDisplay.c_str(), CP_UTF8);
+    const auto targetText = SalWideToMultiBytePath(targetDisplay.c_str(), CP_UTF8);
+    const bool shareJob = (script.Count > 1 || request.HasDeferredTarget() || request.IsDirectoryCopyEntry()) &&
+                          request.CanShareJob();
+    auto& jobs = dlgData.TransferJobs;
+    auto existing = shareJob ? std::find_if(jobs.begin(), jobs.end(), [&](const auto& job) { return request.IsInJob(job); })
+                             : jobs.end();
+    auto* planned = script.CopySource && script.CopySource->Session ? script.CopySource->Session.get() : nullptr;
+    if (planned && (!planned->IsOpen() || !request.IsInJob(*planned)))
+    {
+        error = planned->IsOpen() ? ERROR_FILE_INVALID : ERROR_BROKEN_PIPE;
+        return false;
+    }
+    const bool merge = !planned && existing == jobs.end() && (op.OpFlags & OPFL_UAC_TREE_ENTRY) &&
+                       !(op.OpFlags & OPFL_UAC_TREE_ROOT);
+    auto& pending = dlgData.PendingTreeMerge;
+    if (merge && (!pending || !pending->Request.AllowsTreeEntry(request)))
+        return false; // Descendants cannot widen the tree or reopen an ended session.
+    if (!planned && existing == jobs.end())
+    {
+        UacF7::TransferPrompt prompt{merge ? pending->Request : request,
+            merge ? pending->Source.c_str() : sourceText.c_str(),
+            merge ? pending->Target.c_str() : targetText.c_str(), !merge && targetDenied};
+        SendMessage(progress, WM_USER_DIALOG, WORKER_DIALOG_UAC_TRANSFER, reinterpret_cast<LPARAM>(&prompt));
+        if (!prompt.approved)
+        {
+            jobs.clear();
+            error = ERROR_CANCELLED;
+            return true;
+        }
+    }
+    const HANDLE cancel = dlgData.CancelWorkerEvent;
+    if (WaitForSingleObject(cancel, 0) == WAIT_OBJECT_0)
+    {
+        jobs.clear();
+        return true;
+    }
+    if (!planned && shareJob && existing == jobs.end())
+        existing = jobs.emplace(jobs.end());
+    const auto result = [&] {
+        if (merge)
+        {
+            const auto opened = pending->Request.Execute(progress, cancel, &*existing, nullptr, nullptr, NotifyNativeBrokerActivity);
+            pending.reset();
+            // Opening scope makes no filesystem changes. Never launch an item
+            // separately if that session did not open or does not contain it.
+            if (opened.error || opened.unknown || !request.IsInJob(*existing))
+                return UacF7::Result{opened.error ? opened.error : ERROR_BROKEN_PIPE, false};
+        }
+        return ExecuteWithNativeTransferProgress(request, progress, cancel,
+            planned ? planned : existing != jobs.end() ? &*existing : nullptr, op, script, dlgData, totalDone);
+    }();
+    if (WaitForSingleObject(cancel, 0) == WAIT_OBJECT_0 || result.unknown || result.error == ERROR_CANCELLED)
+    {
+        jobs.clear();
+        if (planned)
+            planned->Close();
+    }
+    else if (existing != jobs.end() && !existing->IsOpen())
+        jobs.erase(existing);
+    if (result.unknown)
+    {
+        SendMessage(progress, WM_USER_DIALOG, WORKER_DIALOG_UAC_TRANSFER_UNKNOWN, moving);
+        return true;
+    }
+    if (result.error != ERROR_SUCCESS)
+    {
+        error = result.error;
+        if (error == ERROR_FILE_INVALID && request.IsOverwrite() && dlgData.ConflictDecisionInjected)
+        {
+            dlgData.ConflictTargetChanged = TRUE;
+            success = TRUE; // Dispatch requeues the conflict without accounting for a completed file.
+            return true;
+        }
+        return error == ERROR_CANCELLED || *dlgData.CancelWorker != FALSE;
+    }
+    if (request.IsMoveCompletion() || request.IsDirectoryCopyEntry())
+    {
+        success = TRUE; // The owning worker path accounts for the item.
+        return true;
+    }
+    totalDone += op.Size;
+    if (!moving || request.IsCrossVolumeMove())
+    {
+        const CQuadWord mainWork = max(op.FileSize, COPY_MIN_FILE_SIZE);
+        const CQuadWord namedBytes = (op.OpFlags & OPFL_COPY_ADS) != 0 && op.Size > mainWork ? op.Size - mainWork : CQuadWord(0, 0);
+        script.AddBytesToTFSandSetProgressSize(op.FileSize + namedBytes, totalDone);
+    }
+    SetProgress(progress, 0, CaclProg(totalDone, script.TotalSize), dlgData);
+    success = TRUE;
+    return true;
+}
+
+static const COperations::ProtectedFileSource* ListedTransferSource(const COperation& op, const COperations& script)
+{
+    if (!(op.OpFlags & OPFL_UAC_TRANSFER_LISTED) || !script.ProtectedFileSources)
+        return nullptr;
+    const auto& sources = *script.ProtectedFileSources;
+    const auto listed = sources.find(op.SourceNameW);
+    return listed != sources.end() ? &listed->second : nullptr;
+}
+
+static bool TryTransferWithBroker(HWND progress, const COperation& op, COperations& script,
+                              CQuadWord& totalDone, CProgressDlgData& dlgData, BOOL& success, DWORD& error,
+                              HANDLE* input = nullptr, bool targetDenied = false)
+{
+    const bool directory = op.Opcode == ocMoveDir;
+    const bool directoryCopy = op.Opcode == ocCreateDir;
+    const bool moving = op.Opcode == ocMoveFile || directory;
+    const bool eligibleMove = directory
+        ? (op.Attr & FILE_ATTRIBUTE_DIRECTORY) && !(op.Attr & FILE_ATTRIBUTE_REPARSE_POINT) &&
+              !script.CopyAttrs && !script.CopySecurity
+        : UacF7::IsEligibleMoveFile(op.Attr, script.CopyAttrs, script.CopySecurity);
+    const bool encrypted = !moving && UacF7::IsEncryptedCopyFile(op.Attr);
+    const bool compressedMove = moving && script.CopyAttrs && UacF7::IsCompressedCopyFile(op.Attr);
+    if (!(op.OpFlags & OPFL_UAC_TRANSFER_ELIGIBLE) || script.OverwriteOlder || dlgData.ConflictDecisionInjected ||
+        ((op.OpFlags & OPFL_AS_ENCRYPTED) != 0 && !encrypted) ||
+        !op.SourceNameWValid || !op.TargetNameWValid ||
+        (directoryCopy ? (op.Attr != FILE_ATTRIBUTE_DIRECTORY || (op.OpFlags & OPFL_COPY_ADS)) :
+         moving ? !eligibleMove
+                : (!UacF7::IsEligibleFileCopy(op.Attr, script.CopyAttrs, script.IgnoreTransferAds, script.CopySecurity) ||
+                   op.FileSize.Value > UacF7::maxPilotCopyBytes)))
+        return false;
+
+    BOOL limited = FALSE;
+    DWORD limit = 0;
+    script.GetSpeedLimit(&limited, &limit);
+    if (limited)
+        return false;
+
+    const UacF7::PreparedLeaf* listedSource = nullptr;
+    if (op.OpFlags & OPFL_UAC_TRANSFER_LISTED)
+    {
+        const auto* listed = ListedTransferSource(op, script);
+        if (!listed || !listed->Request)
+        {
+            error = listed ? listed->Error : ERROR_FILE_INVALID;
+            return false;
+        }
+        listedSource = listed->Request.get();
+    }
+    const auto* deferred = script.DeferredTransferTarget ? &*script.DeferredTransferTarget : nullptr;
+    const bool plannedRoot = (op.OpFlags & OPFL_UAC_TREE_ROOT) && script.CopySource &&
+                             script.CopySource->Session && script.CopySource->Session->NeedsTreeRoot();
+    if (!deferred && !plannedRoot)
+    {
+        const std::wstring targetPath = WorkerOperationPathW(op.TargetName, op.TargetNameW.c_str());
+        if (GetFileAttributesW(targetPath.c_str()) != INVALID_FILE_ATTRIBUTES)
+        {
+            if (listedSource)
+                error = ERROR_ALREADY_EXISTS;
+            return false;
+        }
+        const DWORD targetError = GetLastError();
+        if (targetError != ERROR_FILE_NOT_FOUND && targetError != ERROR_ACCESS_DENIED)
+            return false;
+    }
+
+    auto operation = UacF7::Operation::Copy;
+    if (directoryCopy)
+        operation = UacF7::Operation::CopyDirectoryEntry;
+    else if (directory)
+        operation = UacF7::Operation::MoveDirectory;
+    else if (moving)
+        operation = compressedMove ? UacF7::Operation::MoveCompressed : UacF7::Operation::Move;
+    else if (encrypted)
+        operation = UacF7::Operation::CopyEncrypted;
+    else if (script.CopySecurity)
+        operation = script.CopyAttrs ? UacF7::Operation::CopyCompressedSecurity : UacF7::Operation::CopySecurity;
+    else if (script.CopyAttrs)
+        operation = UacF7::Operation::CopyCompressed;
+    else if (script.IgnoreTransferAds)
+        operation = UacF7::Operation::CopyIgnoreAds;
+    UacF7::PreparedTransfer request;
+    const ULONGLONG expectedSize = directoryCopy ? 0 : op.FileSize.Value;
+    if (!request.Prepare(op.SourceNameW, op.TargetNameW, expectedSize, operation, listedSource, deferred) ||
+        (moving && !directory && !request.IsCrossVolumeMove() && !listedSource &&
+         ((op.OpFlags & (OPFL_UAC_TRANSFER_SOURCE | OPFL_COPY_ADS)) != 0 || !UacF7::IsPlainDeleteFile(op.Attr))))
+    {
+        if (listedSource || deferred)
+            error = ERROR_NOT_SUPPORTED;
+        return false;
+    }
+    if ((encrypted || request.IsCrossVolumeMove()) && input && *input != INVALID_HANDLE_VALUE)
+    {
+        // Raw export and the sealed source guard need the ordinary copy
+        // handle closed before the elevated operation starts.
+        HANDLES(CloseHandle(*input));
+        *input = INVALID_HANDLE_VALUE;
+    }
+    return ExecuteWorkerTransfer(progress, op, script, totalDone, dlgData, success, request, error, targetDenied);
+}
+
+static bool PrepareWorkerOverwrite(const COperation& op, COperations& script,
+                                   const CProgressDlgData& dlgData, UacF7::PreparedTransfer& request)
+{
+    if (op.Opcode != ocCopyFile || !(op.OpFlags & OPFL_UAC_TRANSFER_ELIGIBLE) ||
+        script.OverwriteOlder || script.CopySecurity || script.CopyAttrs || script.IgnoreTransferAds ||
+        (dlgData.ConflictDecisionInjected &&
+         (dlgData.InjectedConflictType != cmctFileExists || !op.ScannedTargetRevision.attributes)) ||
+        !op.SourceNameWValid || !op.TargetNameWValid ||
+        (op.OpFlags & OPFL_AS_ENCRYPTED) || !UacF7::IsPlainCopyFile(op.Attr))
+        return false;
+    BOOL limited = FALSE;
+    DWORD limit = 0;
+    script.GetSpeedLimit(&limited, &limit);
+    const auto* listed = ListedTransferSource(op, script);
+    if ((op.OpFlags & OPFL_UAC_TRANSFER_LISTED) && (!listed || !listed->Request))
+        return false;
+    return !limited && request.PrepareOverwrite(op.SourceNameW, op.TargetNameW, op.FileSize.Value,
+                                                 listed ? listed->Request.get() : nullptr) &&
+           (!dlgData.ConflictDecisionInjected ||
+            UacF7::SameFileRevision(op.ScannedTargetRevision, request.Approval().revision));
+}
+
+enum class SourceOverwriteResult { Unavailable, Failed, Finished, Skipped, Cancelled };
+
+static SourceOverwriteResult TryOverwriteDeniedSource(HWND progress, COperation& op, COperations& script,
+                                                      CQuadWord& totalDone, CProgressDlgData& dlgData,
+                                                      UacF7::OverwriteApproval& approval, DWORD& error)
+{
+    using Outcome = SourceOverwriteResult;
+    if (dlgData.SkipAllFileOpenOut)
+        return Outcome::Unavailable;
+    if (dlgData.ConflictDecisionInjected && op.ScannedTargetRevision.attributes &&
+        !ValidateInjectedTargetIdentity(&op, dlgData))
+    {
+        dlgData.ConflictTargetChanged = TRUE;
+        return Outcome::Finished; // The coordinator requeues this item without advancing progress.
+    }
+
+    UacF7::PreparedTransfer overwrite;
+    if (!PrepareWorkerOverwrite(op, script, dlgData, overwrite))
+        return Outcome::Unavailable;
+    if (!dlgData.ConflictDecisionInjected && dlgData.SkipAllOverwrite)
+        return Outcome::Skipped;
+
+    const bool targetChanged = approval.captured && !overwrite.MatchesApproval(approval);
+    if (targetChanged || (!approval.captured && !dlgData.OverwriteAll && dlgData.CnfrmFileOver))
+    {
+        const auto targetPath = WorkerOperationPathW(op.TargetName, op.TargetNameW.c_str());
+        HANDLE target = HANDLES_Q(CreateFileW(targetPath.c_str(), FILE_READ_ATTRIBUTES,
+                                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                              OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+        if (target == INVALID_HANDLE_VALUE)
+            return Outcome::Unavailable;
+        char targetInfo[101];
+        const bool sameTarget = overwrite.MatchesOverwriteTarget(target);
+        if (sameTarget)
+            GetFileOverwriteInfo(targetInfo, _countof(targetInfo), target, op.TargetName, nullptr, nullptr);
+        HANDLES(CloseHandle(target));
+        if (!sameTarget)
+            return Outcome::Unavailable;
+
+        const auto sourcePath = WorkerOperationPathW(op.SourceName, op.SourceNameW.c_str());
+        HANDLE source = HANDLES_Q(CreateFileW(sourcePath.c_str(), FILE_READ_ATTRIBUTES,
+                                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                              OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+        char sourceInfo[101];
+        GetFileOverwriteInfo(sourceInfo, _countof(sourceInfo), source, op.SourceName, nullptr, nullptr);
+        if (source != INVALID_HANDLE_VALUE)
+            HANDLES(CloseHandle(source));
+
+        int answer = IDCANCEL;
+        char* details[] = {reinterpret_cast<char*>(&answer), op.TargetName, targetInfo, op.SourceName, sourceInfo};
+        SendMessage(progress, WM_USER_DIALOG, 1, reinterpret_cast<LPARAM>(details));
+        if (answer == IDB_SKIPALL)
+            dlgData.SkipAllOverwrite = TRUE;
+        if (answer == IDB_SKIPALL || answer == IDB_SKIP)
+            return Outcome::Skipped;
+        if (answer != IDYES && answer != IDB_ALL)
+            return Outcome::Cancelled;
+        if (answer == IDB_ALL)
+            dlgData.OverwriteAll = TRUE;
+    }
+
+    approval = overwrite.Approval();
+    BOOL success = FALSE;
+    if (!ExecuteWorkerTransfer(progress, op, script, totalDone, dlgData, success, overwrite, error))
+        return Outcome::Failed;
+    return success ? Outcome::Finished : Outcome::Cancelled;
+}
+
+struct MoveCopyReceipt
+{
+    UacF7::MoveFileIdentity source{}, target{};
+    bool sourceCaptured = false;
+    bool captured = false;
+};
+
 BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                 COperations* script, CQuadWord& totalDone,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
                 CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
-                BOOL isMove, CAsyncCopyParams*& asyncPar)
+                BOOL isMove, CAsyncCopyParams*& asyncPar, MoveCopyReceipt* moveReceipt = nullptr)
 {
     if (script->CopyAttrs && copyAsEncrypted)
         TRACE_E("DoCopyFile(): unexpected parameter value: copyAsEncrypted is TRUE when script->CopyAttrs is TRUE!");
@@ -5622,6 +6139,61 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
     // CreateFile would trim the spaces/dots and copy a different file or under a different name
     BOOL invalidSrcName = FileNameIsInvalid(op->SourceName, TRUE);
     BOOL invalidTgtName = FileNameIsInvalid(op->TargetName, TRUE);
+
+    UacF7::OverwriteApproval approvedOverwrite{};
+    const bool deferred = script->DeferredTransferTarget.has_value();
+    if (deferred || (op->OpFlags & OPFL_UAC_TRANSFER_SOURCE) != 0)
+    {
+        BOOL& skipAll = deferred ? dlgData.SkipAllFileOpenOut : dlgData.SkipAllFileOpenIn;
+        int answer;
+        do
+        {
+            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+            if (*dlgData.CancelWorker)
+                return FALSE;
+            if (skipAll)
+                break;
+            const bool listedSource = (op->OpFlags & OPFL_UAC_TRANSFER_LISTED) != 0;
+            const auto* preparedSource = ListedTransferSource(*op, *script);
+            DWORD error = listedSource && preparedSource && preparedSource->Error ? preparedSource->Error :
+                          (listedSource || deferred ? ERROR_NOT_SUPPORTED : ERROR_ACCESS_DENIED);
+            if (!invalidSrcName && !invalidTgtName)
+            {
+                const auto outcome = !deferred && !isMove && !copyAsEncrypted
+                    ? TryOverwriteDeniedSource(hProgressDlg, *op, *script, totalDone, dlgData, approvedOverwrite, error)
+                    : SourceOverwriteResult::Unavailable;
+                if (outcome == SourceOverwriteResult::Finished || outcome == SourceOverwriteResult::Cancelled)
+                    return outcome == SourceOverwriteResult::Finished;
+                if (outcome == SourceOverwriteResult::Skipped)
+                    break;
+                BOOL success = FALSE;
+                if (outcome == SourceOverwriteResult::Unavailable &&
+                    TryTransferWithBroker(hProgressDlg, *op, *script, totalDone, dlgData, success, error, nullptr, deferred))
+                {
+                    if (success && isMove && skip)
+                        *skip = TRUE; // The broker already removed the source.
+                    return success;
+                }
+            }
+            answer = IDCANCEL;
+            char* data[] = {reinterpret_cast<char*>(&answer), LoadStr(isMove ? IDS_ERRORMOVE : IDS_ERRORCOPY),
+                            deferred || error == ERROR_ALREADY_EXISTS ? op->TargetName : op->SourceName, GetErrorText(error)};
+            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, reinterpret_cast<LPARAM>(data));
+            if (answer == IDCANCEL)
+                return FALSE;
+            if (answer == IDB_SKIPALL)
+                skipAll = TRUE;
+        } while (answer == IDRETRY);
+
+        CQuadWord transferred;
+        script->GetTFSandResetTrSpeedIfNeeded(&transferred);
+        totalDone += op->Size;
+        SetTFSandPSforSkippedFile(op, transferred, script, totalDone);
+        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+        if (skip != NULL)
+            *skip = TRUE;
+        return TRUE;
+    }
 
     // optimization: skipping all "older and identical" files is about 4x faster,
     // slowing down when the file is newer is 5%, so it should be well worth it
@@ -5708,6 +6280,8 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
     script->GetTFSandResetTrSpeedIfNeeded(&lastTransferredFileSize);
 
 COPY_AGAIN:
+        if (moveReceipt)
+            *moveReceipt = {};
 
     operationDone = CQuadWord(0, 0);
     HANDLE in;
@@ -5750,11 +6324,14 @@ COPY_AGAIN:
             CQuadWord fileSize = op->FileSize;
 
             HANDLE out;
+            DWORD transferError;
             BOOL lossEncryptionAttr = FALSE;
             BOOL skipAllocWholeFileOnStart = FALSE;
             while (1)
             {
             OPEN_TGT_FILE:
+
+                transferError = ERROR_SUCCESS;
 
                 BOOL encryptionNotSupported = FALSE;
                 DWORD fileAttrs = asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN |
@@ -5775,6 +6352,24 @@ COPY_AGAIN:
                         out = SalCreateFileEx(op->TargetName, GENERIC_WRITE | (script->CopyAttrs ? GENERIC_READ : 0), 0, fileAttrs, &encryptionNotSupported);
                         if (!encryptionNotSupported && script->CopyAttrs && out == INVALID_HANDLE_VALUE) // in case read access to the directory is not allowed (we added it only for setting the Compressed attribute), try creating a write-only file
                             out = SalCreateFileEx(op->TargetName, GENERIC_WRITE, 0, fileAttrs, &encryptionNotSupported);
+                    }
+
+                    if (out == INVALID_HANDLE_VALUE && !invalidTgtName &&
+                        (!copyAsEncrypted || UacF7::IsEncryptedCopyFile(op->Attr)) &&
+                        !dlgData.SkipAllFileOpenOut && GetLastError() == ERROR_ACCESS_DENIED)
+                    {
+                        BOOL success = FALSE;
+                        if (TryTransferWithBroker(hProgressDlg, *op, *script, totalDone, dlgData, success, transferError, &in, true))
+                        {
+                            if (in != INVALID_HANDLE_VALUE)
+                                HANDLES(CloseHandle(in));
+                            if (success && isMove && skip)
+                                *skip = TRUE; // The broker already removed the source.
+                            return success;
+                        }
+                        if (transferError)
+                            goto CREATE_ERROR;
+                        SetLastError(ERROR_ACCESS_DENIED);
                     }
 
                     if (out == INVALID_HANDLE_VALUE && encryptionNotSupported && dlgData.FileOutLossEncrAll && !lossEncryptionAttr)
@@ -6062,6 +6657,8 @@ COPY_AGAIN:
                         }
                     }
 
+                    if (moveReceipt)
+                        moveReceipt->sourceCaptured = UacF7::CaptureMoveFileIdentity(in, moveReceipt->source, true);
                     HANDLES(CloseHandle(in));
                     in = NULL;
 
@@ -6148,6 +6745,8 @@ COPY_AGAIN:
                                 }
                             }
                         }
+                        if (moveReceipt && moveReceipt->sourceCaptured)
+                            moveReceipt->captured = UacF7::CaptureMoveFileIdentity(out, moveReceipt->target, true);
                         if (!HANDLES(CloseHandle(out)))
                         {
                             out = NULL;
@@ -6308,7 +6907,8 @@ COPY_AGAIN:
                             totalDone += op->Size;
                             SetTFSandPSforSkippedFile(op, lastTransferredFileSize, script, totalDone);
 
-                            HANDLES(CloseHandle(in));
+                            if (in != INVALID_HANDLE_VALUE)
+                                HANDLES(CloseHandle(in));
                             SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
                             if (skip != NULL)
                                 *skip = TRUE;
@@ -6319,7 +6919,8 @@ COPY_AGAIN:
                         {
                         CANCEL_OPEN2:
 
-                            HANDLES(CloseHandle(in));
+                            if (in != INVALID_HANDLE_VALUE)
+                                HANDLES(CloseHandle(in));
                             return FALSE;
                         }
                         }
@@ -6328,14 +6929,34 @@ COPY_AGAIN:
                     {
                     CREATE_ERROR:
 
-                        DWORD err = GetLastError();
+                        DWORD err = transferError ? transferError : GetLastError();
                         if (invalidTgtName)
                             err = ERROR_INVALID_NAME;
                         BOOL errDeletingFile = FALSE;
-                        if (err == ERROR_FILE_EXISTS || // overwrite the file?
-                            err == ERROR_ALREADY_EXISTS)
+                        UacF7::PreparedTransfer overwrite;
+                        const bool targetExists = err == ERROR_FILE_EXISTS || err == ERROR_ALREADY_EXISTS;
+                        // A broker copy to a free name never authorizes a newly found target.
+                        const bool brokerTargetAppeared = transferError && targetExists && !isMove && in != INVALID_HANDLE_VALUE;
+                        if (brokerTargetAppeared)
+                            transferError = ERROR_SUCCESS;
+                        bool canElevateOverwrite = !transferError && !isMove && !copyAsEncrypted && !dlgData.SkipAllFileOpenOut &&
+                                                   mustDeleteFileBeforeOverwrite != 1 &&
+                                                   (targetExists || err == ERROR_ACCESS_DENIED) &&
+                                                   PrepareWorkerOverwrite(*op, *script, dlgData, overwrite);
+                        if (transferError)
+                            goto NORMAL_ERROR;
+                        if (dlgData.ConflictDecisionInjected && op->ScannedTargetRevision.attributes &&
+                            !ValidateInjectedTargetIdentity(op, dlgData))
                         {
-                            if (!dlgData.OverwriteAll && (dlgData.CnfrmFileOver || script->OverwriteOlder))
+                            HANDLES(CloseHandle(in));
+                            dlgData.ConflictTargetChanged = TRUE;
+                            return TRUE;
+                        }
+                        if (targetExists || canElevateOverwrite)
+                        {
+                            if (brokerTargetAppeared ||
+                                (!dlgData.OverwriteAll && (dlgData.CnfrmFileOver || script->OverwriteOlder) &&
+                                 (!canElevateOverwrite || !overwrite.MatchesApproval(approvedOverwrite))))
                             {
                                 char sAttr[101], tAttr[101];
                                 BOOL getTimeFailed;
@@ -6348,11 +6969,13 @@ COPY_AGAIN:
                                                            OPEN_EXISTING, 0, NULL));
                                 if (out != INVALID_HANDLE_VALUE)
                                 {
+                                    canElevateOverwrite = canElevateOverwrite && overwrite.MatchesOverwriteTarget(out);
                                     GetFileOverwriteInfo(tAttr, _countof(tAttr), out, op->TargetName, &tFileTime, &getTimeFailed);
                                     HANDLES(CloseHandle(out));
                                 }
                                 else
                                 {
+                                    canElevateOverwrite = false;
                                     getTimeFailed = TRUE;
                                     strcpy(tAttr, LoadStr(IDS_ERR_FILEOPEN));
                                 }
@@ -6427,6 +7050,21 @@ COPY_AGAIN:
                                     return FALSE;
                                 }
                                 }
+                            }
+
+                            if (!targetExists)
+                            {
+                                // CREATE_NEW denied access before the ordinary conflict path.
+                                if (!canElevateOverwrite)
+                                    goto NORMAL_ERROR;
+                                BOOL success = FALSE;
+                                if (ExecuteWorkerTransfer(hProgressDlg, *op, *script, totalDone, dlgData, success, overwrite, err, true))
+                                {
+                                    HANDLES(CloseHandle(in));
+                                    return success;
+                                }
+                                approvedOverwrite = overwrite.Approval();
+                                goto NORMAL_ERROR;
                             }
 
                             DWORD attr = GetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str());
@@ -6519,6 +7157,16 @@ COPY_AGAIN:
                                         err = GetLastError();
                                         if (chAttr)
                                             SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), attr);
+                                        if (canElevateOverwrite && !chAttr && err == ERROR_ACCESS_DENIED)
+                                        {
+                                            BOOL success = FALSE;
+                                            if (ExecuteWorkerTransfer(hProgressDlg, *op, *script, totalDone, dlgData, success, overwrite, err, true))
+                                            {
+                                                HANDLES(CloseHandle(in));
+                                                return success;
+                                            }
+                                            approvedOverwrite = overwrite.Approval();
+                                        }
                                         errDeletingFile = TRUE;
                                         goto NORMAL_ERROR;
                                     }
@@ -6551,6 +7199,7 @@ COPY_AGAIN:
                                             return TRUE;
                                         }
                                         chAttr = TRUE;
+                                        canElevateOverwrite = false;
                                         SetFileAttributesW(WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL).c_str(), 0);
                                     }
                                     // GENERIC_READ for 'out' slows asynchronous copying from disk to network (measured 95 MB/s instead of 111 MB/s on Win7 x64 GLAN)
@@ -6616,6 +7265,7 @@ COPY_AGAIN:
                                         continue;
                                     }
 
+                                    canElevateOverwrite = false;
                                     // on target paths that support ADS also delete ADS on the target file (CREATE_ALWAYS should remove them, but on home W2K and XP they simply stay; no idea why, W2K and XP in VMWare delete ADS normally)
                                     if (script->TargetPathSupADS && !DeleteAllADS(out, op->TargetName))
                                     {
@@ -6727,7 +7377,9 @@ COPY_AGAIN:
                             ret = IDCANCEL;
                             std::wstring lockPath = WorkerOperationPathW(op->TargetName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL);
                             char* caption = LoadStr(errDeletingFile ? IDS_ERRORDELETINGFILE : IDS_ERROROPENINGFILE);
-                            if (IsLockRecoveryError(err))
+                            const DWORD encryption = op->Attr | (copyAsEncrypted ? FILE_ATTRIBUTE_ENCRYPTED : 0);
+                            const bool efsUnsupported = !isMove && !errDeletingFile && UacF7::IsEfsCopyFailure(encryption, err);
+                            if (!efsUnsupported && IsLockRecoveryError(err))
                             {
                                 CFileLockRecoveryDialogData data = { &ret, caption, op->TargetName,
                                                                     GetErrorText(err), lockPath.c_str() };
@@ -6735,12 +7387,15 @@ COPY_AGAIN:
                             }
                             else
                             {
-                                char* data[4] = { (char*)&ret, caption, op->TargetName, GetErrorText(err) };
+                                std::string message = efsUnsupported ? LoadStr(IDS_UAC_COPY_EFS_UNSUPPORTED) : GetErrorText(err);
+                                char* data[4] = { (char*)&ret, caption, op->TargetName, message.data() };
                                 SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
                             }
                             switch (ret)
                             {
                             case IDRETRY:
+                                if (in == INVALID_HANDLE_VALUE)
+                                    goto COPY_AGAIN;
                                 break;
 
                             case IDB_SKIPALL:
@@ -6769,17 +7424,42 @@ COPY_AGAIN:
             if (*dlgData.CancelWorker)
                 return FALSE;
 
+            if (!invalidTgtName && !dlgData.SkipAllFileOpenIn &&
+                ((!copyAsEncrypted && err == ERROR_ACCESS_DENIED) ||
+                 (!isMove && UacF7::IsEncryptedCopyFile(op->Attr) && UacF7::IsEfsCopyFailure(op->Attr, err))))
+            {
+                const auto outcome = !isMove && !copyAsEncrypted
+                    ? TryOverwriteDeniedSource(hProgressDlg, *op, *script, totalDone, dlgData, approvedOverwrite, err)
+                    : SourceOverwriteResult::Unavailable;
+                if (outcome == SourceOverwriteResult::Finished || outcome == SourceOverwriteResult::Cancelled)
+                    return outcome == SourceOverwriteResult::Finished;
+                if (outcome == SourceOverwriteResult::Skipped)
+                    goto SKIP_OPEN_IN;
+                BOOL success = FALSE;
+                if (outcome == SourceOverwriteResult::Unavailable &&
+                    TryTransferWithBroker(hProgressDlg, *op, *script, totalDone, dlgData, success, err))
+                {
+                    if (success && isMove && skip)
+                        *skip = TRUE; // The broker already removed the source.
+                    return success;
+                }
+            }
+
             if (dlgData.SkipAllFileOpenIn)
                 goto SKIP_OPEN_IN;
 
             int ret;
             ret = IDCANCEL;
-            char* data[4];
-            data[0] = (char*)&ret;
-            data[1] = LoadStr(IDS_ERROROPENINGFILE);
-            data[2] = op->SourceName;
-            data[3] = GetErrorText(err);
-            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            {
+                char* data[4];
+                data[0] = (char*)&ret;
+                std::string message = !isMove && UacF7::IsEfsCopyFailure(op->Attr, err)
+                                          ? LoadStr(IDS_UAC_COPY_EFS_UNSUPPORTED) : GetErrorText(err);
+                data[1] = LoadStr(IDS_ERROROPENINGFILE);
+                data[2] = op->SourceName;
+                data[3] = message.data();
+                SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            }
             switch (ret)
             {
             case IDRETRY:
@@ -6825,6 +7505,12 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
     // name, 'ignInvalidName' is TRUE)
     BOOL invalidName = FileNameIsInvalid(op->SourceName, TRUE, dir) ||
                        FileNameIsInvalid(op->TargetName, TRUE, dir && ignInvalidName);
+
+    if (script->DeferredTransferTarget ||
+        (!dir && (op->OpFlags & OPFL_UAC_TRANSFER_LISTED)))
+        return DoCopyFile(op, hProgressDlg, buffer, script, totalDone, clearReadonlyMask, nullptr,
+                          lantasticCheck, mustDeleteFileBeforeOverwrite, allocWholeFileOnStart,
+                          dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar);
 
     if (!copyAsEncrypted && !script->SameRootButDiffVolume && HasTheSameRootPath(op->SourceName, op->TargetName))
     {
@@ -7033,6 +7719,23 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 DWORD err = GetLastError();
                 if (invalidName)
                     err = ERROR_INVALID_NAME;
+                bool elevatedAttemptFailed = false;
+                if (err == ERROR_ACCESS_DENIED && !invalidName && !*novellRenamePatch && !dlgData.SkipAllMoveErrors)
+                {
+                    DWORD transferError = ERROR_SUCCESS;
+                    BOOL success = FALSE;
+                    const bool sourceCanMove = (op->OpFlags & OPFL_UAC_TRANSFER_ELIGIBLE) && op->SourceNameWValid &&
+                        ProbeLocalElevationAccess(op->SourceNameW, DELETE, dir != FALSE) == ERROR_SUCCESS;
+                    if (TryTransferWithBroker(hProgressDlg, *op, *script, totalDone, dlgData, success, transferError,
+                                              nullptr, sourceCanMove))
+                        return success;
+                    if (transferError)
+                    {
+                        elevatedAttemptFailed = true;
+                        err = transferError;
+                        goto NORMAL_ERROR;
+                    }
+                }
                 // Novell patch - before calling MoveFile we need to drop the read-only attribute
                 if (!invalidName && *novellRenamePatch || err == ERROR_ACCESS_DENIED)
                 {
@@ -7350,7 +8053,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     if (dlgData.SkipAllMoveErrors)
                         goto SKIP_MOVE_ERROR;
 
-                    if (err == ERROR_SHARING_VIOLATION && ++autoRetryAttempts <= 2)
+                    if (!elevatedAttemptFailed && err == ERROR_SHARING_VIOLATION && ++autoRetryAttempts <= 2)
                     {               // auto-retry added to handle move errors while directory icons are being read (SHGetFileInfo running in parallel with MoveFile)
                         Sleep(100); // wait a moment before the next attempt
                     }
@@ -7398,20 +8101,37 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
         }
 
         BOOL skip;
+        MoveCopyReceipt receipt;
+        const bool capture = (op->OpFlags & OPFL_UAC_TRANSFER_ELIGIBLE) && !script->CopyAttrs && !script->CopySecurity &&
+                             !script->OverwriteOlder && !copyADS && !copyAsEncrypted &&
+                             !(op->OpFlags & (OPFL_SRCPATH_IS_NET | OPFL_TGTPATH_IS_NET)) &&
+                             op->SourceNameWValid && op->TargetNameWValid && UacF7::IsPlainDeleteFile(op->Attr) &&
+                             op->FileSize.Value <= UacF7::maxCrossVolumeMoveBytes;
         BOOL notError = DoCopyFile(op, hProgressDlg, buffer, script, totalDone,
                                    clearReadonlyMask, &skip, lantasticCheck,
                                    mustDeleteFileBeforeOverwrite, allocWholeFileOnStart,
-                                   dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar);
+                                   dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar, capture ? &receipt : nullptr);
         if (notError && !skip) // still need to clean up the file from the source
         {
-            WorkerClearReadOnlyW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL)); // ensure it can be deleted
+            const auto sourcePath = WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL);
+            const bool verified = receipt.captured && receipt.source.serial != receipt.target.serial;
+            if (!verified)
+                WorkerClearReadOnlyW(sourcePath);
+            bool protectedCompletion = false;
             while (1)
             {
-                if (DeleteFileW(WorkerOperationPathW(op->SourceName, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL).c_str()))
-                    break;
+                DWORD err = ERROR_ACCESS_DENIED;
+                if (!protectedCompletion)
                 {
-                    DWORD err = GetLastError();
-
+                    if (verified)
+                        err = UacF7::DeleteCopiedMoveSource(sourcePath, WorkerOperationPathW(op->TargetName, op->TargetNameW.c_str()),
+                                                            receipt.source, receipt.target);
+                    else
+                        err = DeleteFileW(sourcePath.c_str()) ? ERROR_SUCCESS : GetLastError();
+                    if (!err)
+                        break;
+                }
+                {
                     WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
                     if (*dlgData.CancelWorker)
                         return FALSE;
@@ -7419,6 +8139,27 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     if (dlgData.SkipAllDeleteErr)
                         return TRUE;
 
+                    if (err == ERROR_ACCESS_DENIED && receipt.captured)
+                    {
+                        UacF7::PreparedTransfer request;
+                        if (request.PrepareMoveCompletion(op->SourceNameW, op->TargetNameW, op->FileSize.Value,
+                                                          receipt.source, receipt.target))
+                        {
+                            // A retry must recheck both files. Do not delete a name
+                            // that might now refer to a different source.
+                            protectedCompletion = true;
+                            BOOL success = FALSE;
+                            if (ExecuteWorkerTransfer(hProgressDlg, *op, *script, totalDone, dlgData, success, request, err))
+                                return success;
+                        }
+                        else if (protectedCompletion || receipt.source.serial != receipt.target.serial)
+                            err = ERROR_FILE_INVALID;
+                    }
+                    if (err == ERROR_FILE_INVALID && verified)
+                    {
+                        SendMessage(hProgressDlg, WM_USER_DIALOG, WORKER_DIALOG_UAC_TRANSFER_UNKNOWN, TRUE);
+                        return FALSE;
+                    }
                     int ret = IDCANCEL;
                     char* data[4];
                     data[0] = (char*)&ret;
@@ -7444,8 +8185,13 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
     }
 }
 
+static bool TryDeleteVerifiedLeaf(HWND progress, const COperation& op, COperations& script,
+                                  CProgressDlgData& dlgData, BOOL& success, bool* nonEmptyDirectory = nullptr,
+                                  bool accessDenied = false);
+
 BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
-                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData, const wchar_t* exactName)
+                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData, const wchar_t* exactName,
+                  const COperation* branchRow = nullptr)
 {
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
@@ -7544,7 +8290,17 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             else
             {
                 if (DeleteFileW(nameW.c_str()) == 0)
+                {
                     err = GetLastError();
+                    BOOL verifiedOrSkipped = FALSE;
+                    if (err == ERROR_ACCESS_DENIED && branchRow &&
+                        TryDeleteVerifiedLeaf(hProgressDlg, *branchRow, *script, dlgData, verifiedOrSkipped, nullptr, true))
+                    {
+                        if (!verifiedOrSkipped)
+                            return FALSE;
+                        err = ERROR_SUCCESS;
+                    }
+                }
             }
         }
         else
@@ -7698,12 +8454,27 @@ BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified
     return TRUE;
 }
 
+static void PrepareWorkerTreeMerge(const COperation& op, CProgressDlgData& dlgData)
+{
+    if (!(op.OpFlags & OPFL_UAC_TREE_ROOT))
+        return;
+    auto& pending = dlgData.PendingTreeMerge;
+    pending.emplace();
+    if (!pending->Request.PrepareTreeMerge(op.SourceNameW, op.TargetNameW))
+    {
+        pending.reset();
+        return;
+    }
+    pending->Source = SalWideToMultiBytePath(SalPathRemoveExtendedPrefixW(op.SourceNameW.c_str()).c_str(), CP_UTF8);
+    pending->Target = SalWideToMultiBytePath(SalPathRemoveExtendedPrefixW(op.TargetNameW.c_str()).c_str(), CP_UTF8);
+}
+
 BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                  DWORD clearReadonlyMask, CProgressDlgData& dlgData,
                  CQuadWord& totalDone, CQuadWord& operTotal,
                  const char* sourceDir, BOOL adsCopy, COperations* script,
                  void* buffer, BOOL& skip, BOOL& alreadyExisted,
-                 BOOL createAsEncrypted, BOOL ignInvalidName, const wchar_t* exactName)
+                 BOOL createAsEncrypted, BOOL ignInvalidName, const COperation& op)
 {
     if (script->CopyAttrs && createAsEncrypted)
         TRACE_E("DoCreateDir(): unexpected parameter value: createAsEncrypted is TRUE when script->CopyAttrs is TRUE!");
@@ -7717,12 +8488,17 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
 
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
+    const wchar_t* exactName = op.TargetNameWValid ? op.TargetNameW.c_str() : nullptr;
     std::wstring nameCrDirW = WorkerOperationPathW(name, exactName);
 
     while (1)
     {
-        DWORD err;
-        if (!invalidName && WorkerCreateDirectory(name, &err, exactName))
+        const bool plannedRoot = (op.OpFlags & OPFL_UAC_TREE_ROOT) && script->CopySource &&
+                                 script->CopySource->Session && script->CopySource->Session->NeedsTreeRoot();
+        const bool reviewedSource = (op.OpFlags & OPFL_UAC_TRANSFER_LISTED) &&
+                                    script->CopySource && script->CopySource->Session;
+        DWORD err = ERROR_ACCESS_DENIED;
+        if (!invalidName && !reviewedSource && !plannedRoot && WorkerCreateDirectory(name, &err, exactName))
         {
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)CREATE_DIR_SIZE.Value, TRUE, 0, NULL, MAX_OP_FILESIZE); // directory already created
 
@@ -7912,18 +8688,40 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                     }
                 }
             }
+            if (!skip)
+                PrepareWorkerTreeMerge(op, dlgData);
             return TRUE;
         }
         else
         {
             if (invalidName)
                 err = ERROR_INVALID_NAME;
-            if (err == ERROR_ALREADY_EXISTS ||
-                err == ERROR_FILE_EXISTS)
+            if (!plannedRoot && err == ERROR_ACCESS_DENIED && (op.OpFlags & OPFL_UAC_TREE_ENTRY))
+            {
+                const DWORD attrs = GetFileAttributesW(nameCrDirW.c_str());
+                if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY))
+                    err = ERROR_ALREADY_EXISTS;
+            }
+            if (err == ERROR_ACCESS_DENIED && (op.OpFlags & OPFL_UAC_TREE_ENTRY) && !dlgData.SkipAllDirCreateErr)
+            {
+                BOOL success = FALSE;
+                if (TryTransferWithBroker(hProgressDlg, op, *script, totalDone, dlgData, success, err, nullptr, true))
+                {
+                    if (success)
+                        script->AddBytesToSpeedMetersAndTFSandPS(static_cast<DWORD>(CREATE_DIR_SIZE.Value),
+                                                                 TRUE, 0, NULL, MAX_OP_FILESIZE);
+                    return success;
+                }
+                if (reviewedSource && err == ERROR_ACCESS_DENIED)
+                    err = ERROR_NOT_SUPPORTED;
+            }
+            if (!plannedRoot && (err == ERROR_ALREADY_EXISTS || err == ERROR_FILE_EXISTS))
             {
                 DWORD attr2 = GetFileAttributesW(nameCrDirW.c_str());
-                if (attr2 & FILE_ATTRIBUTE_DIRECTORY) // "directory overwrite"
+                if (attr2 != INVALID_FILE_ATTRIBUTES && (attr2 & FILE_ATTRIBUTE_DIRECTORY)) // "directory overwrite"
                 {
+                    // Freeze the identity shown before the user answers.
+                    PrepareWorkerTreeMerge(op, dlgData);
                     if (dlgData.CnfrmDirOver && !dlgData.DirOverwriteAll) // should we ask the user about overwriting the directory?
                     {
                         char sAttr[101], tAttr[101];
@@ -8021,6 +8819,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
             {
             SKIP_CREATE_ERROR:
 
+                if (op.OpFlags & OPFL_UAC_TREE_ROOT)
+                    dlgData.PendingTreeMerge.reset();
                 skip = TRUE; // this is a skip (all operations within the directory must be skipped)
                 return TRUE;
             }
@@ -8032,7 +8832,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
 }
 
 BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
-                 CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CProgressDlgData& dlgData)
+                 CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CProgressDlgData& dlgData,
+                 const COperation& operation)
 {
     DWORD err;
     int AutoRetryCounter = 0;
@@ -8040,13 +8841,19 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
 
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
+    const bool exactDelete = script->AllowPermanentDeletePilot && dontUseRecycleBin && operation.SourceNameWValid;
+    const auto exactName = exactDelete ? WorkerOperationPathW(name, operation.SourceNameW.c_str()) : std::wstring{};
     const char* nameRmDir = name;
     char nameRmDirCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(nameRmDir, nameRmDirCopy);
+    if (!exactDelete)
+        MakeCopyWithBackslashIfNeeded(nameRmDir, nameRmDirCopy);
 
     while (1)
     {
-        ClearReadOnlyAttr(nameRmDir, attr); // ensure it can be deleted
+        if (exactDelete)
+            WorkerClearReadOnlyW(exactName, attr);
+        else
+            ClearReadOnlyAttr(nameRmDir, attr);
 
         err = ERROR_SUCCESS;
         if (script->CanUseRecycleBin && !dontUseRecycleBin &&
@@ -8079,8 +8886,18 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
         }
         else
         {
-            if (RemoveDirectory(nameRmDir) == 0)
+            const BOOL removed = exactDelete ? RemoveDirectoryW(exactName.c_str()) : RemoveDirectory(nameRmDir);
+            if (!removed)
                 err = GetLastError();
+        }
+
+        BOOL elevated = FALSE;
+        if (err == ERROR_ACCESS_DENIED &&
+            TryDeleteVerifiedLeaf(hProgressDlg, operation, *script, dlgData, elevated, nullptr, true))
+        {
+            if (!elevated)
+                return FALSE;
+            err = ERROR_SUCCESS;
         }
 
         if (err == ERROR_SUCCESS)
@@ -8141,7 +8958,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
             }
         }
 
-        DWORD attr2 = SalGetFileAttributes(nameRmDir); // get the current attribute state
+        const DWORD attr2 = exactDelete ? GetFileAttributesW(exactName.c_str()) : SalGetFileAttributes(nameRmDir);
         if (attr2 != INVALID_FILE_ATTRIBUTES)
             attr = attr2;
     }
@@ -8863,6 +9680,179 @@ CONVERT_AGAIN:
     }
 }
 
+static LONGLONG MetadataFileTime(const FILETIME& time)
+{
+    ULARGE_INTEGER value{};
+    value.LowPart = time.dwLowDateTime;
+    value.HighPart = time.dwHighDateTime;
+    return static_cast<LONGLONG>(value.QuadPart);
+}
+
+static BOOL ExecuteVerifiedWorkerLeaf(HWND progress, const COperation& op, const UacF7::PreparedLeaf* request,
+                                      CProgressDlgData& dlgData, WPARAM promptKind, int errorTitle,
+                                      bool shieldedOk = false, bool* nonEmptyDirectory = nullptr,
+                                      DWORD preparationError = ERROR_SUCCESS)
+{
+    bool retryDeclined = false;
+    for (;;)
+    {
+        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+        if (*dlgData.CancelWorker)
+            return FALSE;
+        DWORD error = request ? request->ExecuteLocal() : preparationError;
+        BOOL& skipAll = promptKind == WORKER_DIALOG_UAC_DELETE ? dlgData.SkipAllDeleteErr : dlgData.SkipAllChangeAttrs;
+        if (error != ERROR_SUCCESS && skipAll)
+            return TRUE;
+        if (request && error == ERROR_ACCESS_DENIED)
+        {
+            const std::wstring display = SalPathRemoveExtendedPrefixW(op.SourceNameW.c_str());
+            const std::string path = SalWideToMultiBytePath(display.c_str(), CP_UTF8);
+            const bool acceptedShield = shieldedOk;
+            UacF7::LeafPrompt prompt{*request, path.c_str(), shieldedOk};
+            prompt.retryDeclined = retryDeclined;
+            shieldedOk = false;
+            SendMessage(progress, WM_USER_DIALOG, promptKind, reinterpret_cast<LPARAM>(&prompt));
+            if (prompt.result.unknown)
+                return FALSE;
+            error = prompt.result.error;
+            if (promptKind == WORKER_DIALOG_UAC_DELETE && acceptedShield && error == ERROR_CANCELLED)
+                return FALSE;
+        }
+        if (nonEmptyDirectory && error == ERROR_DIR_NOT_EMPTY)
+        {
+            *nonEmptyDirectory = true;
+            return TRUE;
+        }
+        if (error == ERROR_SUCCESS)
+            return TRUE;
+        if (*dlgData.CancelWorker)
+            return FALSE;
+        int answer = IDCANCEL;
+        char* data[] = {reinterpret_cast<char*>(&answer), LoadStr(errorTitle), op.SourceName, GetErrorText(error)};
+        SendMessage(progress, WM_USER_DIALOG, 0, reinterpret_cast<LPARAM>(data));
+        if (answer == IDB_SKIPALL)
+            skipAll = TRUE;
+        if (answer != IDRETRY)
+            return answer == IDB_SKIP || answer == IDB_SKIPALL;
+        retryDeclined = true;
+    }
+}
+
+static bool TryDeleteVerifiedLeaf(HWND progress, const COperation& op, COperations& script,
+                                  CProgressDlgData& dlgData, BOOL& success, bool* nonEmptyDirectory,
+                                  bool accessDenied)
+{
+    // Recheck the worker's actual policy in case it changed after building the script.
+    const bool permanent = (dlgData.UseRecycleBin == 0 && !script.InvertRecycleBin) ||
+                           ((dlgData.UseRecycleBin == 1 || dlgData.UseRecycleBin == 2) && script.InvertRecycleBin);
+    if (!script.AllowPermanentDeletePilot || !permanent || !op.SourceNameWValid ||
+        FileNameIsInvalid(op.SourceName, TRUE))
+        return false;
+
+    if (op.Opcode == ocDeleteDir && static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(op.TargetName)) == MAXDWORD)
+        return false; // never retry a finalizer marked incomplete
+
+    const std::wstring path = SalPathRemoveExtendedPrefixW(op.SourceNameW.c_str());
+    const bool selected = script.PreparedDeleteRequest && path == script.PreparedDeletePath;
+    const COperations::ProtectedFileSource* listed = nullptr;
+    if (!selected && script.ProtectedFileSources)
+    {
+        const auto found = script.ProtectedFileSources->find(path);
+        if (found != script.ProtectedFileSources->end())
+            listed = &found->second;
+    }
+    if (op.Opcode == ocDeleteDir && !selected && !listed && !accessDenied)
+        return false; // keep the ordinary RemoveDirectory path and its retry behavior
+    UacF7::PreparedLeaf localRequest;
+    const UacF7::PreparedLeaf* request = script.PreparedDeleteRequest.get();
+    bool shielded = false;
+    DWORD preparationError = ERROR_SUCCESS;
+    if (selected)
+    {
+        if (op.Attr != script.PreparedDeleteAttrs)
+        {
+            success = FALSE;
+            return true;
+        }
+        shielded = script.DeleteShieldAccepted;
+        script.DeleteShieldAccepted = false;
+    }
+    else
+    {
+        request = nullptr;
+        if (listed)
+        {
+            request = listed->Request.get();
+            preparationError = listed->Error;
+        }
+        if (!request && !preparationError)
+        {
+            if ((op.OpFlags & OPFL_UAC_BRANCH_DELETE) && !accessDenied)
+                return false; // keep the normal worker and its lock-recovery dialog
+            if (!localRequest.PrepareDeleteLeaf(op.SourceNameW, op.Attr))
+                return false;
+            request = &localRequest;
+        }
+    }
+    const int errorTitle = op.Opcode == ocDeleteDirLink ? IDS_ERRORDELETINGDIRLINK :
+                           op.Opcode == ocDeleteDir ? IDS_ERRORDELETINGDIR : IDS_ERRORDELETINGFILE;
+    success = ExecuteVerifiedWorkerLeaf(progress, op, request, dlgData, WORKER_DIALOG_UAC_DELETE,
+                                        errorTitle, shielded, nonEmptyDirectory, preparationError);
+    return true;
+}
+
+bool BuildBasicMetadataChange(DWORD expected, DWORD desired, const CChangeAttrsData& input,
+                              UacF7::MetadataChange& change)
+{
+    constexpr DWORD allowed = UacF7::basicAttributes | FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_DIRECTORY;
+    if (!input.AllowBasicMetadataPilot || ((expected | desired) & ~allowed) != 0 ||
+        ((expected ^ desired) & FILE_ATTRIBUTE_DIRECTORY) != 0)
+        return false;
+
+    change = {};
+    change.expectedAttributes = expected;
+    const DWORD desiredBasic = desired & UacF7::basicAttributes;
+    if (desiredBasic != (expected & UacF7::basicAttributes))
+        change.attributes = desiredBasic ? desiredBasic : FILE_ATTRIBUTE_NORMAL;
+    if (input.ChangeTimeCreated)
+        change.created = MetadataFileTime(input.TimeCreated);
+    if (input.ChangeTimeAccessed)
+        change.accessed = MetadataFileTime(input.TimeAccessed);
+    if (input.ChangeTimeModified)
+        change.modified = MetadataFileTime(input.TimeModified);
+    if ((input.ChangeTimeCreated && !change.created) || (input.ChangeTimeAccessed && !change.accessed) ||
+        (input.ChangeTimeModified && !change.modified))
+        return false;
+    return true;
+}
+
+static bool TryChangeBasicMetadata(HWND progress, COperation& op, const CChangeAttrsData& input,
+                                   CProgressDlgData& dlgData, BOOL& success, UacF7::PreparedLeaf* protectedRequest)
+{
+    UacF7::MetadataChange change{};
+    const DWORD desired = static_cast<DWORD>(reinterpret_cast<DWORD_PTR>(op.TargetName));
+    if (!op.SourceNameWValid || !BuildBasicMetadataChange(op.Attr, desired, input, change))
+    {
+        // A prepared protected request must never fall through to the legacy path-based mutation.
+        success = FALSE;
+        return protectedRequest != nullptr;
+    }
+
+    if (protectedRequest != nullptr)
+    {
+        success = ExecuteVerifiedWorkerLeaf(progress, op, protectedRequest, dlgData,
+                                             WORKER_DIALOG_UAC_METADATA, IDS_ERRORCHANGINGATTRS, input.MetadataShieldedOk);
+        return true;
+    }
+
+    UacF7::PreparedLeaf request;
+    if (!request.PrepareMetadata(op.SourceNameW, change, {input.BasicMetadataSet, input.BasicMetadataClear}))
+        return false;
+    success = ExecuteVerifiedWorkerLeaf(progress, op, &request, dlgData,
+                                         WORKER_DIALOG_UAC_METADATA, IDS_ERRORCHANGINGATTRS, input.MetadataShieldedOk);
+    return true;
+}
+
 BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD attrs,
                    COperations* script, CQuadWord& totalDone,
                    FILETIME* timeModified, FILETIME* timeCreated, FILETIME* timeAccessed,
@@ -9450,11 +10440,11 @@ static DWORD WINAPI ParallelCopyThreadProc(LPVOID parameter)
 
 static BOOL CanUseParallelCopy(const COperations* script, const COperation* operation)
 {
-    return script->IsCopyOperation &&
+    return script->IsCopyOperation && !script->DeferredTransferTarget &&
            script->CopyMoveTransferMode == CMS_STORAGE_AWARE &&
            !script->CopySecurity && !script->CopyAttrs && !script->OverwriteOlder &&
            operation->Opcode == ocCopyFile &&
-           (operation->OpFlags & (OPFL_COPY_ADS | OPFL_AS_ENCRYPTED)) == 0 &&
+           (operation->OpFlags & (OPFL_COPY_ADS | OPFL_AS_ENCRYPTED | OPFL_UAC_TRANSFER_SOURCE)) == 0 &&
            !FileNameIsInvalid(operation->SourceName, TRUE) && !FileNameIsInvalid(operation->TargetName, TRUE);
 }
 
@@ -9464,6 +10454,19 @@ static BOOL ValidateInjectedTargetIdentity(COperation* operation, CProgressDlgDa
     std::wstring target = GetParallelCopyPathW(operation, FALSE);
     if (target.empty()) return FALSE;
     target = SalPathAddExtendedPrefixW(target.c_str());
+    if (operation->ScannedTargetRevision.attributes)
+    {
+        HANDLE file = HANDLES_Q(CreateFileW(target.c_str(), FILE_READ_ATTRIBUTES,
+                                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                                            OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+        if (file == INVALID_HANDLE_VALUE)
+            return FALSE;
+        UacF7::ArchiveRevision current;
+        const bool matches = UacF7::CaptureOverwriteRevision(file, current) &&
+                             UacF7::SameFileRevision(operation->ScannedTargetRevision, current);
+        HANDLES(CloseHandle(file));
+        return matches;
+    }
     DWORD volumeSerial;
     ULONGLONG fileIndex;
     return GetParallelFileIdentity(target, volumeSerial, fileIndex) &&
@@ -9646,7 +10649,7 @@ static BOOL CanPrepareParallelDirectory(const COperations* script, const COperat
 {
     return script != NULL && operation != NULL && operation->Opcode == ocCreateDir &&
            !script->CopyAttrs && !script->CopySecurity &&
-           (operation->OpFlags & (OPFL_COPY_ADS | OPFL_AS_ENCRYPTED)) == 0 &&
+           (operation->OpFlags & (OPFL_COPY_ADS | OPFL_AS_ENCRYPTED | OPFL_UAC_TREE_ROOT)) == 0 &&
            !FileNameIsInvalid(operation->TargetName, TRUE,
                               (operation->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0);
 }
@@ -10314,7 +11317,7 @@ static int RunParallelCopyBatch(COperations* script, int first, HWND progressDia
     if (initialLeaseGeneration != 0 && script->CopyMoveConflictMode != CMCM_SCAN_AHEAD)
         return 0;
     if (limit < 2 || script->IsParallelCopyDisabled() ||
-        !CanUseParallelCopy(script, &script->At(first)))
+        script->At(first).ScannedTargetRevision.attributes || !CanUseParallelCopy(script, &script->At(first)))
     {
         if (initialLeaseGeneration != 0)
             script->ReleaseParallelCopyLease(first, initialLeaseGeneration);
@@ -10360,6 +11363,7 @@ static DWORD WINAPI ConflictScannerBody(void* parameter)
         DWORD attributes = INVALID_FILE_ATTRIBUTES, volumeSerial = 0;
         ULONGLONG size = 0, fileIndex = 0;
         FILETIME writeTime = {};
+        UacF7::ArchiveRevision revision;
         BOOL inspect = op->Opcode == ocCopyFile || op->Opcode == ocMoveFile ||
                        op->Opcode == ocCreateDir;
         if (inspect)
@@ -10387,13 +11391,15 @@ static DWORD WINAPI ConflictScannerBody(void* parameter)
                             type = targetIsDirectory ? cmctTypeMismatch : cmctFileExists;
                         else if (op->Opcode == ocCreateDir)
                             type = targetIsDirectory ? cmctDirectoryExists : cmctTypeMismatch;
+                        if ((op->OpFlags & OPFL_UAC_TRANSFER_ELIGIBLE) && op->Opcode == ocCopyFile && type == cmctFileExists)
+                            CaptureScannedOverwriteRevision(target, info, revision);
                     }
                     HANDLES(CloseHandle(handle));
                 }
             }
         }
         data->Script->PublishConflictScanResult(index, type, attributes, size, writeTime,
-                                                volumeSerial, fileIndex, identityValid, existed);
+                                                volumeSerial, fileIndex, identityValid, existed, revision);
         data->Script->SignalConflictChanged();
     }
     data->Script->SetConflictScanState(FALSE,
@@ -10415,6 +11421,7 @@ unsigned ThreadWorkerBody(void* parameter)
     CProgressDlgData dlgData;
     dlgData.WorkerNotSuspended = data->WorkerNotSuspended;
     dlgData.CancelWorker = data->CancelWorker;
+    dlgData.CancelWorkerEvent = data->CancelWorkerEvent;
     dlgData.OperationProgress = data->OperationProgress;
     dlgData.SummaryProgress = data->SummaryProgress;
     dlgData.OverwriteAll = dlgData.OverwriteHiddenAll = dlgData.DeleteHiddenAll =
@@ -10490,6 +11497,7 @@ unsigned ThreadWorkerBody(void* parameter)
         GainWriteOwnerAccess();
 
     HWND hProgressDlg = data->HProgressDlg;
+    const HANDLE cancelWorkerEvent = data->CancelWorkerEvent;
     void* buffer = data->Buffer;
     BOOL bufferIsAllocated = data->BufferIsAllocated;
     CChangeAttrsData* attrsData = (CChangeAttrsData*)data->Buffer;
@@ -10539,6 +11547,32 @@ unsigned ThreadWorkerBody(void* parameter)
         lstrcpyn(opChangAttrs, LoadStr(IDS_CHANGINGATTRS), 50);
 
         int i = 0;
+        if (script->DeleteShieldAccepted && script->PreparedDeleteRequest &&
+            script->PreparedDeleteRequest->IsDirectoryDelete() && script->Count > 1)
+        {
+            // A selected protected directory is the final postorder operation.
+            // Its empty-only preattempt obtains consent before any child changes.
+            const COperation& directory = script->At(script->Count - 1);
+            if (directory.Opcode == ocDeleteDir && directory.SourceNameWValid &&
+                SalPathRemoveExtendedPrefixW(directory.SourceNameW.c_str()) == script->PreparedDeletePath)
+            {
+                pd.Operation = opStrDeleting;
+                pd.Source = directory.SourceName;
+                pd.Preposition = "";
+                pd.Target = "";
+                SetProgressDialog(hProgressDlg, &pd, dlgData);
+                bool nonEmpty = false;
+                BOOL removedOrSkipped = FALSE;
+                if (!TryDeleteVerifiedLeaf(hProgressDlg, directory, *script, dlgData, removedOrSkipped, &nonEmpty) ||
+                    !nonEmpty)
+                {
+                    Error = !removedOrSkipped;
+                    i = script->Count; // the selected directory was removed, skipped, or cancelled
+                }
+            }
+            else
+                Error = TRUE; // do not change descendants without the verified selected directory
+        }
         while (!Error && !*dlgData.CancelWorker)
         {
             CCopyMoveConflictDecision conflictDecision = cmcdNone;
@@ -10595,7 +11629,8 @@ unsigned ThreadWorkerBody(void* parameter)
                 break;
 
             COperation* op = &script->At(i);
-            BOOL injectConflictDecision = conflictScanner != NULL && conflictDecision == cmcdOverwrite;
+            BOOL injectConflictDecision = conflictScanner != NULL && conflictDecision == cmcdOverwrite &&
+                                          executionConflictType != cmctNone;
             BOOL savedOverwriteAll = FALSE;
             BOOL savedDirOverwriteAll = FALSE;
             if (injectConflictDecision)
@@ -10613,6 +11648,36 @@ unsigned ThreadWorkerBody(void* parameter)
 
             switch (op->Opcode)
             {
+            case ocCopyProtectedTree:
+            {
+                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+                if (*dlgData.CancelWorker)
+                {
+                    Error = TRUE;
+                    break;
+                }
+                pd.Operation = opStrCopying;
+                pd.Source = op->SourceName;
+                pd.Preposition = opStrCopyingPrep;
+                pd.Target = op->TargetName;
+                SetProgressDialog(hProgressDlg, &pd, dlgData);
+
+                UacF7::TransferPrompt prompt{*script->ProtectedTreeTransfer, op->SourceName, op->TargetName, true};
+                SendMessage(hProgressDlg, WM_USER_DIALOG, WORKER_DIALOG_UAC_TRANSFER, reinterpret_cast<LPARAM>(&prompt));
+                if (prompt.approved && WaitForSingleObject(cancelWorkerEvent, 0) == WAIT_TIMEOUT)
+                {
+                    prompt.result = ExecuteWithNativeTransferProgress(prompt.request, hProgressDlg,
+                        cancelWorkerEvent, nullptr, *op, *script, dlgData, totalDone);
+                    SendMessage(hProgressDlg, WM_USER_DIALOG, WORKER_DIALOG_UAC_TREE_RESULT, reinterpret_cast<LPARAM>(&prompt.result));
+                }
+                Error = prompt.result.unknown || prompt.result.error != ERROR_SUCCESS;
+                if (!Error)
+                {
+                    totalDone += op->Size;
+                    SetProgress(hProgressDlg, 1000, CaclProg(totalDone, script->TotalSize), dlgData);
+                }
+                break;
+            }
             case ocCopyFile:
             {
                 if ((op->OpFlags & OPFL_PARALLEL_DONE) != 0)
@@ -10707,7 +11772,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 BOOL skip, alreadyExisted;
                 Error = !DoCreateDir(hProgressDlg, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
                                      totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
-                                     alreadyExisted, crAsEncrypted, ignInvalidName, op->TargetNameWValid ? op->TargetNameW.c_str() : NULL);
+                                     alreadyExisted, crAsEncrypted, ignInvalidName, *op);
                 if (!Error)
                 {
                     if (skip) // skip directory creation
@@ -10826,10 +11891,22 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
 
+                BOOL deletedOrSkipped = FALSE;
+                if (TryDeleteVerifiedLeaf(hProgressDlg, *op, *script, dlgData, deletedOrSkipped))
+                {
+                    Error = !deletedOrSkipped;
+                    if (deletedOrSkipped)
+                    {
+                        totalDone += op->Size;
+                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    }
+                    break;
+                }
                 if (op->Opcode == ocDeleteFile)
                 {
                     Error = !DoDeleteFile(hProgressDlg, op->SourceName, op->Size,
-                                          script, totalDone, op->Attr, dlgData, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL);
+                                          script, totalDone, op->Attr, dlgData, op->SourceNameWValid ? op->SourceNameW.c_str() : NULL,
+                                          (op->OpFlags & OPFL_UAC_BRANCH_DELETE) ? op : nullptr);
                 }
                 else
                 {
@@ -10837,7 +11914,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     {
                         Error = !DoDeleteDir(hProgressDlg, op->SourceName, op->Size,
                                              script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
-                                             dlgData);
+                                             dlgData, *op);
                     }
                     else
                     {
@@ -10887,6 +11964,18 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
 
+                BOOL metadataSuccess = FALSE;
+                if (TryChangeBasicMetadata(hProgressDlg, *op, *attrsData, dlgData, metadataSuccess,
+                                            script->ProtectedMetadataRequest.get()))
+                {
+                    Error = !metadataSuccess;
+                    if (metadataSuccess)
+                    {
+                        totalDone += op->Size;
+                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    }
+                    break;
+                }
                 Error = !DoChangeAttrs(hProgressDlg, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
                                        script, totalDone,
                                        attrsData->ChangeTimeModified ? &attrsData->TimeModified : NULL,
@@ -10963,6 +12052,9 @@ unsigned ThreadWorkerBody(void* parameter)
     }
     if (conflictScanner != NULL)
     {
+        // A worker can stop on a refused UAC request without a Cancel command from the dialog.
+        if (Error)
+            SetEvent(cancelWorkerEvent);
         if (*dlgData.CancelWorker)
             SetEvent(dlgData.WorkerNotSuspended);
         WaitForSingleObject(conflictScanner, INFINITE);
@@ -10980,6 +12072,9 @@ unsigned ThreadWorkerBody(void* parameter)
         free(tgtBuffer);
     if (bufferIsAllocated)
         free(buffer);
+    dlgData.TransferJobs.clear();
+    if (script->CopySource)
+        script->CopySource->Session.reset();
     *dlgData.CancelWorker = Error;                  // if this was triggered by Cancel, make that obvious ...
     SendMessage(hProgressDlg, WM_COMMAND, IDOK, 0); // we're done ...
     WaitForSingleObject(wContinue, INFINITE);       // we need to stop the main thread

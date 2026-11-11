@@ -1,0 +1,466 @@
+<!--
+| Date | Summary | Reason | Ticket | Model |
+| 2026-11-11 | Record the CI compatibility and fixture fixes. | Keep the frozen SDK contract and local verification visible. | #731 | GPT-6.1 Sol |
+| 2026-11-11 | Record the rooted F5 approval failure and verified refusal. | Track the exact error and keep the corrected pilot open. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Consolidate UAC status and remaining acceptance work. | Replace repeated status snapshots with one plan and keep the detailed evidence. | https://github.com/KRtkovo-eu-AI/salamander/issues/731 | GPT-6.1 Sol |
+| 2026-11-10 | Record exact selection and mixed permanent-delete checks. | Document the ordinary VM run and the prepared protected fixture. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record link identity preparation and deletion evidence. | Document the verified referents and separate pending UAC interaction. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record permanent deletion across an unreadable Unicode branch. | Keep the exact VM proof and pending elevated deletion distinct. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the reproduced fallback and final image sizes. | Document the VM evidence without claiming system consent coverage. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the planned F5 root and native verification. | Track the read-only planning phase, create-only boundary, and remaining VM checks. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Document transfer refusal across planning and copying. | Track the built change and separate pending Windows verification. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record partial copy verified in the VM. | Separate app Skip All from unverified Windows consent outcomes. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record protected copy planning and build verification. | Track the first VM result and the pending acceptance cases. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the verified rooted F5 source listing. | Separate native transport evidence from pending worker and VM validation. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the existing-tree F5 merge and stale-root checks. | Separate verified merge behavior from remaining recursive transfer work. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record rooted recursive F5 into an unregistered protected destination. | Document actual consent, preserved streams, regression checks and remaining cases. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record atomic F6 into a missing protected path and the F5 staging constraint. | Keep tested directory moves distinct from recursive copy work. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record same-volume directory move UAC support and acceptance. | Keep atomic F6 evidence separate from directory creation and merge cases. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the complete typed-destination transfer and VM evidence. | Separate verified file jobs from the directory worker, cross-volume and scheduling cases. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the broker scope for missing transfer destinations. | Track the tested dispatcher behavior separately from the remaining host and VM work. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record verified existing protected transfer destinations. | Separate host and broker regression evidence from the pending Windows consent checks. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record wide Find traversal and exact denied-path verification. | Separate verified ordinary behavior from Windows consent testing. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record Find and Branch View editor scope and transfer parent gap. | Track the editor continuation and a single-consent path for protected nested targets. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Document Branch View metadata routing and local results. | Track verification of physical parent and item identities. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record Branch View overwrite and approved move VM evidence. | Separate verified outcomes from outstanding protected transfer cases. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record VM evidence for Branch View F3, F5 and cancelled F6. | Document the reproduced relative-path failure and the successful retest after the fix. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record Branch View transfer coverage, evidence and limits. | Distinguish verified exact-file transfer support from the pending broader scope. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record exact Branch View permanent deletion and its scope. | Document native evidence and the pending VM and multi-parent cases. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the interrupted VM deployments. | Keep the local evidence distinct from the pending UI acceptance. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record exact-image verification and the Branch View batch gap. | Identify the next source and worker paths without duplicating completed checks. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record verified Find result viewing and its limits. | Document exact identity tests and remaining VM evidence. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record Branch View file actions and the comparison focus retest. | Distinguish local verification from pending VM acceptance. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record scoped comparison through denied directories. | Capture VM results and the remaining foreground and boundary checks. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record scoped comparison from ordinary panels. | Track VM coverage and the remaining denied directory traversal. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Clarify the general scope of the UAC goal. | Treat the reported paths as regression examples. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record protected inventory VM results and remaining native paths. | Keep the Access Denied goal and its evidence current. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the partial directory size fallback in the VM. | Distinguish the host fallback from broker inventory coverage. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Plan remaining native Access Denied coverage. | Track three reported size regressions and their acceptance criteria. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record protected directory content comparison and VM acceptance. | Track each panel grant and the scoped read path. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Verify protected Branch View on the existing listing session. | Record recursive VM listing, refresh and authorization boundaries. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Verify F3 on a moved file that retains restricted permissions. | Record identity validation and both VM consent outcomes. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Verify copy and move from a deeply protected panel. | Record shared job consent, collision and cancellation evidence. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Verify Space and Find from a deeply protected panel. | Record the precise scope, builds and VM results. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Define the Access Denied acceptance criterion and deep-tree scenarios. | Test protected operations through their real entry points and document permission boundaries. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the long-path and read-only inventory findings. | Keep ACL denials, stale links and path-length failures separate. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record Windows compatibility aliases in size scans. | Separate deliberate link denials from genuine protected directory access. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record VM tests of the single shield action. | Verify one broker for each protected size, copy and move batch. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Use one shielded action per approved job scope. | Replace manual scope controls with automatic reuse. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record isolated VM acceptance for scoped elevation. | Verify both choices and the foreground between protected subtrees. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record item and job scope for size, copy and move. | Separate local evidence from interactive acceptance. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record foreground restoration for size scans and Shell consent. | Document the call-site audit and the isolated VM results. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the upstream clipboard integration. | Preserve the lifetime of staged clipboard files in the UAC worker. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the protected panel restore fix. | Verify that saved paths cannot block startup on an access prompt. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Record the F5 and F6 target shield and VM evidence. | Keep one in-app confirmation for an identified protected target. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Record one shield for protected recycling. | Verify direct Windows consent and the original account receipt. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Verify protected directory rename and direct permanent delete. | Record VM coverage, consent scope and runtime limits. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Record direct Windows consent after shielded OK. | Verify removal of the redundant administrator dialog. | #731 | Codex |
+| 2026-11-10 | Record protected panel metadata and the Ctrl+F2 shield. | Verify a single nonrecursive change and the elevation boundary. | #731 | Codex |
+| 2026-11-10 | Record native OK shields for F7 and F2. | Verify the indicator against real permissions and review other dialogs. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Verify protected-panel F7 and F2 preparation. | Offer separate elevation when local path checks cannot identify the objects. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Record UAC foreground return and scoped panel evidence. | Separate the observed window fix from open panel authorization work. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Audit shared authorization for native operations inside a panel subtree. | Separate repeated consent and pre-broker failures from verified runtime evidence. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Restore F3 in protected panels and keep directory size batches running. | Verify the selected file through its listing session and isolate denied subtrees. | #731 | Codex |
+| 2026-11-10 | Verify protected directory identity through its parent. | Cover directories that deny the ordinary process even a metadata handle. | #731 | Codex |
+| 2026-11-10 | Integrate the current upstream release branch. | Preserve asynchronous Find and locked-file recovery alongside UAC. | #731 | Codex |
+| 2026-11-09 | Record the deferral of the interactive DPI check. | Resume it when the test VM can use actual higher scaling. | | Codex |
+| 2026-11-09 | Distinguish completed P7 evidence from remaining acceptance gates. | Avoid repeating closed scenarios and record F6 on two volumes under WOW64. | | Codex |
+| 2026-11-09 | Verify hidden language modules in the UAC payload. | Prevent an unverified module from passing distribution checks. | | Codex |
+| 2026-11-09 | Verify Scan Ahead with a paused scanner. | Reproduce the stale wait and check isolation using real Windows events. | | Codex |
+| 2026-11-09 | Verify the exact x64 Scan Ahead pilot payload. | Tie distribution and transport evidence to the binaries used for VM acceptance. | | Codex |
+| 2026-11-09 | Measure localized UAC button widths. | Check translated captions and the shield at four simulated font sizes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Close simultaneous Scan Ahead F5 VM acceptance. | Verify both Windows consent outcomes in the same run. | | Codex |
+| 2026-11-09 | Refresh and exercise the portable ARM64 runner. | Run native fixtures from an isolated directory with the current host and tests. | | Codex |
+| 2026-11-09 | Record CodeQL on the changed Scan Ahead translation units. | Verify the local production delta before the next full remote analysis. | | Codex |
+| 2026-11-09 | Verify the current Scan Ahead change on Win32 and ARM64. | Update architecture evidence for the latest production code. | | Codex |
+| 2026-11-09 | Consolidate P7 status and Recycle Bin decisions. | Keep completed experiments and remaining evidence in one place. | | Codex |
+| 2026-11-09 | Record local CI coverage and the dual F5 VM result. | Separate simultaneous cancellation evidence from the approved single-item retry. | | Codex |
+| 2026-11-09 | Verify two copy jobs under cancellation. | Check that cancelling one active pipe leaves the other scoped dispatcher usable. | | Codex |
+| 2026-11-09 | Prepare a two-job F5 acceptance fixture. | Verify that UAC refusal and protected copy completion stay scoped to their respective jobs. | | Codex |
+| 2026-11-09 | Stop Scan Ahead when a protected worker exits on error. | Prevent background scanning and queued conflict prompts after a refused UAC request. | | Codex |
+| 2026-11-09 | Verify the overwrite journal while its owner is alive. | Distinguish an active concurrent overwrite from interrupted recovery. | | Codex |
+| 2026-11-09 | Verify that UAC release signatures are embedded. | Require the distributed binaries to carry the verified signatures. | | Codex |
+| 2026-11-09 | Record the local ARM64 CI candidate checks. | Separate workflow validation from ARM64 runtime evidence. | | Codex |
+| 2026-11-09 | Prepare a portable native Windows ARM64 acceptance bundle. | Make the verified test images usable without a local compiler. | | Codex |
+| 2026-11-09 | Verify that a temporary DELETE ACE survives a hard interruption. | Rule out a permission grant that cannot be reliably revoked. | | Codex |
+| 2026-11-09 | Test the Shell recycle COM proxy with two Windows accounts. | Determine which account supplies access and owns the receipt. | | Codex |
+| 2026-11-09 | Verify effective access in the Shell recycle COM proxy. | Distinguish caller identity configuration from permission to delete the source. | | Codex |
+| 2026-11-09 | Probe IFileOperation as an out-of-process COM server. | Establish whether caller identity can be configured before testing alternate-account recycle. | | Codex |
+| 2026-11-09 | Verify the twelve language modules with the published x64 host. | Check the current unsigned payload and enforce the release signature gate. | | Codex |
+| 2026-11-09 | Record green CI on the published UAC head. | Tie the full builds, tests and CodeQL result to f0b9678c. | | Codex |
+| 2026-11-09 | Fix the Find stop-event wrapper after fork CI. | Restore Debug builds across all three architectures. | | Codex |
+| 2026-11-09 | Reconcile the four UAC acceptance areas with current evidence. | Separate local acceptance from release and account gaps. | | Codex |
+| 2026-11-09 | Verify the deep-path F7 dialog in the latest Win32 host. | Cover dark mode, keyboard scrolling and default cancellation under WOW64. | | Codex |
+| 2026-11-09 | Verify Win32 and ARM64 images after the deep F7 path fix. | Match the current host to its broker, resources and native test coverage. | | Codex |
+| 2026-11-09 | Verify bounded F7 consent with a deeply nested path. | Keep the full target and default Cancel accessible without fixed path scratch storage. | | Codex |
+| 2026-11-09 | Review the updated UAC message layout. | Record targeted CodeQL and expose the remaining dialog height limit. | | Codex |
+| 2026-11-09 | Repair the standalone ZIP64 range regression. | Run the real parser with SDK tracing initialized. | | Codex |
+| 2026-11-09 | Revalidate the deployed x64 broker images after the F7 layout change. | Record release transport and leaf tests and the standalone ZIP probe limitation. | | Codex |
+| 2026-11-09 | Check Czech F7 path wrapping with scaled Win32 fonts. | Cover four DPI values without signing out of the VM. | | Codex |
+| 2026-11-09 | Verify complete Unicode paths in the Czech F7 consent dialog. | Prevent clipping after a full-width character. | | Codex |
+| 2026-11-09 | Record the Czech F7 light-theme check. | Track clipping of a long Unicode path in the consent dialog. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify current Win32 F7 in the protected VM pilot. | Confirm the default cancellation and an approved operation under WOW64. | | Codex |
+| 2026-11-09 | Verify Win32 and ARM64 packages after the F7 and Find changes. | Distinguish x86 execution from ARM64 cross-compilation. | | Codex |
+| 2026-11-09 | Analyze the current F7 and Find changes with CodeQL. | Tie security-extended results to the actual modified translation units. | | Codex |
+| 2026-11-09 | Verify the corrected Find cancellation log in the VM. | Confirm distinct entries for declined files and directories. | | Codex |
+| 2026-11-09 | Verify exact-file duplicate search and correct its cancellation log. | Keep file and directory cancellation diagnostics distinct. | | Codex |
+| 2026-11-09 | Repeat the complete local PR Tests catalog on the current source. | Verify the latest protected F7, Find and broker changes together. | | Codex |
+| 2026-11-09 | Verify late F6 progress in the native dialog. | Confirm both progress bars, one byte total, and the broker memory sample. | | Codex |
+| 2026-11-09 | Prepare a paced F6 verification fixture. | Make native verification frames visible and sample the elevated broker. | | Codex |
+| 2026-11-09 | Complete installed broker rejection for both negative images. | Verify pre-launch rejection and restoration of the exact broker and ACL. | | Codex |
+| 2026-11-09 | Verify stale broker rejection in the protected installation. | Exercise the installed probe through the check before broker launch. | | Codex |
+| 2026-11-09 | Verify the exact VM candidate in transport and packaging checks. | Tie stale-image rejection and the full language payload to the tested application binary. | | Codex |
+| 2026-11-09 | Verify late F6 completion with a 320 MiB file. | Prove the broker retires the source while preserving the ordinary destination identity. | | Codex |
+| 2026-11-09 | Verify a changed target in a mixed Scan Ahead batch. | Record the repeated native conflict and the retained completed copy. | | Codex |
+| 2026-11-09 | Verify mixed F5 selection in the protected pilot. | Check that an ordinary folder completes before the selected protected file asks for consent. | | Codex |
+| 2026-11-09 | Verify Enter cancels protected F7 in the VM. | Check the real focus, shield and unchanged destination on the protected pilot. | | Codex |
+| 2026-11-09 | Default the protected F7 prompt to Cancel. | Keep the shield on the action that requests elevation. | | Codex |
+| 2026-11-09 | Align the pilot guide with P7 acceptance. | Document scoped recycle, protected search Stop and the F6 verification phase. | | Codex |
+| 2026-11-09 | Record Czech F7 visual acceptance. | Verify the translated consent dialog and Unicode destination in the protected pilot. | | Codex |
+| 2026-11-09 | Verify the full protocol 11 language payload. | Match packaged resources to the current sources and the accepted x64 pilot. | | Codex |
+| 2026-11-09 | Verify cancellation during F6 copy verification. | Cover the cancellation boundary after a verified block and before source retirement. | | Codex |
+| 2026-11-09 | Verify Win32 and ARM64 builds after Find cancellation and focus restoration. | Keep the architecture matrix aligned with the tested x64 candidate. | | Codex |
+| 2026-11-09 | Record targeted CodeQL and x64 payload verification after the Find and focus changes. | Verify the final local candidate against the current source and distribution gates. | | Codex |
+| 2026-11-09 | Restore the invoking window after broker consent. | Return to the active Samandarin operation when Windows switches foreground windows. | | Codex |
+| 2026-11-09 | Verify protected Find Stop, restart and memory in the VM. | Exercise an actual read session and measure both processes on the same fixture. | | Codex |
+| 2026-11-09 | Measure ordinary Find memory for the cancellation candidate. | Compare the same workload without accessibility enumeration or elevation. | | Codex |
+| 2026-11-09 | Stop active protected Find reads promptly. | Close the scoped read pipe and keep incomplete replies out of results. | | Codex |
+| 2026-11-09 | Cancel the protected Find broker handshake on Stop. | Stop waiting for an authorized read session once the search is cancelled. | | Codex |
+| 2026-11-09 | Bind queued Find notifications to their search. | Prevent a late completion or refresh from affecting a restarted protected search. | | Codex |
+| 2026-11-09 | Record local CodeQL analysis for protocol 11. | Check the broker and the changed worker before the next shared push. | | Codex |
+| 2026-11-09 | Verify protocol 11 payloads and stale-pair rejection. | Check all build architectures after adding F6 completion progress. | | Codex |
+| 2026-11-09 | Show verification progress during elevated F6 completion. | Update the current-file bar without counting the ordinary copy twice. | | Codex |
+| 2026-11-09 | Test cancellation and disconnect when checking an existing F6 copy. | Cover the stage before the elevated broker can retire the source. | | Codex |
+| 2026-11-09 | Verify the Shell recycle destination with a physical bin. | Check whether a real bin passed as the destination controls placement. | | Codex |
+| 2026-11-09 | Record SMB drive disconnect and remap evidence. | Verify that an unavailable mapped path fails without touching prior copies. | | Codex |
+| 2026-11-09 | Record the disabled Recycle Bin check on the isolated NTFS volume. | Verify the real Shell response separately from the callback simulation. | | Codex |
+| 2026-11-09 | Test a permanent-delete fallback during the elevated recycle retry. | Verify that the Shell retry stops if it drops the recycle flag. | | Codex |
+| 2026-11-09 | Prepare architecture-checked ARM64 runtime tests. | Verify the ARM64 binaries locally and keep the native execution gate explicit. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record successful fork CI and CodeQL on 7bd944c8. | Link the exact published candidate to the native results and the full C++ scan. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Recheck the UAC candidate before the shared push. | Verify the current file core and encrypted copy regressions before GitHub validation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify a live F5 copy against an actual journaled overwrite. | Pause the exchange after the original moves aside and check that the copy cannot fill the gap. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Isolate the Windows F5 cancellation retest. | Distinguish a single completed cancellation from other queued pilot operations. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the approved directory size and the Windows F5 cancellation result. | Record panel totals, the retained partial copy and the original selection. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify packaged language file versions in UAC payloads. | Catch same-architecture language modules that the application rejects at startup. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify F6 recovery after the last source link is delete-pending. | Cover hard termination after both source names disappear and before clearing the durable receipt. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify partial F5 batch results after cancelling elevation. | Confirm the first copy remains and later entries are not processed. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Run the security-extended profile on the local UAC databases. | Verify the current broker and classify alerts in the selected host sources before publishing. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify Czech F7 and directory size elevation prompts in the VM. | Exercise localized text, Unicode paths, the shield and cancellation in the dark scheme. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the directory sizes shortcut in the VM. | Confirm that the shortcut offers elevation for the blocked subtree. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record the protected F5 Release memory comparison. | Verify the journal publication guard in the isolated VM. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Measure the ordinary F5 reference before comparing brokers. | Verify identical source batches and capture the normal host memory in both trials. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Document the recovered F5 decision and panel size shortcut. | Align the user guide with the verified conflict dialog and the disk size command. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the native F5 recovery conflict and installed Czech UAC strings. | Confirm the open overwrite decision and preserve the recovered original after cancellation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Extend the targeted CodeQL scan and verify the slot parser fix. | Remove the only finding on a branch-changed line and rebuild the matching release payloads. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Run the previous CodeQL rules against the local UAC revision. | Verify both Find fixes without pushing the unfinished VM acceptance branch. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Serialize protected F5 publication with an in-flight overwrite. | Close the interval between the initial journal check and the final rename. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify concurrent F5 publication and overwrite recovery boundaries. | Preserve competing and original data and identify the unguarded publication interval. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify F5 recovery from the protected panel in the VM. | Confirm the restored original and absence of staging or journal files after actual consent. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Recover an interrupted F5 overwrite before a new copy. | Restore the verified original and require a fresh overwrite decision. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify interruption during protected F5 overwrite in the VM. | Prove that the original and journal survive when the broker exits before publication. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify language module architectures in the release payload. | Detect the Win32 pilot packaging mismatch before startup. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Accept protected Win32 F7 under WOW64. | Verify cancellation and elevation through the matched Win32 broker in Program Files (x86). | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Compare localization dialog templates with the fork base. | Separate unchanged dialog geometry from runtime sizing of the UAC prompts. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the candidate refuses cross-account recycling. | Confirm denial leaves the original file and both bins untouched. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify F6 recovery after the durable receipt and repeat protected recycle. | Confirm both file identities after interruption and the exact caller-bin receipt on the candidate. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the Win32 panel under WOW64. | Check ordinary F5 and fail-closed behavior outside the protected deployment. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the mapped SMB drive boundary. | Check real remote-drive classification and ordinary copying through a temporary drive letter. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify ordinary and denied SMB copies in the panel. | Exercise the live F5 entry point without escalating a network source. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the local identity boundary on a real SMB path. | Contrast the native broker identity check with an ordinary read and copy. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify combined F5 metadata from the panel. | Record refusal of an ordinary-writable source and exact readback from a protected source. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify that a disconnected Find scope leaves other VM results intact. | Record the exact pipe error, remaining results and restoration of the regular broker. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify alternate-administrator EFS read denial in the VM. | Complete the two-account encrypted copy acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Refresh the complete local P7 test preflight. | Verify the current candidate before the next shared publication. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify copy option changes cannot reuse broker consent. | Exercise both denials on live pipes and prepare the combined metadata panel test. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Validate the Win32 and ARM64 P7 Release payloads. | Check the actual release binaries and exercise the Win32 broker transport under WOW64. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Build a combined x64 P7 acceptance payload. | Bind the current host, broker, probe and all language modules to one tested candidate. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Complete and verify all UAC translation archives. | Ensure each shipped language contains the full UAC text set. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Complete the Spanish and Italian UAC strings. | Verify localized UAC messages in both built language modules. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Complete the French and Slovak UAC strings. | Verify translated consent, scope and error text in both built language files. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Complete the German UAC strings. | Verify localized consent and error text in the German language binary. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify exact-file Find scope and investigate the Recycle Bin namespace. | Record live-pipe authorization checks and the known-folder API limits. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Revalidate the recycle account policy inside the Shell callback. | Refuse a retry if Windows switches to a credential policy. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify UAC payloads for all three build architectures. | Detect mixed-architecture application and broker pairs before distribution. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Exercise a disconnected Find content stream on a live pipe. | Verify another scoped session can still return content. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the encrypted copy’s EFS recipients. | Confirm that copying did not add the approving administrator or a recovery key. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the original account can read both EFS files. | Confirm the protected copy keeps the key holder’s access and matching content. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify combined Find predicates and duplicates in the VM. | Keep accessible and approved matches after an independent denied scope. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the Recycle Bin account guard in the VM. | Preserve the source before the Shell can recycle it into another account. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Probe an explicit alternate account Recycle Bin destination. | Verify the NTFS Shell destination and stage the original-account guard. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Prevent the Shell from recycling into the approving administrator’s bin. | Reject credential-based retries after the observed wrong-account side effect. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the portable elevation boundary for current probe images. | Record protected-installation refusal on x64 and Win32. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the original Shell restore command for the protected receipt. | Match the account, file identity and original path before restoration. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Confirm protected recycling under the original account. | Verify the exact receipt after the corrected Shell callback sequence. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Stage the protected Recycle Bin retry build. | Verify the corrected host against the existing VM broker and fixture. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Allow the actual Shell elevation retry for recycling. | Do not turn the first request for elevation into a failure of the next source check. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Complete the local native CI preflight. | Build and run the same test projects and standalone scripts as the CI runner. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Pass the local CI Python preflight. | Repair three stale Branch View and translation fixtures affected by the UAC changes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Trace the ordinary Shell refusal on the exact P7 fixture. | Separate the original ACL failure from the approved elevated retry. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Keep native progress exact over the 64-bit byte range. | Prevent wrapped percentages for large F6 batches. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the local volume boundary on the live broker pipe. | Refuse remote and device namespaces even with valid local file IDs. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Recheck two-volume moves and EFS on the current implementation. | Verify cancellation, stream preservation and encrypted raw I/O after the progress changes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify malformed broker progress and update the Recycle Bin guide. | Exercise the protocol rejection paths and publish the current VM result. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the current UAC release candidate and language resources. | Bind the payload checks to protocol 10 and both compiled translations. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Repair the ZIP regression harnesses and record the CI baseline. | Recheck the failures on the published ZIP revision before a consolidated push. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record protected Recycle Bin acceptance failure. | The approved VM attempt returned access denied and preserved the original. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the active UAC caption shield in the VM. | Confirm it appears alongside native progress during a real transfer. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Show the UAC shield in native progress captions. | Mark active broker work after authentication and restore the ordinary icon afterwards. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify live F6 progress in the native VM dialog. | Record protected transfer integrity and separate incomplete memory measurements. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Show native progress for protected trees and encrypted import. | Use verified operation totals without treating provisional work as completion. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Report brokered F5 and F6 byte progress in the existing dialogs. | Give long protected transfers live feedback while preserving the terminal result. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Prepare the combined protected Find acceptance fixture. | Compare tagged duplicates and a same-size text nonmatch across ordinary and protected roots. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Revalidate the original-account Recycle Bin receipt in the acceptance VM. | Establish the Shell baseline before the protected panel tests. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify pre-publication F6 cancellation through the native dialog. | Confirm cleanup and restore the regular pilot after controlled tests. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify F6 interruption on two NTFS volumes and in the post-publication UI. | Prove partial-move reporting while both files remain intact. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record the timing limit of interactive F6 cancellation tests. | Separate a completed move from verified cancellation before publication. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify protected F6 completion after ordinary cross-volume copy. | Cover cancellation and approved source removal without replacing the destination. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify a protected F6 move above 4 GiB between NTFS volumes. | Exercise the native worker and elevated broker with a fully allocated file. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify requeued F5 target revision in Scan Ahead. | Confirm that the new revision requires a fresh overwrite decision in the upstream dialog. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify a late target revision during F5 consent in the VM. | Check that consent cannot authorize overwriting a changed target. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify protected F5 overwrite with NTFS streams in the VM. | Cover both source and existing destination streams with Windows consent. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify shared F5 consent in the P7 virtual machine. | Confirm two files with one prompt and require fresh consent for a new job. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Stage a shared P7 acceptance candidate. | Bind the VM and release checks to one verified build and evidence manifest. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Keep confirmed protected recycle results after a late Shell failure. | Use one exact receipt to distinguish completed work from cancellation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Kill the EFS copy fixture before and after publication commits. | Verify the committed file and workspace recovery after a real process exit. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Bind ordinary F6 source retirement to both copied identities. | Stop when either file name has been substituted before the UAC retry. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Measure equivalent x64 Release images for closed-scope cleanup. | Record the individual and combined size delta before VM memory measurement. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Release closed broker scopes during batches. | Keep only connected scopes available for the next item. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Restore Archive after an interrupted compressed F6. | Correct the bit after the recovery alias and original ACL have been restored. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Combine compression and security in protected F5 copies. | Preserve both selected options and give the combined operation its own consent scope. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Share request delivery tracking across one-shot and scoped UAC operations. | Distinguish pre-dispatch errors from a possibly completed mutation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Support protected direct files in mixed F5 and F6 selections. | Bind direct transfer admission to the operation instead of the entire selection. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the approved release signer and the complete broker dependency block. | Reject extra import names and delay imports in the standalone artifact verifier. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Support protected F5 overwrite targets with named streams. | Verify backup contents before automatic retirement. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Stop Find work for a disconnected protected scope. | Keep valid results and continue scanning the other scopes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Recheck default-only F6 destinations before source retirement. | Preserve the source if the published destination gains an alternate stream. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Preserve a sparse named stream on a dense F5 file. | Verify storage per opened stream rather than inferring it from the main stream. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Preserve sparse F5 files with named streams and exact security. | Verify each stream and the destination security before publication. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Test F6 interruption during the staged write. | Verify that cancellation and a broken pipe remove partially written data. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Page through sparse allocated ranges. | Preserve highly fragmented streams during guarded cross-volume moves. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Preserve source streams in verified disk overwrites. | Verify every replacement stream before retiring the original. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Remove the cross-volume F6 pilot limits. | Verify offsets past 4 GiB and cancellation without a total deadline. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Allow verified F5 overwrite after source access denial. | Retain ordinary conflict consent and the exact target revision. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Bind Scan Ahead F5 overwrites to the reviewed revision. | Requeue replaced targets without carrying forward the old conflict decision. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Enable serial protected transfer admission in Scan Ahead. | Separate approved conflicts from free targets and stop the batch on cancellation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Test abrupt process exit during disk overwrite. | Verify recovery and retained data at each exchange checkpoint. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Match protected duplicate filters and digest on one open. | Keep combined results independent of mutable NTFS timestamps. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify disk overwrite receipts before retiring backups. | Retain the prior target when the published copy was changed after a broker exit. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Combine exact compression and named streams in F5. | Verify contents, storage and collision behavior together. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Preserve compression on guarded F6 streams. | Verify mixed compression and sparsity before source retirement. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Connect the protected Recycle Bin pilot to Delete. | Verify a single-file Shell retry and the original account receipt. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Share Shell recycle identity and receipt verification. | Reject a substituted source before the Shell processes the queued item. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Bind protected Find duplicate digests to the checked revision. | Reject changed candidates before hashing their contents. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Keep denied F6 completion retries verified. | Preserve both files when the copied pair can no longer be verified. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Remove custom installer work from UAC scope. | Keep the runtime and independent artifact checks on the feature branch. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify the executable roles in a UAC pair. | Reject a substitute with the correct protocol before launching it. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record guarded F6 with sparse named streams. | Verify that the move keeps data and holes in each stream. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record final verification of encrypted F5 publication. | Keep rollback armed until EFS data and timestamps are verified. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify protected Find text and tags on one open file. | Keep combined predicates on the same revision. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Add a two-volume test mode for guarded F6. | Exercise verified publication and recovery on distinct NTFS volumes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Verify stale overwrite rejection through the broker pipe. | Reject changed destinations before touching recovery state. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record installer-time verification of the UAC pair. | Fail the pilot build if payload validation fails. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record stricter Shell recycle path admission. | Avoid normalization aliases before queuing deletion. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record concurrent publication through two broker jobs. | Verify one winner and no lost sources on NTFS. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Document the UAC pilot for users and record Release regressions. | Separate supported operations from open release gates. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record Czech UAC localization and round-trip verification. | Track localized prompts and release validation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record the P7 protocol resource and stale-image checks. | Detect mismatched broker packages before elevation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record original-volume and account checks for Recycle Bin receipts. | Verify identity independently of the mounted drive path. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record duplicate validation at comparison time. | Confirm empty candidates and reject short or changed reads. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record exact-file consent in Find refinement. | Keep protected text and tags available in intersection and subtraction. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record larger streamed cross-volume F6 transfers. | Keep F6 size and time limits independent from F5. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record guarded cross-volume F6 with ADS. | Verify the protected destination and retire the source after all streams are published. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record the verified F6 stream inventory. | Acquire and recheck per-stream locks against the same file ID. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record NTFS named-stream oplock and unlink evidence. | Define the source guard needed for moves that preserve ADS. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record F6 source access denied during preparation. | Pass eligible cross-volume moves through the verified worker retry. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record F6 cancellation and partial replies. | Preserve the broker outcome across one-shot and shared sessions. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record source sealing before recovery link creation. | Reject preexisting handles before the link can change NTFS metadata. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record compressed F6 publication. | Preserve LZNT1 and the source attributes captured before sealing. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record sparse F6 publication. | Track allocated ranges and guarded source retirement. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record F6 completion after an ordinary cross-volume copy. | Verify both identities and the copied data before deleting the source. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record broker integration for guarded cross-volume F6. | Preserve ordinary moves and isolate the verified retry. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Keep scoped batch authorization in memory. | Separate live UAC consent from operation-specific crash cleanup. | https://github.com/KRtkovo-eu-AI/salamander/issues/731 | Codex |
+| 2026-11-09 | Record the F6 source retirement sequence. | Verify both unlinks against a durable pinned target. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record durable F6 target verification during recovery. | Retain incomplete or substituted receipts. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record guarded destination publication for F6. | Keep the source lock and pin the exact new target. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record source guard and filter reservation for F6. | Exclude writers that opened before the journaled DACL seal. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record durable ACL recovery for interrupted F6 source handling. | Preserve the original name and DACL without replacing independent changes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Record the F6 source DACL and recovery-rights probe. | Verify file-wide exclusion and reopening by exact identity. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record verified EFS Raw named-stream copies. | Keep encrypted metadata combinations and concurrent changes explicit. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record all pilot installer message translations. | Verify that each setup language includes the required path. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the F6 oplock and delete-pending experiments. | Isolate the limits of stream and extended-attribute exclusion. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record active cancellation of scoped file transfers. | Preserve completed copies and stop the rest of the batch. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record security metadata with F5 streams and sparse allocation. | Verify supported combinations without dropping payload data. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the P7 installer and payload preflight. | Track the signed pilot and remaining distribution checks. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Verify repeated scoped requests on a real broker pipe. | Cover collision, authorization boundaries and disconnect before mutation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Reuse scoped consent for permanent deletion and metadata. | Enforce approved parent, item type and attribute and time settings. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Verify late EA writes and prepare Shell recycle acceptance. | Establish source safety and the original-account receipt checks. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Add a durable cross-volume source recovery journal. | Bind recovery to verified NTFS names and file identities. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Verify a source recovery link across process termination. | Establish exact recovery and expose remaining NTFS write paths. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Return known transfer failures to ordinary error handling. | Preserve completed work and scoped consent after a skipped failure. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Reuse transfer consent within a scoped job. | Bind subsequent requests to the approved operation and parent identities. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Route one encrypted file through the F5 broker. | Use an explicit consent and verify inherited destination security. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Verify the complete EFS Raw copy path. | Bind source metadata to the guarded export and test cancellation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record guarded EFS publication. | Verify encrypted content, inherited permissions and rollback. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record private EFS workspace recovery. | Verify encrypted staging, targeted cleanup and substitution refusal. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Require explicit user requests for features beyond existing operations. | Keep the UAC plan within the agreed scope. | | Codex |
+| 2026-11-08 | Record EFS Raw round trip and handle-based source binding. | Establish preservation and callback failure behavior before wiring F5. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the Shell transfer recycling probe. | Verify caller ownership and the source-sharing boundary before protected recycling. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record exact-file Find grants. | Document authorization, mixed-scope search and local validation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record independent Find scopes. | Document serialized consent, cancellation and scoped duplicate reads. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record protected Find keywords. | Document host-side parsing, verified stream limits and local evidence. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record protected duplicate search. | Document metadata grouping, scoped hashing and pending VM acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record protected Find content streaming. | Document explicit scope, local evidence and remaining acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the additional cross-volume source guard probes. | Establish the behavior of NTFS attributes and delete-pending under contention. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record per-item UAC in native operation batches. | Document cancellation, existing worker boundaries and pending VM evidence. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the protected disk overwrite pilot. | Document the verified replacement and VM acceptance boundary. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Start the native overwrite work after ZIP acceptance. | Share the verified exchange before wiring disk conflicts. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record final protected ZIP acceptance. | Preserve disk, CRC, cancellation and disconnect evidence. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Keep interrupted ZIP handling internal to the write. | Remove the standalone command and record the VM edit results. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record ZIP recovery and the first acceptance results. | Track successful read and extraction and the diagnosed Windows ACL difference. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document protected ZIP editing from the panel. | Track staging, validation, delete and F5 additions. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document streamed ZIP replacement and session handoff. | Track the implemented write protocol before wiring ZIP commands. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document ZIP recovery journal and the locked archive revision. | Record the broker boundary for updating and restoring a protected archive. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Describe verified ZIP update publication and recovery. | Track the write backend and remaining ZIP integration. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record protected ZIP selection extraction. | Track manifest bounds, one target consent, and partial outcomes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record single-entry protected ZIP extraction. | Separate source reads from bounded destination publication. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the protected ZIP F3 implementation. | Track the verified entry reader and deferred joint acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Limit the current UAC scope to core functions and ZIP. | Sequence the remaining ZIP work and defer other plugins and public SDK changes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Verify persistent protected ZIP authorization. | Reuse one broker across manual refreshes and release it on archive exit. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Verify the protected ZIP64 archive panel. | Record folder navigation, manual refresh, cancellation, and ordinary ZIP behavior. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Define the protected ZIP panel acceptance gate. | Require the existing archive panel and compare an elevated plugin host. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the protected ZIP64 listing pilot. | Document the bounded protocol and local and VM evidence. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Revise protected archive reads for ZIP64. | Use bounded reads from the original and keep the archive parser at ordinary integrity. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Design the protected ZIP listing pilot. | Separate protected source reads from elevated extraction and verify ZIP staging constraints. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record explicit administrator editing on F4. | Document the original-file flow, editor validation, and pilot checks. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record detailed protected Ctrl+Q measurements. | Verify the existing occupied-space dialog and editable estimate. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Keep protected totals in the full Ctrl+Q dialog. | Use identical geometry and controls for both access modes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record protected F3 viewer snapshots and compact size results. | Describe the single-file authorization and VM checks. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P6 protected logical sizing and metadata Find. | Reuse the rooted listing broker and verify ordinary search continues while consent is pending. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Close the P5 metadata and Recycle Bin matrix. | Record EFS refusal and Shell recycling acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5n explicit security preservation in F5. | Document the bounded DACL and ownership contract and its verification. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5m permanent junction deletion. | Document the junction checks and local and VM evidence. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5l permanent directory symbolic-link deletion. | Document scope and local and VM evidence. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5k permanent file symbolic-link deletion. | Document scope and local and VM checks. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5j junction rename. | Document the accepted junction format and the local and VM results. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5i directory symbolic-link rename. | Document the type check and the local and VM results. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5h file symbolic-link rename. | Document the no-follow boundary and the local and VM results. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5g NTFS compression preservation in F5. | Document consent, attribute behavior, and local and VM evidence. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5f sparse F5 preservation. | Document local and VM evidence for data and allocation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P5e preservation of named streams in protected F5. | Document the pilot scope and local and VM results. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document P5d explicit Ignore ADS for protected F5. | Record stream handling in the broker and the VM checks. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document P5c basic directory attributes. | Track bounded Ctrl+F2 changes and their verification. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document P5b directory time preservation in protected F5. | Record the explicit option and its pilot limits. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document P5a directory timestamps and local validation. | Track the first bounded metadata extension after the transfer pilots. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the P4n NTFS source-retirement probe. | Verify the late-stream race before enabling cross-volume F6. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the P4m NTFS overwrite probe. | Establish which rename modes permit a target substitution. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document cancellation of a running protected F5 copy. | Track cleanup before publication and acknowledged success after it. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the P4k CI result and allocation fix. | Keep the next stage gated on clean analysis. | https://github.com/majklvi/salamander/runs/128721425272 | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P4j CodeQL and the protected F5 queue pilot. | Track queue admission and isolated VM acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Document the UAC architecture, source audit, implementation stages and validation gates. | Plan per-operation elevation without implementing it. |  | GPT-6 (Codex) |
+| 2026-11-07 | Record the first P0 experiment. | Link the prototype and remaining gates. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record the VM elevation matrix. | Capture the result with a separate administrator account. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record pipe loss and Shell comparisons and select the P0 backend. | Set the first local implementation slice and remaining gates. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Add the P2 broker bootstrap and test procedure. | Track verified transport and the isolated VM acceptance gate. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record interactive P2 acceptance results. | Verify the exact staged broker pair in the isolated VM. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record the P3a verified-parent experiment. | Prove object identity under substitution before authorizing a broker write. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record the protected F7 broker pilot. | Track the one-leaf capability and VM validation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record the P3b native rename proof and pilot boundary. | Verify target anchoring and source identity before exposing a second broker command. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Document the P3b panel and broker integration. | Track the shared rename path, validation and VM acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record the four P3b consent tests in the isolated VM. | Verify both panel entry points with real UAC approval and cancellation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record the extended P3b matrix in the isolated VM. | Verify a late collision, a different administrator, and disconnects around the rename. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Document the P3c basic metadata pilot. | Track the single-file attribute and timestamp command and its acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Document the P3d permanent delete pilot. | Record its limited scope, verified NTFS operation and VM cases. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Record P3d acceptance and the Administrator button shield. | Verify real consent and preserve Cancel as the default. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Document the P3e protected directory listing pilot and VM evidence. | Track reuse and termination of one rooted listing session. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Document the UAC shield in the protected panel path bar. | Keep the translated status in a tooltip. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Document the selected-item palette for the approved path. | Make the scope visible using the active color scheme. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Keep the regular directory bar background behind the UAC text. | Use the selected-item foreground only. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the P4a staged one-file copy primitive. | Define the copy and commit behavior before connecting it to F5. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document the P4b single-file broker copy. | Record both access-denied routes, bounds and acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document the P4c same-volume F6 pilot. | Track the transfer gate, verified rename and VM results. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document the P4d protected subtree inventory. | Record strict scanning and the VM acceptance. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document P4e source manifest revalidation. | Define the input and verification required by the recursive copy pilot. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record the P4d CodeQL result and the inventory label fix. | Track the format-string regression and its validation. | https://github.com/majklvi/salamander/security/code-scanning/13 | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document the P4f native tree copy pilot. | Record tested publication, rollback and the remaining broker integration gate. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document the P4g staging integrity profile. | Record verified access isolation and inherited destination DACLs. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Document the registered P4h F5 pilot. | Describe consent, target identity provisioning and broker checks. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record P4h failure and alternate-account acceptance. | Distinguish clean rollback from the protected residue of forced broker termination. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record journaled recovery for interrupted tree copies. | Define the recovery trigger, identity checks and isolated VM result. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Record multiple registered F5 destinations. | Describe protected ancestry and per-target recovery isolation. | | GPT-6.1 Sol (Codex) |
+-->
+
+# Plán implementace podpory UAC v Open Samandarin
+
+Stav k 11. listopadu 2026. Základní podpora UAC pro běžné interní operace a vestavěný ZIP je ověřená v konkrétních scénářích na místním NTFS. K dokončení chybí hlavně kombinace s neprůchodnými podstromy, některé akce nad výsledky Findu a Branch View a společná akceptace jedné přesné revize.
+
+Vývoj probíhá na `feature/uac-support`. Důkazy v tabulce pocházejí z různých sestavení. Pracovní kopie nad `1577825e` obsahuje další změny včetně protokolu 26. [Fork PR #67](https://github.com/majklvi/salamander/pull/67) slouží k CI a CodeQL publikovaných revizí. Podrobné výsledky P0–P7, konfigurace, otisky a odkazy na důkazy jsou v [historii implementace a testů](uac-implementation-history.md).
+
+## Cíl a pravidla
+
+Při řešitelném odepření přístupu v nativní operaci nabídnout UAC pro konkrétní ověřenou úlohu. Platný souhlas použít pro všechny její způsobilé navazující kroky. Po odmítnutí, odepření i správci nebo ztrátě ověřitelné identity sdělit příčinu, dotčenou položku a stav už hotové práce. Kód 5 může doplnit vysvětlení. Stejné pravidlo platí při přípravě úlohy, čtení rodiče i zpracování potomků.
+
+- Běžná operace používá běžný token. Pokud předem rozpoznáme chráněný cíl a dialog už má potvrzovací tlačítko se štítem, toto potvrzení otevře přímo výzvu Windows. Běžné potvrzení přepisu, vytvoření cesty nebo trvalého smazání zůstává v původním toku. Při pozdějším odepření nabídne pokračování se štítem stávající chybový dialog.
+- Souhlas patří k běžící úloze, jejímu typu operace a ověřeným cestám či identitám. Čtecí relace panelu pokrývá výpis v rámci kořene. Čtení obsahu, zápis a spuštění externího programu mohou vyžadovat vlastní souhlas. Nové úloze se souhlas nepředává.
+- Po skončení úlohy nebo odpojení oprávnění zaniká. Po nejistém výsledku se změna automaticky neopakuje. Kolize s novou revizí vyžaduje nové rozhodnutí o konfliktu. Zrušení zachová dokončené kroky a úklid se týká pouze ověřených pracovních objektů.
+- Rozšiřujeme stávající interní funkce. ZIP je jediný zahrnutý plugin. Samostatný příkaz obnovy ZIPu byl odstraněn na žádost uživatele. Ochrana originálu a bezpečný úklid patří do běžné operace. Změny instalátoru jsou mimo zadání.
+
+## Pokrytí a důkazy
+
+**VM** označuje ověřený konkrétní scénář v izolovaných Windows. **Lokálně** označuje sestavení nebo automatické kontroly. Potvrzení systémové výzvy se započítá k úspěšné operaci až po ověření jejího výsledku.
+
+| Oblast | Doložené chování | Zbývá |
+| --- | --- | --- |
+| Diskový panel a Branch View | VM ověřila vstup do chráněného podstromu, navigaci, Ctrl+R a Branch View i jeho obnovení v téže relaci. Vstup podle identity z výpisu rodiče prošel i pro `C:\ProgramData\Whesvc`. Chráněná uložená cesta při startu má vlastní tok obnovy. | Akce nad více položkami z různých fyzických rodičů mají samostatné hranice ověření. |
+| F7, F2 a Ctrl+F2 | VM ověřila vytvoření, přejmenování souboru i adresáře, běžné atributy a časy bez rekurze a štít v příslušném potvrzení. Pro podporované odkazy platí identita samotného odkazu. | Chráněné Ctrl+F2 z Branch View a případy se stejně pojmenovanými položkami čekají na společnou akceptaci. |
+| F5 soubory | VM ověřila kopii z chráněného zdroje, zápis do chráněného cíle, dávku na jediný souhlas, chybějící cílové podsložky, chráněný přepis, změnu revize a dvě nezávislé dávky. Podporované kombinace ADS, sparse, komprese, EFS a explicitních oprávnění mají samostatné důkazy. | Ověřit zbývající kombinace chráněného zdroje, cíle a pokročilých voleb na společném kandidátovi. |
+| F5 celé stromy | VM ověřila čitelný strom do nového neregistrovaného cíle i sloučení s existujícím chráněným stromem. Lokálně funguje výpis chráněné větve a založení dosud chybějícího kořene pod existujícím rodičem v jedné relaci. Ve VM bez dostupné elevace kopie zachovala čitelné větve. | Po systémovém Ne prošla částečná kopie. Úplná kopie po Ano čeká na opravený pilot. Otevřené jsou také více vybraných kořenů, chybějící předci cílového kořene a některé volby metadat. |
+| F6 | VM ověřila přesun souborů i celých složek na témže svazku se zachováním NTFS ID, včetně nové chráněné cílové cesty. Přesun jednotlivého souboru přes dva pevné svazky NTFS prošel nad 4 GiB. Průběh brokeru je vidět v běžném okně se štítem. | Přesun celého chráněného stromu mezi svazky a vybrané kombinace Branch View, konfliktů a přerušení. |
+| Shift+Delete | VM ověřila přímo chráněný soubor, prázdný adresář, podporované odkazy a pozdní odepření u potomka. Běžný smíšený výběr odstranil přesně vybrané položky. Po přeskočení nečitelné větve zůstali její rodiče a čitelní sourozenci se zpracovali. Lokální transport ověřil převzetí identity odkazu z chráněného výpisu. | Ve VM dokončit chráněný smíšený výběr. Chybí bezpečné rekurzivní smazání neprázdného chráněného stromu, jehož výpis běžný účet nedostane. |
+| Delete do Koše | VM ověřila Ano, Ne a obnovu při elevaci stejným účtem. Standardní účet, který by potřeboval jiného správce, bezpečně ponechá soubor na místě. | Hranici jiného účtu ponechat. Znovu ji otevřít až s mechanismem, který prokáže správný SID Koše, obnovu a stav po pádu. |
+| Velikost a obsazené místo | VM ověřila Space, Ctrl+Q a Ctrl+Shift+F10 na chráněných testovacích stromech. Výsledky původních systémových reprodukcí jsou níže. | Společná regresní sada na jednom kandidátovi a dvě zbývající varianty systémového stromu. |
+| Find, F3 a F4 | VM ověřila běžné výsledky během čekání na souhlas, chráněné hledání podle metadat a obsahu, odmítnutí i výpadek jedné větve. F3 otevřelo ověřený chráněný soubor v čitelném rodiči po Ano a po Ne ponechalo panel. F4 u ověřeného externího editoru otevřelo a uložilo původní soubor. | Doložit kombinaci hledání a následných F3/F4 nad chráněnými výsledky, včetně zrušení, shodných názvů a návratu do Findu. |
+| Porovnání adresářů | VM ověřila nezávislý souhlas pro levou a pravou stranu a opětovné použití souhlasu pro více odepřených výpisů i čtení na jedné straně. | Kořen svazku, systémové Ne, odepření i správci vedle čitelné větve a popředí na finálním sestavení. |
+| ZIP a ZIP64 | VM ověřila běžný archivní panel, podsložky, Ctrl+R a interní F3 v jedné čtecí relaci. F5 do běžného cíle a se samostatným souhlasem do chráněného cíle, přidání, přepis a odstranění položky, odmítnutí, CRC a odpojení mají důkazy. | F3 a F5 mají limit 16 MiB na rozbalený soubor. Výběr F5 má navíc limity 4 096 položek, 32 úrovní a 64 MiB požadavku. Čtení za 4 GiB ověřil samostatný test. Zápis do velkého ZIP64 nebyl součástí VM akceptace. |
+
+Prameny pro jednotlivé oblasti jsou v [testech panelu a základních operací](uac-implementation-history.md#86-p3a-ověření-identity-rodiče-pro-mkdir), [akceptaci ZIPu](uac-implementation-history.md#847-rozsah-dokončení-zipu) a [ověření hlubokého chráněného stromu](uac-implementation-history.md#výsledky-hlubokého-stromu-ve-vm-10-listopadu-2026).
+
+### Původní reprodukce výpočtu velikosti
+
+| Reprodukce | Pozorovaný výsledek |
+| --- | --- |
+| `C:\Users` mezerníkem | Bez dostupné elevace po Skip All i po systémovém Ne výpočet dokončil dostupnou část. Panel ukázal dolní mez s `>=` a aplikace oznámila neúplnost. |
+| `C:\Windows` přes Ctrl+Q | Po jednom Ano se zpracovaly dosažitelné větve a složky odmítnuté i brokeru se automaticky vynechaly. Standardní Calculate Occupied Space ukázal dostupný součet 35 414 524 797 bajtů. Space a Ctrl+Shift+F10 na tomto stromu čekají na ověření. |
+| `C:\Users\SamandarinUacTest\Application Data` | Ve schváleném panelu Space i Ctrl+Q ověřily kompatibilní junction a započítaly 0 bajtů bez následování cíle a další výzvy. |
+
+Cesty jsou reprodukční příklady. Obecný test kombinuje čitelné sourozence před a za odepřením, několik chráněných větví, odmítnutí i správci a kompatibilní i neověřený odkaz. Ověřuje úplný výsledek, částečný součet, stav bez čitelných dat a zrušení celé úlohy. [Sestavení, součty a automatické kontroly](uac-implementation-history.md#otevřený-cíl-p7--výpočet-velikosti-a-zbývající-cesty-k-chybě-5).
+
+### Poslední ověření F5 s chráněným zdrojem
+
+Ve VM dne 11. listopadu běžel ověřený pár Release x64 s protokolem 26. Po jediném systémovém Ano vznikl nový cílový kořen a první čitelný soubor se shodným SHA-256. F5 se zastavilo chybou 50 při vytváření `01-restricted` a před výzvou Windows zobrazilo další aplikační nabídku Administrator, přestože OK už mělo štít. Po systémovém Ne v samostatné kopii do běžného cíle vznikly oba čitelné soubory se správnými otisky, obě chráněné větve chyběly a v cíli nezůstaly pracovní soubory. Další výzva se nezobrazila. Důkazy jsou v `C:/Samandarin/builds/uac-deep-access/rooted-tree-acceptance-26/vm-Approve.json` a `vm-Decline.json`.
+
+Při přípravě kopie chráněné složky host dříve přijímal jen identitu získanou výpisem. Pro tuto operaci nově přijme také identitu ověřenou na otevřeném rodiči a složce, jejichž handly drží plán až do konce. Broker stále ověřuje rozsah a identity. Schválené OK se štítem otevře přímo výzvu Windows, pokud ID cíle souhlasí s připravenou relací. Prošlo 28 kontrol cest workeru. Schválenou úplnou kopii a přímý přechod na Windows je třeba ověřit v opraveném pilotu.
+
+## Další postup
+
+1. **Uzavřít jeden reprodukovatelný F5 scénář.** Se stejnou dvojicí hosta a brokeru prověřit dvě chráněné zdrojové větve, Unicode, prázdnou podsložku a dosud chybějící cílový kořen. Pro Ano ověřit všechny otisky a jedinou systémovou výzvu. Odmítnutí bylo ověřeno v zapisovatelném cíli. V opraveném pilotu zopakovat i Ne, pokud se změní jeho zpracování. Záznam musí obsahovat případnou chybu aplikace i skutečný stav na disku.
+2. **Vyřešit chybějící větve nativních operací.** Prioritu má Shift+Delete neprázdného stromu s odepřeným výpisem a F6 celého chráněného stromu mezi svazky. U mazání ověřit hranici vybraného stromu, odkazy, přerušení a zachování přeskočené větve. U přesunu ověřit úplnou kopii před smazáním zdroje a chování po odpojení.
+3. **Provést společnou akceptaci.** Použít jeden ověřený pár binárek a smíšený strom s chráněným kořenem, dvěma vnořenými chráněnými větvemi a čitelným sourozencem. Zahrnout otevřené varianty výpočtu velikosti, práci nad výsledky Findu a Branch View a samostatný souhlas obou stran porovnání. U každého výsledku zaznamenat vstupní akci, fázi odepření, rozsah souhlasu, počet systémových výzev, stav dat a aktivní okno. Kombinovat běžný token, Ano, Ne, jiný účet správce a odepření i zvýšenému tokenu tam, kde dávají smysl.
+4. **Ověřit přesnou revizi k vydání.** Místně spustit relevantní nativní, transportní a integrační testy. Po společném pushi vyhodnotit sestavení, testy a skutečnou analýzu CodeQL v #67 pro přesné SHA. Nativní běh ARM64, podepsaný distribuční pár a vyšší DPI mají samostatné podmínky. ARM64 bylo křížově sestaveno, Win32 ověřen pod WOW64. Podpis a prostředí ARM64 zatím nejsou k dispozici. Vyšší DPI je odloženo.
+
+Už ověřený scénář opakovat při změně dotčené cesty, doložené regresi nebo při akceptaci nové platformy či společné revize. Souběžné F5, F6 nad 4 GiB, stejný účet u Koše a základní ZIP akceptaci proto nevedeme jako nové implementační úkoly. Srovnatelné údaje o velikosti binárek a soukromé paměti patří k příslušné změně v historii. Starší měření nepopisují současný build.
+
+CI na `fc70927d` zachytilo změnu zmrazeného `CFileData`, zastaralé testovací modely Branch View a konflikt při překladu `memcpy` v Debug. Oprava obnovuje sdílenou hlavičku SDK, ukládá příznak neúplné velikosti v interních datech diskového řádku a používá `CopyMemory` pro identitu adresáře. Všech šest dříve neúspěšných skupin a 256 kontrol výpočtu velikosti následně prošlo místně v Debug. [Původní běh testů](https://github.com/majklvi/salamander/actions/runs/42979610795/job/130386719517).
+
+## Architektura a hranice
+
+Hlavní aplikace zůstává `asInvoker`. Windows spustí samostatný broker pro úzce vymezené souborové kroky. UI, plánování, konflikty, konfigurace, pluginy a parsování zůstávají v hostu. Host a broker ověří protějšek, roli a verzi protokolu. Broker kontroluje schválený rozsah, identitu rodičů a položek a před změnou ověří revizi cíle. Kde je to možné, pracuje relativně k ověřeným handlům.
+
+Bezpečný fallback má zachovat dosavadní práci, uvést důvod a respektovat volby úlohy. Síťové cesty, mapované disky, elevace přenosné instalace a obecná elevace pluginů jsou mimo aktuální rozsah. Přístup ke vzdálenému serveru, chybějící EFS klíč, explicitní odepření správci a neověřitelné objekty mají vlastní omezení. Při řešení chyby se automaticky nemění vlastník ani ACL. [Bezpečnostní návrh a podmínky přijetí](uac-implementation-history.md#8-bezpečnostní-návrh-a-podmínky-jeho-přijetí).
+
+### 6.1 Výsledky P0 a volba backendu
+
+`IFileOperation` v P0 provedl jednoduché vytvoření složky po souhlasu a zůstává vhodný pro ověřené operace Koše. Pro nativní engine dává samostatný broker hostu kontrolu nad tím, co uživatel schválil, jak se ověří identita a revize, jak běží fronta a jak se zapíše výsledek jednotlivých kroků. [Srovnání a výsledky P0](uac-implementation-history.md#61-výsledky-p0-a-volba-backendu).
+
+### 8.5 Akceptační test P2 ve VM
+
+VM ověřila souhlas i odmítnutí, odlišný účet správce, neshodu protokolu a ztrátu spojení na páru z `ca70fb8c`. [Výsledky P2](uac-implementation-history.md#85-akceptační-test-p2-ve-vm) · [Laboratorní postup](../src/uacbroker/README.md).

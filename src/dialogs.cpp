@@ -2,6 +2,44 @@
 // SPDX-FileCopyrightText: 2026 Open Samandarin Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // | Date | Summary | Reason | Ticket | Model |
+// | 2026-11-10 | Respect refused UAC consent in the same delete scope. | Suppress repeated system prompts while allowing an explicit retry. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Display the approved roots for an existing F5 tree. | Keep the consent scope independent of the first denied entry. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Show the scope of the rooted F5 consent. | Describe the selected trees instead of their parent directories. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Describe the directory rename used for same-volume F6. | Show the exact source and destination in the existing transfer dialog. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Use accepted Copy/Move OK for the first matching target denial. | Avoid a duplicate Administrator button while preserving normal consent. | #731 | GPT-6 (Codex) |
+// | 2026-11-10 | Honor the initial shield for one verified permanent deletion. | Go straight to Windows for the explicitly approved item. | #731 | GPT-6.1 Sol |
+// | 2026-11-10 | Use the shielded metadata confirmation for the same denied item. | Go straight to Windows consent for one verified change. | #731 | GPT-6.1 Sol (Codex) |
+// | 2026-11-10 | Update the Change Attributes OK shield from the selected options. | Leave elevation and write handling in the existing worker. | #731 | GPT-6 (Codex) |
+// | 2026-11-10 | Handle UAC foreground return on the owner thread. | Avoid activating a dialog directly from the broker worker. | #731 | GPT-6 (Codex) |
+// | 2026-11-09 | Suppress queued conflict prompts during cancellation. | Keep Scan Ahead from reopening a prompt during job shutdown. | | Codex |
+// | 2026-11-09 | Show the Windows shield while an elevated job runs. | Restore the previous small caption icon when the broker returns. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Release closed leaf broker sessions during a batch. | Keep metadata and deletion scopes only while connected. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-09 | Show both options in protected F5 consent. | Explain that compression and permissions will both be preserved. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Cancel active protected transfers. | Keep the progress dialog responsive and wait for the actual broker outcome. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Share one consent across matching leaf mutations. | Display the approved directory and preserve default Cancel. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Report only uncertain broker outcomes in the consent dialog. | Let the ordinary worker dialog handle confirmed failures. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Reuse approved F5 and F6 scopes in the progress dialog. | Ask again only for a different scope. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Describe EFS preservation in the F5 consent. | Identify what the elevated copy will preserve. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Explain the scope of elevated batch items. | Make cancellation and completed items predictable. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Identify the protected F5 replacement. | Show the authorized replacement paths. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Share the protected read consent prompt with F3. | Keep the scope and shield consistent. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Offer explicit administrator consent for a protected read. | Keep the exact folder and operation visible in a shared prompt. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Describe a refused EFS broker copy. | Report the exact boundary when EFS is detected after consent. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Identify the security scope in F5 consent. | Show the owner and access rules covered by the request. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Describe junction deletion in the consent prompt. | Identify the link and explain that its target is kept. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Identify directory symbolic links in permanent-delete consent. | Make clear that the linked folder is kept. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Identify file symbolic links in permanent-delete consent. | Describe the exact object approved for deletion. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Describe compression preservation in F5 consent. | Show the attribute requested from the broker. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | State when a protected F5 skips named streams. | Make the selected stream behavior visible at consent. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Select consent text for folder attributes. | Keep timestamp-only and ordinary file prompts specific. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Describe a folder timestamp change in the UAC prompt. | Distinguish the directory and file scopes. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Keep Cancel responsive during a protected tree copy. | Show the confirmed result even after a cancel request. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Show tree copy consent from the admitted progress dialog. | Keep queued tree operations behind the FIFO barrier. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-07 | Show the shield on Administrator in permanent-delete consent. | Keep Cancel as the default independently of the shield. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-07 | Confirm the exact permanent delete path in the progress dialog. | Default to Cancel and report an unconfirmed deletion without replay. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-07 | Show the metadata UAC consent on the progress dialog thread. | Keep secure consent and uncertain results in the existing UI. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Show the exact F5 source and target before broker consent. | Default to Cancel and show failures without replay. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Show exact F6 paths and the move-specific result. | Share the F5 consent UI while keeping the requested action explicit. | | GPT-6.1 Sol (Codex) |
 // | 2026-11-09 | Pass lock paths with a typed payload and format localized text safely. | Address CodeQL findings in the file-lock recovery dialog. | https://github.com/KRtkovo-eu-AI/salamander/pull/842 | GPT-6 (Codex) |
 // | 2026-11-09 | Offer lock-process recovery in file error dialogs. | Let users resolve sharing failures without installing an extension. | https://github.com/KRtkovo-eu-AI/salamander/issues/836 | GPT-6 (Codex) |
 // CommentsTranslationProject: TRANSLATED
@@ -20,6 +58,21 @@
 #include "menu.h"
 #include "consts.h"
 #include "common/widepath.h"
+
+bool ConfirmProtectedRead(HWND owner, int caption, int description, const std::wstring& path)
+{
+    const std::string message = std::string(LoadStr(description)) + "\n\n" +
+                                SalWideToMultiBytePath(path.c_str(), CP_UTF8);
+    const std::string alias = std::to_string(IDOK) + "\t" + LoadStr(IDS_AS_ADMIN_TITLE);
+    MSGBOXEX_PARAMS consent{};
+    consent.HParent = owner;
+    consent.Text = message.c_str();
+    consent.Caption = LoadStr(caption);
+    consent.Flags = MSGBOXEX_OKCANCEL | MSGBOXEX_ICONQUESTION | MSGBOXEX_DEFBUTTON2 | MSGBOXEX_SHIELDONOKBTN;
+    consent.AliasBtnNames = alias.c_str();
+    return SalMessageBoxEx(&consent) == IDOK;
+}
+#include "uacbroker/f7pilot.h"
 
 CConfiguration Configuration;
 
@@ -80,31 +133,88 @@ CChangeAttrDialog::CChangeAttrDialog(HWND parent, DWORD attr, DWORD attrDiff,
     HAccessedTime = NULL;
 }
 
+static bool ReadAttributeDialogTime(const SYSTEMTIME& date, HWND clock, SYSTEMTIME& value, FILETIME& local)
+{
+    if (DateTime_GetSystemtime(clock, &value) != GDT_VALID)
+        return false;
+    value.wYear = date.wYear;
+    value.wMonth = date.wMonth;
+    value.wDayOfWeek = date.wDayOfWeek;
+    value.wDay = date.wDay;
+    value.wMilliseconds = 0;
+    return SystemTimeToFileTime(&value, &local) != FALSE;
+}
+
 BOOL CChangeAttrDialog::GetAndValidateTime(CTransferInfo* ti, int resIDDate, int resIDTime, SYSTEMTIME* time)
 {
-    HWND hDate = GetDlgItem(HWindow, resIDDate);
-    HWND hTime = GetDlgItem(HWindow, resIDTime);
-
-    SYSTEMTIME st;
-    SYSTEMTIME st2;
-    DateTime_GetSystemtime(hDate, &st);
-    DateTime_GetSystemtime(hTime, &st2);
-    st2.wYear = st.wYear;
-    st2.wMonth = st.wMonth;
-    st2.wDayOfWeek = st.wDayOfWeek;
-    st2.wDay = st.wDay;
-    st2.wMilliseconds = 0;
-
-    FILETIME dummyFT;
-    if (!SystemTimeToFileTime(&st2, &dummyFT))
+    SYSTEMTIME date{}, value{};
+    FILETIME local{};
+    if (DateTime_GetSystemtime(GetDlgItem(HWindow, resIDDate), &date) != GDT_VALID ||
+        !ReadAttributeDialogTime(date, GetDlgItem(HWindow, resIDTime), value, local))
     {
         SalMessageBox(HWindow, LoadStr(IDS_INVALIDDATE), LoadStr(IDS_ERRORTITLE),
                       MB_OK | MB_ICONEXCLAMATION);
         ti->ErrorOn(resIDDate);
         return FALSE;
     }
-    *time = st2;
+    *time = value;
     return TRUE;
+}
+
+void CChangeAttrDialog::UpdateElevationShield()
+{
+    if (!ElevationShieldProbe)
+        return;
+    bool required = false;
+    if (IsDlgButtonChecked(HWindow, IDC_RECURSESUBDIRS) != BST_CHECKED)
+    {
+        const auto readTime = [](HWND dateControl, HWND clock, LONGLONG& time) {
+            SYSTEMTIME date{}, value{};
+            const DWORD selected = DateTime_GetSystemtime(dateControl, &date);
+            if (selected == GDT_NONE)
+                return true;
+            FILETIME local{}, utc{};
+            if (selected != GDT_VALID || !ReadAttributeDialogTime(date, clock, value, local) ||
+                !LocalFileTimeToFileTime(&local, &utc))
+                return false;
+            ULARGE_INTEGER ticks{};
+            ticks.LowPart = utc.dwLowDateTime;
+            ticks.HighPart = utc.dwHighDateTime;
+            time = static_cast<LONGLONG>(ticks.QuadPart);
+            return time > 0;
+        };
+
+        UacF7::MetadataChange times{};
+        if (readTime(HCreatedDate, HCreatedTime, times.created) &&
+            readTime(HAccessedDate, HAccessedTime, times.accessed) &&
+            readTime(HModifiedDate, HModifiedTime, times.modified))
+        {
+            constexpr struct
+            {
+                int control;
+                DWORD attribute;
+            } attributes[] = {
+                {IDC_ARCHIVE, FILE_ATTRIBUTE_ARCHIVE},
+                {IDC_READONLY, FILE_ATTRIBUTE_READONLY},
+                {IDC_HIDDEN, FILE_ATTRIBUTE_HIDDEN},
+                {IDC_SYSTEM, FILE_ATTRIBUTE_SYSTEM},
+                {IDC_COMPRESSED, FILE_ATTRIBUTE_COMPRESSED},
+                {IDC_ENCRYPTED, FILE_ATTRIBUTE_ENCRYPTED},
+            };
+            DWORD set = 0, clear = 0;
+            for (const auto& item : attributes)
+            {
+                const auto state = IsDlgButtonChecked(HWindow, item.control);
+                if (state == BST_CHECKED)
+                    set |= item.attribute;
+                else if (state == BST_UNCHECKED)
+                    clear |= item.attribute;
+            }
+            required = ElevationShieldProbe(set, clear, times, ElevationShieldContext);
+        }
+    }
+    Button_SetElevationRequiredState(GetDlgItem(HWindow, IDOK), required);
+    ElevationShieldShown = required;
 }
 
 void CChangeAttrDialog::Transfer(CTransferInfo& ti)
@@ -154,6 +264,7 @@ void CChangeAttrDialog::Transfer(CTransferInfo& ti)
             ret &= GetAndValidateTime(&ti, IDC_ATTR_CREATED_DATE, IDC_ATTR_CREATED_TIME, &TimeCreated);
         if (ret & ChangeTimeAccessed)
             ret &= GetAndValidateTime(&ti, IDC_ATTR_ACCESSED_DATE, IDC_ATTR_ACCESSED_TIME, &TimeAccessed);
+        ElevationShieldAccepted = ret && ElevationShieldShown;
     }
 
     if (ti.Type == ttDataToWindow)
@@ -185,7 +296,9 @@ CChangeAttrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HCreatedTime = GetDlgItem(HWindow, IDC_ATTR_CREATED_TIME);
         HAccessedDate = GetDlgItem(HWindow, IDC_ATTR_ACCESSED_DATE);
         HAccessedTime = GetDlgItem(HWindow, IDC_ATTR_ACCESSED_TIME);
-        break;
+        const auto result = CCommonDialog::DialogProc(uMsg, wParam, lParam);
+        UpdateElevationShield();
+        return result;
     }
     case WM_COMMAND:
     {
@@ -271,7 +384,10 @@ CChangeAttrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 break;
             }
+            default:
+                return CCommonDialog::DialogProc(uMsg, wParam, lParam);
             }
+            UpdateElevationShield();
         }
         break;
     }
@@ -280,7 +396,10 @@ CChangeAttrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         LPNMHDR nmh = (LPNMHDR)lParam;
         if (nmh->code == DTN_DATETIMECHANGE)
+        {
             EnableWindows();
+            UpdateElevationShield();
+        }
         break;
     }
     }
@@ -464,7 +583,7 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* c
     NextTimeLeftUpdateTime = GetTickCount();
     TimeLeftLastValue.SetUI64(0);
 
-    if (Script != NULL && Script->IsCopyOrMoveOperation)
+    if (Script != NULL && Script->IsCopyOrMoveOperation && !Script->ProtectedTreeTransfer)
     {
         const char* mode = LoadStr(IDS_COPYMOVE_SCHED_TITLE_STORAGEAWARE);
         if (Script->CopyMoveTransferMode == CMS_SEQUENTIAL)
@@ -481,6 +600,8 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* c
 
 CProgressDialog::~CProgressDialog()
 {
+    if (BrokerShieldIcon != NULL)
+        DestroyIcon(BrokerShieldIcon);
     if (Worker != NULL)
         TRACE_E("Unexpected situation in CProgressDialog::~CProgressDialog(): worker thread is still alive!");
 }
@@ -877,6 +998,35 @@ void CProgressDialog::SetWindowIcon()
     }
 }
 
+void NotifyNativeBrokerActivity(HWND dialog, bool active)
+{
+    SendMessage(dialog, WM_USER_UAC_PROGRESS_ACTIVE, active, 0);
+}
+
+void CProgressDialog::SetBrokerActive(bool active)
+{
+    if (active == BrokerShieldVisible)
+        return;
+    if (active)
+    {
+        if (BrokerShieldIcon == NULL)
+        {
+            SHSTOCKICONINFO info{};
+            info.cbSize = sizeof(info);
+            if (FAILED(SHGetStockIconInfo(SIID_SHIELD, SHGSI_ICON | SHGSI_SMALLICON, &info)))
+                return;
+            BrokerShieldIcon = info.hIcon;
+        }
+        PreviousSmallIcon = (HICON)SendMessage(HWindow, WM_SETICON, ICON_SMALL, (LPARAM)BrokerShieldIcon);
+    }
+    else
+    {
+        SendMessage(HWindow, WM_SETICON, ICON_SMALL, (LPARAM)PreviousSmallIcon);
+        PreviousSmallIcon = NULL;
+    }
+    BrokerShieldVisible = active;
+}
+
 int CProgressDialog::GetSelectedConflictIndex() const
 {
     if (HConflictOperations == NULL || Script == NULL)
@@ -974,7 +1124,8 @@ void CProgressDialog::EndConflictPromptPresentation()
 void CProgressDialog::PromptNextConflict()
 {
     if (ConflictPromptActive || ConflictAutomaticPromptConsumed || Script == NULL ||
-        Script->CopyMoveConflictMode != CMCM_SCAN_AHEAD)
+        Script->CopyMoveConflictMode != CMCM_SCAN_AHEAD ||
+        CancelWorker || (CancelWorkerEvent != NULL && WaitForSingleObject(CancelWorkerEvent, 0) == WAIT_OBJECT_0))
         return;
 
     int index = -1;
@@ -1362,9 +1513,12 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
         }
 
-        Worker = StartWorker(Script, HWindow, AttrsData, ConvertData, WContinue,
-                             WorkerNotSuspended, CancelWorkerEvent, &CancelWorker, &OperationProgress,
-                             &SummaryProgress);
+        if (Script->ProtectedTreeTransfer)
+            EnableWindow(GetDlgItem(HWindow, IDB_PAUSERESUME), FALSE);
+        if (!Script->ProtectedTreeTransfer || IsInQueue)
+            Worker = StartWorker(Script, HWindow, AttrsData, ConvertData, WContinue,
+                                 WorkerNotSuspended, CancelWorkerEvent, &CancelWorker, &OperationProgress,
+                                 &SummaryProgress);
         if (Worker == NULL)
         {
             if (IsInQueue)
@@ -1428,6 +1582,14 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         return TRUE;
     }
+    case UacF7::restoreConsentForegroundMessage:
+        UacF7::RestoreConsentForeground(HWindow, reinterpret_cast<HWND>(wParam), static_cast<DWORD>(lParam));
+        return TRUE;
+
+    case WM_USER_UAC_PROGRESS_ACTIVE:
+        SetBrokerActive(wParam != 0);
+        return TRUE;
+
     case WM_USER_SETDIALOG:
     {
         WPARAM progressWParam = wParam;
@@ -1595,8 +1757,8 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         //--- worker request to show a dialog
     case WM_USER_DIALOG:
     {
-        if (CancelWorker)
-            return TRUE; // should terminate, it should not request anything
+        if (CancelWorker && wParam != WORKER_DIALOG_UAC_TREE_RESULT && wParam != WORKER_DIALOG_UAC_TRANSFER_UNKNOWN)
+            return TRUE; // other worker prompts are suppressed after cancellation
 
         if (DelayParallelProgressShow)
         {
@@ -1749,6 +1911,153 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             CConfirmEncryptionLossDlg dlg(HWindow, (BOOL)(INT_PTR)data[1], data[2], (BOOL)(INT_PTR)data[3]);
             *(int*)data[0] = (int)dlg.Execute();
+            break;
+        }
+
+        case WORKER_DIALOG_UAC_TRANSFER:
+        {
+            auto& prompt = *reinterpret_cast<UacF7::TransferPrompt*>(lParam);
+            if (prompt.targetDenied && Script->ShieldedTransferTarget &&
+                prompt.request.MatchesTargetDirectory(*Script->ShieldedTransferTarget))
+            {
+                Script->ShieldedTransferTarget.reset();
+                prompt.approved = !CancelWorker;
+                break;
+            }
+            const bool moving = prompt.request.IsMove();
+            const bool tree = prompt.request.IsTree();
+            int confirmText = moving ? IDS_UAC_MOVE_CONFIRM : IDS_UAC_COPY_CONFIRM;
+            if (prompt.request.IsDirectoryMove())
+                confirmText = IDS_UAC_RENAME_DIRECTORY_CONFIRM;
+            else if (prompt.request.IsOverwrite())
+                confirmText = IDS_UAC_COPY_OVERWRITE_CONFIRM;
+            else if (tree)
+                confirmText = IDS_UAC_TREE_COPY_CONFIRM;
+            else if (prompt.request.PreservesSecurity())
+                confirmText = prompt.request.PreservesCompression() ? IDS_UAC_COPY_COMPRESSED_SECURITY_CONFIRM
+                                                                     : IDS_UAC_COPY_SECURITY_CONFIRM;
+            else if (prompt.request.PreservesEncryption())
+                confirmText = IDS_UAC_COPY_ENCRYPTED_CONFIRM;
+            else if (prompt.request.PreservesCompression())
+                confirmText = IDS_UAC_COPY_COMPRESSED_CONFIRM;
+            else if (prompt.request.IgnoresAds())
+                confirmText = IDS_UAC_COPY_IGNORE_ADS_CONFIRM;
+            const bool shareJob = Script->Count > 1 && prompt.request.CanShareJob();
+            std::string message = std::string(LoadStr(confirmText)) + "\n\n" +
+                                  prompt.sourcePath + "\n -> " + prompt.targetPath;
+            if (shareJob && !prompt.request.IsScopedTree())
+            {
+                auto parent = [](std::string_view path) { return path.substr(0, path.rfind('\\') + 1); };
+                message += std::string("\n\n") + LoadStr(IDS_UAC_TRANSFER_JOB_SCOPE) + "\n" +
+                           std::string(parent(prompt.sourcePath)) + "\n -> " + std::string(parent(prompt.targetPath));
+            }
+            else if (Script->Count > 1 && !prompt.request.IsScopedTree())
+                message += std::string("\n\n") + LoadStr(IDS_UAC_BATCH_ITEM_SCOPE);
+            const std::string alias = std::to_string(IDOK) + "\t" + LoadStr(IDS_AS_ADMIN_TITLE);
+            MSGBOXEX_PARAMS confirm{};
+            confirm.HParent = HWindow;
+            confirm.Text = message.c_str();
+            confirm.Caption = LoadStr(moving ? IDS_MOVE : IDS_COPY);
+            confirm.Flags = MSGBOXEX_OKCANCEL | MSGBOXEX_ICONQUESTION | MSGBOXEX_DEFBUTTON2 | MSGBOXEX_SHIELDONOKBTN;
+            confirm.AliasBtnNames = alias.c_str();
+            prompt.approved = SalMessageBoxEx(&confirm) == IDOK && !CancelWorker;
+            break;
+        }
+
+        case WORKER_DIALOG_UAC_TRANSFER_UNKNOWN:
+        {
+            const bool moving = lParam != 0;
+            SalMessageBox(HWindow, LoadStr(moving ? IDS_UAC_MOVE_UNKNOWN : IDS_UAC_COPY_UNKNOWN),
+                          LoadStr(moving ? IDS_ERRORMOVE : IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+            break;
+        }
+
+        case WORKER_DIALOG_UAC_TREE_RESULT:
+        {
+            const auto& result = *reinterpret_cast<const UacF7::Result*>(lParam);
+            if (result.unknown || (result.error != ERROR_SUCCESS && result.error != ERROR_CANCELLED))
+                SalMessageBox(HWindow, result.unknown ? LoadStr(IDS_UAC_TREE_COPY_UNKNOWN) : GetErrorText(result.error),
+                              LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
+            else if (result.error == ERROR_SUCCESS)
+                MainWindow->PostChangeOnPathNotification(Script->WaitInQueueTo, TRUE);
+            break;
+        }
+
+        case WORKER_DIALOG_UAC_METADATA:
+        case WORKER_DIALOG_UAC_DELETE:
+        {
+            const bool deleting = wParam == WORKER_DIALOG_UAC_DELETE;
+            auto& prompt = *reinterpret_cast<UacF7::LeafPrompt*>(lParam);
+            int confirmText = deleting ? IDS_UAC_DELETE_CONFIRM : IDS_UAC_METADATA_CONFIRM;
+            int unknownText = deleting ? IDS_UAC_DELETE_UNKNOWN : IDS_UAC_METADATA_UNKNOWN;
+            if (prompt.request.IsDirectoryDelete())
+                confirmText = IDS_UAC_DELETE_EMPTY_DIRECTORY_CONFIRM;
+            else if (prompt.request.IsJunctionDelete())
+                confirmText = IDS_UAC_DELETE_JUNCTION_CONFIRM;
+            else if (prompt.request.IsDirectorySymlinkDelete())
+                confirmText = IDS_UAC_DELETE_DIRECTORY_SYMLINK_CONFIRM;
+            else if (prompt.request.IsSymlinkDelete())
+                confirmText = IDS_UAC_DELETE_SYMLINK_CONFIRM;
+            else if (prompt.request.IsDirectoryMetadata())
+            {
+                const bool attributes = prompt.request.ChangesAttributes();
+                confirmText = attributes ? IDS_UAC_DIRECTORY_ATTRS_CONFIRM : IDS_UAC_DIRECTORY_TIMES_CONFIRM;
+                unknownText = attributes ? IDS_UAC_DIRECTORY_ATTRS_UNKNOWN : IDS_UAC_DIRECTORY_TIMES_UNKNOWN;
+            }
+            const bool shareJob = Script->Count > 1;
+            const bool trackDeleteRefusal = deleting && shareJob;
+            UacF7::TransferJobScope deleteScope;
+            if (trackDeleteRefusal)
+            {
+                deleteScope = prompt.request.JobScope();
+                const auto declined = std::find_if(DeclinedDeleteScopes.begin(), DeclinedDeleteScopes.end(),
+                    [&](const auto& scope) { return scope.Matches(deleteScope); });
+                if (declined != DeclinedDeleteScopes.end())
+                {
+                    if (!prompt.retryDeclined)
+                        break; // Leave the cancellation result for the worker's usual error choices.
+                    DeclinedDeleteScopes.erase(declined);
+                }
+            }
+            auto existing = shareJob ? std::find_if(TransferJobs.begin(), TransferJobs.end(),
+                                                     [&](const auto& job) { return prompt.request.IsInJob(job); })
+                                     : TransferJobs.end();
+            bool approved = existing != TransferJobs.end() || ((deleting || !shareJob) && prompt.shieldedOk);
+            if (!approved)
+            {
+                std::string message = std::string(LoadStr(confirmText)) + "\n\n" + prompt.path;
+                if (shareJob && !prompt.request.IsDirectoryDelete())
+                {
+                    const std::string_view path(prompt.path);
+                    message += std::string("\n\n") + LoadStr(IDS_UAC_LEAF_JOB_SCOPE) + "\n" +
+                               std::string(path.substr(0, path.rfind('\\') + 1));
+                }
+                const std::string alias = std::to_string(IDOK) + "\t" + LoadStr(IDS_AS_ADMIN_TITLE);
+                MSGBOXEX_PARAMS confirm{};
+                confirm.HParent = HWindow;
+                confirm.Text = message.c_str();
+                confirm.Caption = LoadStr(deleting ? IDS_CONFIRM_DELETE_TITLE : IDS_CHANGEATTRSTITLE);
+                confirm.Flags = MSGBOXEX_OKCANCEL | MSGBOXEX_DEFBUTTON2 | MSGBOXEX_SHIELDONOKBTN |
+                                (deleting ? MSGBOXEX_ICONEXCLAMATION : MSGBOXEX_ICONQUESTION);
+                confirm.AliasBtnNames = alias.c_str();
+                approved = SalMessageBoxEx(&confirm) == IDOK;
+            }
+            if (approved && !CancelWorker)
+            {
+                const bool newScope = existing == TransferJobs.end();
+                if (shareJob && newScope)
+                    existing = TransferJobs.emplace(TransferJobs.end());
+                prompt.result = prompt.request.Execute(HWindow, existing != TransferJobs.end() ? &*existing : nullptr,
+                                                       NotifyNativeBrokerActivity);
+                if (trackDeleteRefusal && newScope && !prompt.result.unknown && prompt.result.error == ERROR_CANCELLED)
+                    DeclinedDeleteScopes.push_back(std::move(deleteScope));
+                if (existing != TransferJobs.end() && (CancelWorker || !existing->IsOpen()))
+                    TransferJobs.erase(existing);
+                if (prompt.result.unknown)
+                    SalMessageBox(HWindow, LoadStr(unknownText),
+                                  LoadStr(deleting ? IDS_ERRORDELETINGFILE : IDS_ERRORCHANGINGATTRS),
+                                  MB_OK | MB_ICONEXCLAMATION);
+            }
             break;
         }
         }
@@ -2070,6 +2379,8 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         {
             if (!IsWindowEnabled(HWindow)) // there is a modal dialog above this dialog (a message box asking about operation canceling or reporting an error)
                 CloseAllOwnedEnabledDialogs(HWindow);
+            for (auto& job : TransferJobs)
+                job.Close();
             CancelWorker = TRUE; // set worker cancel
             if (CancelWorkerEvent != NULL) SetEvent(CancelWorkerEvent);
             EnableWindow(GetDlgItem(HWindow, IDB_PAUSERESUME), FALSE);
@@ -2261,6 +2572,8 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                 CloseAllOwnedEnabledDialogs(HWindow);
             if (InSendMessage())
                 ReplyMessage(0);                   // let the worker continue
+            for (auto& job : TransferJobs)
+                job.Close();
             Script = NULL;                         // script is freed in the worker thread, so we must not use it here anymore
             SetEvent(WContinue);                   // worker may start deleting the script
             WaitForSingleObject(Worker, INFINITE); // wait until it finishes and exits
@@ -2315,6 +2628,8 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
 
                 if (ret == IDYES)
                 {
+                    for (auto& job : TransferJobs)
+                        job.Close();
                     CancelWorker = TRUE; // set cancel of the worker
                     if (CancelWorkerEvent != NULL) SetEvent(CancelWorkerEvent);
                     EnableWindow(GetDlgItem(HWindow, IDB_PAUSERESUME), FALSE);
@@ -2341,6 +2656,8 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         case CM_RESUMEOPER:   // resume posted from the operations queue
         case IDB_PAUSERESUME: // pause/resume
         {
+            if (LOWORD(wParam) == IDB_PAUSERESUME && Script != NULL && Script->ProtectedTreeTransfer)
+                return TRUE;
             if ((LOWORD(wParam) == CM_RESUMEOPER || AcceptCommands) && CanClose && !CancelWorker)
             {
                 AutoPaused = FALSE; // this may be a manual pause/resume or an automatic resume

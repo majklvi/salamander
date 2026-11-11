@@ -1,5 +1,12 @@
 // SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2026 Open Samandarin Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// | 2026-11-08 | Collect one decoded entry for the caller. | Keep partial or invalid output out of viewer and file publication. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Read ZIP entries through the existing authorization. | Use the same bounded broker batch as the panel listing. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Reuse one protected ZIP authorization for explicit refresh. | Release the broker session when the archive panel closes. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Publish a complete protected listing in the standard archive panel. | Refresh explicitly and preserve the existing tree on failure. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-08 | Offer a protected ZIP listing after ordinary read denial. | Reuse the internal viewer for read-only output. | | GPT-6.1 Sol (Codex) |
+// | 2026-11-07 | Route disk navigation and refresh through the approved listing session. | Reuse consent inside the root and release it on exit. | | GPT-6.1 Sol (Codex) |
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
@@ -19,6 +26,7 @@
 #include "fileswnd.h"
 #include "filesbox.h"
 #include "common/widepath.h"
+#include "common/zipread.h"
 #include "dialogs.h"
 #include "stswnd.h"
 #include "snooper.h"
@@ -1167,7 +1175,8 @@ void CFilesWindow::Execute(int index)
                     }
                 }
                 BOOL noChange;
-                if (ChangePathToArchive(fullName, "", -1, NULL, FALSE, &noChange)) // entering the archive successfully
+                if (ChangePathToArchive(fullName, "", -1, NULL, FALSE, &noChange, TRUE, NULL,
+                                        FALSE, FALSE, FALSE, NULL, !linkIsFile)) // entering the archive successfully
                 {
                     if (linkIsFile)
                         TopIndexMem.Clear(); // long jump
@@ -1265,7 +1274,7 @@ void CFilesWindow::Execute(int index)
                 // Vista: we handle unlistable junction points: change path to junction point target
                 char junctTgtPath[MAX_PATH];
                 int repPointType;
-                if (GetPathDriveType() == DRIVE_FIXED && (dir->Attr & FILE_ATTRIBUTE_REPARSE_POINT) &&
+                if (!ProtectedListing && GetPathDriveType() == DRIVE_FIXED && (dir->Attr & FILE_ATTRIBUTE_REPARSE_POINT) &&
                     GetReparsePointDestination(fullName, junctTgtPath, MAX_PATH, &repPointType, TRUE) &&
                     repPointType == 2 /* JUNCTION POINT */ &&
                     SalPathAppend(fullName, "*", MAX_PATH + 10))
@@ -2648,6 +2657,11 @@ void CFilesWindow::UpdateTreeView(BOOL active)
 void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOOL newPathIsTheSame,
                                     BOOL isRefresh, BOOL canChangeSourceUID)
 {
+    if (!cancel && !KeepProtectedListing)
+    {
+        ProtectedListing.reset();
+        ProtectedListingEntries.clear();
+    }
     if (!cancel && (!newPathIsTheSame || !isRefresh)) LeaveBranchView();
     CALL_STACK_MESSAGE6("CFilesWindow::CloseCurrentPath(, %d, %d, %d, %d, %d)",
                         cancel, detachFS, newPathIsTheSame, isRefresh, canChangeSourceUID);
@@ -2716,6 +2730,8 @@ void CFilesWindow::CloseCurrentPath(HWND parent, BOOL cancel, BOOL detachFS, BOO
                 SetArchiveDir(NULL);
                 SetPluginIface(NULL);
                 // a couple more resets for better clarity
+                ProtectedZipSession.reset();
+                ProtectedZip = false;
                 SetZIPArchive("");
                 SetZIPPath("");
 
@@ -3045,7 +3061,87 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
 
         DWORD err, lastErr;
         BOOL pathInvalid, cut;
-        SalCheckAndRestorePathWithCut(parent, changedPath, tryNet, err, lastErr, pathInvalid, cut, FALSE);
+        bool protectedPath = false;
+        const std::wstring requestedWide = SalMultiByteToWidePath(changedPath, IsValidPathUtf8Text(changedPath) ? CP_UTF8 : CP_ACP);
+        if (ProtectedListing && ProtectedListing->Contains(requestedWide))
+        {
+            std::vector<WIN32_FIND_DATAW> listing;
+            const DWORD listError = ProtectedListing->List(requestedWide, listing);
+            if (listError == ERROR_SUCCESS)
+            {
+                ProtectedListingEntries = std::move(listing);
+                protectedPath = true;
+            }
+            else if (!isRefresh && ProtectedListing->IsOpen())
+            {
+                CloseCurrentPath(parent, TRUE, detachFS, FALSE, isRefresh, FALSE);
+                EndStopRefresh();
+                if (setWait)
+                    SetCursor(oldCur);
+                SalMessageBox(parent, GetErrorText(listError), LoadStr(IDS_ERRORCHANGINGDIR), MB_OK | MB_ICONEXCLAMATION);
+                return FALSE;
+            }
+        }
+        const bool leavingProtected = ProtectedListing && !protectedPath;
+        if (leavingProtected && !ProtectedListing->IsOpen())
+        {
+            ProtectedListing.reset();
+            ProtectedListingEntries.clear();
+        }
+        if (!protectedPath && !leavingProtected && !isRefresh && !closeCalled && Is(ptDisk) &&
+            !IsBranchView() && requestedWide.size() > 3 && requestedWide[1] == L':' &&
+            GetDriveTypeW(requestedWide.substr(0, 3).c_str()) == DRIVE_FIXED)
+        {
+            const std::wstring exact = SalPathAddExtendedPrefixW(requestedWide.c_str());
+            HANDLE probe = CreateFileW(exact.c_str(), FILE_LIST_DIRECTORY,
+                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                                        OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+            if (probe != INVALID_HANDLE_VALUE)
+                CloseHandle(probe);
+            else if (GetLastError() == ERROR_ACCESS_DENIED)
+            {
+                auto session = std::make_unique<UacF7::ListingSession>();
+                if (session->Prepare(requestedWide))
+                {
+                    const std::string message = std::string(LoadStr(IDS_UAC_LIST_CONFIRM)) + "\n\n" +
+                                                SalWideToMultiBytePath(requestedWide.c_str(), CP_UTF8);
+                    const std::string alias = std::to_string(IDOK) + "\t" + LoadStr(IDS_AS_ADMIN_TITLE);
+                    MSGBOXEX_PARAMS consent{};
+                    consent.HParent = parent;
+                    consent.Text = message.c_str();
+                    consent.Caption = LoadStr(IDS_ERRORCHANGINGDIR);
+                    consent.Flags = MSGBOXEX_OKCANCEL | MSGBOXEX_ICONQUESTION | MSGBOXEX_SHIELDONDEFBTN;
+                    consent.AliasBtnNames = alias.c_str();
+                    DWORD listingError = ERROR_CANCELLED;
+                    if (SalMessageBoxEx(&consent) == IDOK)
+                    {
+                        listingError = session->Start(parent);
+                        if (!listingError)
+                            listingError = session->List(requestedWide, ProtectedListingEntries);
+                    }
+                    if (listingError)
+                    {
+                        CloseCurrentPath(parent, TRUE, detachFS, FALSE, isRefresh, FALSE);
+                        EndStopRefresh();
+                        if (setWait)
+                            SetCursor(oldCur);
+                        if (listingError != ERROR_CANCELLED)
+                            SalMessageBox(parent, GetErrorText(listingError), LoadStr(IDS_ERRORCHANGINGDIR),
+                                          MB_OK | MB_ICONEXCLAMATION);
+                        return FALSE;
+                    }
+                    ProtectedListing = std::move(session);
+                    protectedPath = true;
+                }
+            }
+        }
+        if (protectedPath)
+        {
+            err = lastErr = ERROR_SUCCESS;
+            pathInvalid = cut = FALSE;
+        }
+        else
+            SalCheckAndRestorePathWithCut(parent, changedPath, tryNet, err, lastErr, pathInvalid, cut, FALSE);
         if (cut)
         { // invalidate proposed listbox settings (we'll list a different path)
             suggestedTopIndex = -1;
@@ -3093,7 +3189,9 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                     MainWindow->CanAddToDirHistory = FALSE;
                 }
 
+                KeepProtectedListing = protectedPath;
                 CloseCurrentPath(parent, FALSE, detachFS, samePath, isRefresh, !samePath); // success, we switch to the new path
+                KeepProtectedListing = false;
 
                 if (samePath)
                 {
@@ -3125,7 +3223,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
             // Refresh tree view AFTER file list loads so the file list appears immediately
             // and the tree view update (which may do disk I/O) doesn't block the UI.
             RefreshHostedTreeViews();
-            if (isRefresh && !cannotList && GetMonitorChanges() && !AutomaticRefresh)
+            if (isRefresh && !protectedPath && !cannotList && GetMonitorChanges() && !AutomaticRefresh)
             {                                                                                                                // auto-refresh failure; we verify whether the directory displayed in the panel is being deleted (happened to me while deleting through the network from another machine) ... If ignored, the panel will never refresh (because auto-refresh is broken)
                 Sleep(400);                                                                                                  // we take a break, so the deletion can proceed (so the directory becomes deleted enough to become unlistable)
                                                                                                                              //        TRACE_I("Calling CommonRefresh again... (unable to receive change notifications, first listing was OK, but maybe current directory is being deleted)");
@@ -3133,6 +3231,11 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
             }
             if (cannotList)
             { // the selected path can't be listed ("access denied" or low_memory) or it was alreadydeleted
+                if (protectedPath)
+                {
+                    ProtectedListing.reset();
+                    ProtectedListingEntries.clear();
+                }
 
             FIXED_DRIVE:
 
@@ -3332,11 +3435,162 @@ static HANDLE OpenArchiveFileForRead(const char* archive, DWORD flagsAndAttribut
                                 NULL, OPEN_EXISTING, flagsAndAttributes, NULL));
 }
 
+namespace
+{
+struct ProtectedZipListing
+{
+    UacF7::ArchiveReadSession& session;
+    std::vector<BYTE> block = std::vector<BYTE>(UacF7::archiveReadBlock);
+    ULONGLONG cachedOffset = 0;
+    DWORD cachedSize = 0;
+
+    static DWORD WINAPI Read(void* context, ULONGLONG offset, void* bytes, DWORD count)
+    {
+        auto& listing = *static_cast<ProtectedZipListing*>(context);
+        const ULONGLONG size = listing.session.Size();
+        if (offset > size || count > size - offset)
+            return ERROR_HANDLE_EOF;
+        auto* output = static_cast<BYTE*>(bytes);
+        while (count)
+        {
+            if (offset < listing.cachedOffset || offset - listing.cachedOffset >= listing.cachedSize)
+            {
+                listing.cachedOffset = offset - offset % UacF7::archiveReadBlock;
+                listing.cachedSize = static_cast<DWORD>(min(size - listing.cachedOffset, static_cast<ULONGLONG>(UacF7::archiveReadBlock)));
+                const DWORD error = listing.session.Read(listing.cachedOffset, listing.block.data(), listing.cachedSize);
+                if (error)
+                    return error;
+            }
+            const auto within = static_cast<DWORD>(offset - listing.cachedOffset);
+            const DWORD copied = min(count, listing.cachedSize - within);
+            memcpy(output, listing.block.data() + within, copied);
+            offset += copied;
+            output += copied;
+            count -= copied;
+        }
+        return ERROR_SUCCESS;
+    }
+
+};
+
+DWORD ReadProtectedZip(HWND owner, const char* archive, CSalamanderDirectory& directory,
+                       CPluginData*& plugin, CPluginDataInterfaceAbstract*& pluginData,
+                       CQuadWord& size, FILETIME& date, UacF7::ArchiveReadSession* session,
+                       std::unique_ptr<UacF7::ArchiveReadSession>& newSession)
+{
+    const std::wstring path = SalPathRemoveExtendedPrefixW(
+        SalMultiByteToWidePath(archive, IsValidPathUtf8Text(archive) ? CP_UTF8 : CP_ACP).c_str());
+    if (path.size() < 4 || _wcsicmp(path.c_str() + path.size() - 4, L".zip") != 0)
+        return ERROR_NOT_SUPPORTED;
+    plugin = Plugins.GetPluginDataFromSuffix("zip\\zip.spl");
+    if (!plugin || !plugin->InitDLL(owner, TRUE))
+        return ERROR_NOT_SUPPORTED;
+    const auto list = reinterpret_cast<SalListZipPanelV1>(GetProcAddress(plugin->GetPluginDLL(), "SalamanderListZipPanelV1"));
+    if (!list)
+        return ERROR_NOT_SUPPORTED;
+    if (!session || !session->IsOpen())
+    {
+        newSession = std::make_unique<UacF7::ArchiveReadSession>();
+        if (!newSession->Prepare(path))
+            return ERROR_ACCESS_DENIED;
+        if (!ConfirmProtectedRead(owner, IDS_UAC_ZIP_TITLE, IDS_UAC_ZIP_CONFIRM, path))
+            return ERROR_CANCELLED;
+        const DWORD startError = newSession->Start(owner);
+        if (startError)
+            return startError;
+        session = newSession.get();
+    }
+
+    ProtectedZipListing listing{*session};
+    const SalZipReadSourceV1 source{session->Size(), &listing, ProtectedZipListing::Read, nullptr};
+    const std::wstring extended = SalPathAddExtendedPrefixW(path.c_str());
+    const DWORD beginError = session->BeginRead();
+    if (beginError)
+        return beginError;
+    EnterPlugin();
+    const DWORD error = list(&source, &directory, &pluginData);
+    LeavePlugin();
+    const DWORD endError = session->EndRead();
+    if (error)
+        return error;
+#ifdef _DEBUG
+    if (pluginData)
+        plugin->OpenedPDCounter++;
+#endif
+
+    if (endError)
+    {
+        directory.Clear(pluginData);
+        plugin->GetPluginInterface()->ReleasePluginDataInterface(pluginData);
+        pluginData = nullptr;
+        return endError;
+    }
+
+    size.SetUI64(session->Size());
+    WIN32_FILE_ATTRIBUTE_DATA attributes{};
+    date = {};
+    if (GetFileAttributesExW(extended.c_str(), GetFileExInfoStandard, &attributes))
+        date = attributes.ftLastWriteTime;
+    return ERROR_SUCCESS;
+}
+}
+
+namespace
+{
+DWORD WINAPI AppendProtectedZipBytes(void* context, const BYTE* bytes, DWORD count)
+{
+    auto& data = *static_cast<std::vector<BYTE>*>(context);
+    if (count > UacF7::maxPilotCopyBytes - data.size())
+        return ERROR_FILE_TOO_LARGE;
+    data.insert(data.end(), bytes, bytes + count);
+    return ERROR_SUCCESS;
+}
+}
+
+DWORD CFilesWindow::ReadProtectedZipEntry(const CFileData& file, const std::string& entry, std::vector<BYTE>& bytes)
+{
+    bytes.clear();
+    if (file.Size.Value > UacF7::maxPilotCopyBytes)
+        return ERROR_FILE_TOO_LARGE;
+    bytes.reserve(static_cast<size_t>(file.Size.Value));
+    const DWORD error = ReadProtectedZipEntry(file, entry.c_str(), UacF7::maxPilotCopyBytes,
+                                             AppendProtectedZipBytes, &bytes);
+    if (error)
+        bytes.clear();
+    return error;
+}
+
+DWORD CFilesWindow::ReadProtectedZipEntry(const CFileData& file, const char* name, ULONGLONG maxBytes,
+                                         SalZipWrite write, void* context)
+{
+    if (!IsProtectedZip() || !ProtectedZipSession || !ProtectedZipSession->IsOpen())
+        return ERROR_PIPE_NOT_CONNECTED;
+    CPluginData* plugin = GetPluginDataForPluginIface();
+    if (!plugin)
+        return ERROR_NOT_SUPPORTED;
+    const auto read = reinterpret_cast<SalReadZipEntryV1>(
+        GetProcAddress(plugin->GetPluginDLL(), "SalamanderReadZipEntryV1"));
+    if (!read)
+        return ERROR_NOT_SUPPORTED;
+
+    auto& session = *ProtectedZipSession;
+    ProtectedZipListing listing{session};
+    const SalZipReadSourceV1 source{session.Size(), &listing, ProtectedZipListing::Read, nullptr};
+    const DWORD beginError = session.BeginRead();
+    if (beginError)
+        return beginError;
+    EnterPlugin();
+    const DWORD error = read(&source, name, &file, maxBytes, write, context);
+    LeavePlugin();
+    const DWORD endError = session.EndRead();
+    return error ? error : endError;
+}
+
 BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archivePath,
                                        int suggestedTopIndex, const char* suggestedFocusName,
                                        BOOL forceUpdate, BOOL* noChange, BOOL refreshListBox,
                                        int* failReason, BOOL isRefresh, BOOL canFocusFileName,
-                                       BOOL isHistory, CPluginData* forcedPlugin)
+                                       BOOL isHistory, CPluginData* forcedPlugin, bool allowProtectedZip)
 {
     if (!isRefresh && !ConfirmUnlockTabForPathChange())
         return FALSE;
@@ -3384,6 +3638,14 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     }
     archive = backup1;
 
+    const bool sameProtectedZip = IsProtectedZip() && StrICmp(GetZIPArchive(), archive) == 0;
+    if (sameProtectedZip && isRefresh && !allowProtectedZip)
+    {
+        if (failReason != NULL)
+            *failReason = CHPPFR_SUCCESS;
+        return TRUE; // RefreshDirectory retains the authorized listing on background refresh.
+    }
+
     //---  start the waiting cursor
     BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // is it already waiting?
     HCURSOR oldCur;
@@ -3401,7 +3663,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     BOOL checkPath = TRUE;
     BOOL forceUpdateInt = FALSE; // is path change required? (possibly even to disk)
     BOOL tryPathWithArchiveOnError = isHistory;
-    if (!Is(ptZIPArchive) || StrICmp(GetZIPArchive(), archive) != 0) // not the archive or a different archive
+    if (!Is(ptZIPArchive) || StrICmp(GetZIPArchive(), archive) != 0 || (sameProtectedZip && forceUpdate && allowProtectedZip))
     {
 
     _REOPEN_ARCHIVE:
@@ -3470,8 +3732,10 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             if (PackerFormatConfig.PackIsArchive(archive) || pluginForOpen != NULL) // is it an archive?
             {
                 // retrieve file info (does it exist?, size, date & time)
+                auto* existingZipSession = sameProtectedZip ? ProtectedZipSession.get() : nullptr;
+                const bool reuseZipSession = existingZipSession && existingZipSession->IsOpen();
                 DWORD err2 = NO_ERROR;
-                HANDLE file = OpenArchiveFileForRead(archive, FILE_ATTRIBUTE_NORMAL);
+                HANDLE file = reuseZipSession ? INVALID_HANDLE_VALUE : OpenArchiveFileForRead(archive, FILE_ATTRIBUTE_NORMAL);
                 if (file != INVALID_HANDLE_VALUE)
                 {
                     GetFileTime(file, NULL, NULL, &archiveDate);
@@ -3480,9 +3744,12 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                     HANDLES(CloseHandle(file));
                 }
                 else
-                    err2 = GetLastError();
+                    err2 = reuseZipSession ? ERROR_ACCESS_DENIED : GetLastError();
 
-                if (err2 != NO_ERROR)
+                const char* extension = strrchr(archive, '.');
+                const bool protectedZip = allowProtectedZip && err2 == ERROR_ACCESS_DENIED &&
+                                          extension && _stricmp(extension, ".zip") == 0;
+                if (err2 != NO_ERROR && !protectedZip)
                 {
                     if (!isRefresh) // during refresh missing-path messages are not displayed
                         DialogError(HWindow, BUTTONS_OK, archive, GetErrorText(err2), LoadStr(IDS_ERROROPENINGFILE));
@@ -3499,14 +3766,36 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                 CPluginDataInterfaceAbstract* pluginData = NULL;
                 CPluginData* plugin = NULL;
-                if (!nullFile)
-                    CreateSafeWaitWindow(LoadStr(IDS_LISTINGARCHIVE), NULL, 2000, FALSE, MainWindow->HWindow);
-                if (nullFile || PackList(this, archive, *newArchiveDir, pluginData, plugin, pluginForOpen))
+                bool listed = false;
+                std::unique_ptr<UacF7::ArchiveReadSession> newZipSession;
+                if (protectedZip)
+                {
+                    nullFile = FALSE;
+                    try
+                    {
+                        err2 = ReadProtectedZip(HWindow, archive, *newArchiveDir, plugin, pluginData, archiveSize,
+                                                archiveDate, existingZipSession, newZipSession);
+                    }
+                    catch (const std::bad_alloc&)
+                    {
+                        err2 = ERROR_NOT_ENOUGH_MEMORY;
+                    }
+                    listed = err2 == ERROR_SUCCESS;
+                    if (!listed && err2 != ERROR_CANCELLED)
+                        DialogError(HWindow, BUTTONS_OK, archive, GetErrorText(err2), LoadStr(IDS_UAC_ZIP_TITLE));
+                }
+                else
+                {
+                    if (!nullFile)
+                        CreateSafeWaitWindow(LoadStr(IDS_LISTINGARCHIVE), NULL, 2000, FALSE, MainWindow->HWindow);
+                    listed = nullFile || PackList(this, archive, *newArchiveDir, pluginData, plugin, pluginForOpen);
+                }
+                if (listed)
                 {
                     // free the cache so it does not linger in the object
                     newArchiveDir->FreeAddCache();
 
-                    if (!nullFile)
+                    if (!protectedZip && !nullFile)
                         DestroySafeWaitWindow();
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
@@ -3526,6 +3815,9 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                             isTheSamePath = TRUE;
                     }
 
+                    if (protectedZip && reuseZipSession)
+                        newZipSession = std::move(ProtectedZipSession);
+
                     // success, switch to the new path - because listing the archive can be time-consuming
                     // the path changes even if the target path doesn't exist - applies to
                     // Change Directory (Shift+F7) which otherwise wouldn't change it
@@ -3539,6 +3831,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                         DirectoryLine->HideThrobberAndSecurityIcon();
 
                     SetPanelType(ptZIPArchive);
+                    ProtectedZip = protectedZip;
+                    ProtectedZipSession = std::move(newZipSession);
                     SetPath(path);
                     UpdateDriveIcon(FALSE);
                     SetArchiveDir(newArchiveDir);
@@ -3563,7 +3857,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                 }
                 else
                 {
-                    DestroySafeWaitWindow(); // nullFile must be FALSE, so the check is omitted...
+                    if (!protectedZip)
+                        DestroySafeWaitWindow(); // nullFile must be FALSE
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
                     TRACE_I("Unable to open file " << archive << ".");
                     delete newArchiveDir;

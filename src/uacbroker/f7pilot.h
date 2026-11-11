@@ -1,0 +1,800 @@
+/*
+| Date | Summary | Reason | Ticket | Model |
+| 2026-11-11 | Use the Windows copy helper for the directory identity. | Avoid expanding the Debug memcpy macro inside the std namespace. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Expose the existing leaf consent scope and explicit retry. | Use the exact broker job identity when remembering a declined deletion. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Retain root planning state after disconnection. | Prevent the worker from creating a scoped root locally after the pipe closes. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Represent copy scopes awaiting their target root. | Admit only creation of the exact planned root before copying children. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Expose exact source-directory identity for F5 planning. | Retain a reviewed ID across the system consent. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Define identity-bearing source listings for rooted F5. | Prepare verified operations from the same approved connection. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Define a read-only start for an existing F5 tree. | Keep subsequent writes scoped to the two approved roots. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Define a rooted directory copy job and its allowed entries. | Reuse copy authority within the verified source and destination trees. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Identify same-volume directory move requests. | Keep directory and file consent scopes separate. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Carry a verified deferred target from the file-operation dialog. | Bind file requests to the exact existing ancestor and missing suffix. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Bind nested transfer requests to the same destination suffix. | Keep the identity of the newly published destination for later files. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Expose the verified create parent identity. | Keep destination preview and transfer preparation on the same identity rules. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Support a verified listed source in the overwrite preparation. | Use the same source identity for a new target and an approved replacement. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Compare the viewer identity against the listing attributes. | Keep protected Find rows tied to an eligible file. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Scope read-only comparison grants. | Separate metadata-only and content-enabled comparison. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Verify a scoped read against a prepared source. | Reject an identity changed while asking for consent. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Expose partial inventory and verified aliases to the host. | Keep complete results distinct from skipped protected entries. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Use verified listing identities for transfer sources. | Prepare F5 and F6 after an ordinary source access denial. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Carry a verified protected Find root. | Keep the Find worker on a separate cancellable broker connection. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Define an inventory-only subtree session. | Keep one size approval separate from listing and content access. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Use the live size consent dialog as the broker owner. | Remove restoration deferred until the end of the scan. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Remember the foreground at broker return for size scans. | Restore only after the invoking panel is enabled. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Match destination consent to the prepared transfer parent. | Keep source and destination access failures distinct. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Verify exact files and empty ordinary directories for permanent deletion. | Bind consent to the chosen object and preserve nested permission checks. | #731 | GPT-6.1 Sol |
+| 2026-11-10 | Add one-shot verified directory rename. | Keep ordinary directories distinct from files and links in the broker. | #731 | GPT-6.1 Sol (Codex) |
+| 2026-11-10 | Carry the metadata dialog choice in the host prompt. | Reuse that choice without changing the broker protocol. | #731 | GPT-6.1 Sol (Codex) |
+| 2026-11-10 | Prepare protected metadata through the panel listing. | Bind the one-shot or batch update to the visible attributes and verified identity. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Expose broker availability to permission previews. | Show a shield only in a compatible unelevated installation. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Prepare leaf operations from a protected listing. | Bind separate consent to the verified folder and file identities. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Expose a common UAC foreground return. | Restore the invoking window from its UI thread. | #731 | GPT-6 (Codex) |
+| 2026-11-10 | Prepare a separate viewer request from the approved panel. | Bind viewer consent to the selected file inside a protected listing. | #731 | Codex |
+| 2026-11-09 | Make active Find broker reads cancellable. | Stop waiting on the scoped read pipe and discard incomplete replies. | | Codex |
+| 2026-11-09 | Cancel the protected Find broker handshake on Stop. | Release the read-only pipe while preserving the transfer cancellation contract. | | Codex |
+| 2026-11-09 | Expose optional broker activity notifications. | Allow native progress to mark authenticated work. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Expose the explicit transfer total to the host. | Distinguish actual tree and raw stream totals from the ordinary estimate. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Accept a host transfer progress callback. | Keep progress optional for non-panel callers. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Expose a verified local finish for an ordinary cross-volume copy. | Keep the protected fallback tied to the same captured objects. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Expose whether a scoped broker session is still open. | Release closed session entries while their batch continues. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Define a combined protected F5 compression and permissions operation. | Keep consent and broker scope specific to both options. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Remove the F6 pilot byte cap. | Retain the representable range of signed Windows file offsets. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Expose capture of an eligible overwrite revision. | Bind a Scan Ahead conflict to the same NTFS revision as a broker request. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Declare a guarded source for Shell recycling. | Keep the verified path pinned through the Shell request. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Share the verified Find file revision with its caller. | Bind repeated reads to the same file identity and metadata. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Give cross-volume moves an independent byte budget. | Keep the existing bounded copy and archive contracts separate. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Share eligibility for a protected move source. | Keep F6 preparation and the broker retry in the same metadata scope. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Use one result policy for authenticated broker replies. | Keep a partial move visible after the one-shot broker exits. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Describe guarded F6 with NTFS compression. | Bind the existing exact-attributes option to its own move scope. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Describe sparse guarded F6 sources. | Share the allowed attributes between the worker and broker. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Finish F6 when only source deletion needs elevation. | Verify the original copy identities and content before retiring the source. | | GPT-6.1 Sol (Codex) |
+| 2026-11-09 | Dispatch guarded F6 moves across fixed NTFS volumes. | Keep source retirement and recovery in one scoped broker request. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Preserve named data streams when copying protected permissions. | Combine the existing staged security and stream validation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Scope permanent deletion and metadata jobs. | Keep link types, parent identity and approved metadata values separate. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Keep overwrite approval bound to the verified revision. | Reuse a conflict decision only for the same source and destination. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Define the scope and lifetime of a transfer job. | Reuse authorization only for matching operations and parent identities. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Add the encrypted F5 request. | Carry an explicit EFS copy contract through the broker. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Add an exact-file scope for protected Find. | Bind single-file consent to a verified identity. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Give protected Find a dedicated read-only scope. | Keep panel listings separate from content sessions. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Define a separate protected copy overwrite request. | Bind the overwrite to a captured target revision. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Remove the standalone broker ZIP recovery operation. | Keep journal handling internal to the authorized write. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Prepare interrupted ZIP recovery from a folder. | Work after restart or loss of the original name. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare streamed protected ZIP preparation and replacement. | Reopen the committed archive through the same write consent. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Bind ZIP recovery to a prepared path and return the opened archive revision. | Capture authoritative metadata while the archive is still locked. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Describe the bounded ZIP selection wire format. | Authorize a fixed manifest beneath one verified directory. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare bounded publication of a decoded ZIP entry. | Reuse verified destinations and keep archive parsing in the host. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Scope archive read limits to a batch. | Reuse the verified file across refreshes. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare the bounded archive read session. | Share its range contract across the broker and host. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Pin a trusted installed editor before an explicit F4 elevation. | Keep editor launch entirely on the host side. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare detailed read-only size results. | Keep logical file sizes separate from optional disk measurements. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare a one-file viewer snapshot request. | Bind the read-only data to one verified file. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Distinguish EFS failures in the copy pilot. | Keep the existing ordinary EFS path and fail closed at the broker boundary. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Define a typed protected security copy. | Bind owner, group and explicit permissions to the F5 request. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare a separate junction deletion request. | Keep approval bound to the verified link type. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare a directory symbolic-link deletion operation. | Bind the approved type without extending deletion to other directory objects. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare a typed file symbolic-link deletion request. | Keep consent and eligible attributes separate from ordinary files. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare a distinct junction rename operation. | Keep the approved reparse type explicit in the protocol. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Distinguish directory symbolic-link rename on the wire. | Bind the approved source type to the operation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare a typed symbolic-link rename request. | Bind the approved object type to the broker operation. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Define a typed compressed-file copy. | Bind preservation of NTFS compression to the consent request. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Recognize sparse files for the default F5 pilot. | Keep the plain-file check available for other operations. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Define a distinct copy command that skips named streams. | Keep the selected data policy bound to the authorized request. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Expose whether the metadata request includes attributes. | Keep time-only consent text specific. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Expose the directory timestamp request type. | Let the prompt describe the correct item. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Carry explicit tree consent and an optional cancellation event. | Let the worker execute while the dialog stays responsive. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Identify queued tree transfers in the consent dialog. | Reuse the tree-specific consent and result strings. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare the registered F5 tree pilot. | Bind a directory source to a fixed protected target. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Expose a bounded inventory for an approved directory. | Use the existing read-only listing session. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Share the prepared transfer with same-volume F6. | Bind source and destination to a typed move request. | | GPT-6.1 Sol (Codex) |
+| 2026-11-08 | Declare a bounded one-file copy request. | Hold both parent identities across UAC. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Expose the approved listing root to the panel. | Locate the protected suffix for display. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Declare one rooted read-only listing session. | Keep one authorization across navigation and refresh. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Declare the one-file permanent delete request. | Pin the original file across UAC consent and retries. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Add a typed request for basic file metadata. | Share one operation between the ordinary token and the broker. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Capture a file identity for the shared F2 rename path. | Keep the source and parent pinned across consent. | | GPT-6.1 Sol (Codex) |
+| 2026-11-07 | Declare the one-leaf F7 elevation pilot. | Hold the verified parent across consent and distinguish uncertain outcomes. | | GPT-6.1 Sol (Codex) |
+*/
+#pragma once
+
+#include <windows.h>
+#include <cstring>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace UacF7
+{
+constexpr UINT restoreConsentForegroundMessage = WM_APP + 427;
+
+class ConsentForeground
+{
+public:
+    explicit ConsentForeground(HWND owner);
+    HWND Owner() const { return owner; }
+    void Restore() const;
+
+private:
+    HWND owner;
+    bool wasForeground;
+};
+
+void RestoreConsentForeground(HWND owner, HWND foreground, DWORD lastInput);
+bool CanOfferElevation();
+
+enum class Operation : DWORD { Mkdir = 1, Rename = 2, Metadata = 3, Delete = 4, List = 5, Copy = 6, Move = 7, CopyTree = 8, CopyIgnoreAds = 9, CopyCompressed = 10, RenameSymlink = 11, RenameDirectorySymlink = 12, RenameJunction = 13, DeleteSymlink = 14, DeleteDirectorySymlink = 15, DeleteJunction = 16, CopySecurity = 17, View = 18, ReadArchive = 19, WriteZipSelection = 20, WriteZipUpdate = 22, CopyOverwrite = 23, FindContent = 24, FindFile = 25, CopyEncrypted = 26, MoveAcrossVolume = 27, FinishCrossVolumeMove = 28, MoveCompressed = 29, CopyCompressedSecurity = 30, RenameDirectory = 31, DeleteDirectory = 32, Inventory = 33, CompareList = 34, CompareContent = 35, MoveDirectory = 36, CopyDirectoryEntry = 37, MergeCopyTree = 38, ListCopyTreeSource = 39, PlanCopyTree = 40 };
+
+inline constexpr bool IsComparisonScope(Operation operation)
+{
+    return operation == Operation::CompareList || operation == Operation::CompareContent;
+}
+
+inline constexpr bool IsDirectoryReadScope(Operation operation)
+{
+    return operation == Operation::List || operation == Operation::FindContent || operation == Operation::Inventory ||
+           IsComparisonScope(operation);
+}
+
+inline bool IsRename(Operation operation)
+{
+    return operation == Operation::Rename || operation == Operation::RenameSymlink ||
+           operation == Operation::RenameDirectorySymlink || operation == Operation::RenameJunction ||
+           operation == Operation::RenameDirectory;
+}
+
+inline bool IsLeafDelete(Operation operation)
+{
+    return operation == Operation::Delete || operation == Operation::DeleteSymlink ||
+           operation == Operation::DeleteDirectorySymlink || operation == Operation::DeleteJunction ||
+           operation == Operation::DeleteDirectory;
+}
+
+inline bool CopiesSecurity(Operation operation)
+{
+    return operation == Operation::CopySecurity || operation == Operation::CopyCompressedSecurity;
+}
+
+inline bool CopiesCompression(Operation operation)
+{
+    return operation == Operation::CopyCompressed || operation == Operation::CopyCompressedSecurity;
+}
+
+inline bool IsFileCopy(Operation operation)
+{
+    return operation == Operation::Copy || operation == Operation::CopyIgnoreAds ||
+           CopiesCompression(operation) || CopiesSecurity(operation) || operation == Operation::CopyEncrypted;
+}
+
+constexpr DWORD maxZipSelectionBytes = 64 * 1024 * 1024;
+constexpr DWORD maxZipSelectionEntries = 4096;
+constexpr DWORD maxZipSelectionDepth = 32;
+constexpr DWORD zipSelectionRoot = MAXDWORD;
+struct ZipSelectionEntry
+{
+    DWORD parent;
+    DWORD nameLength;
+    DWORD size;
+    DWORD directory;
+    FILETIME modified;
+};
+static_assert(sizeof(ZipSelectionEntry) == 24);
+
+struct MoveFileIdentity
+{
+    ULONGLONG serial = 0;
+    BYTE id[16]{};
+};
+
+bool CaptureMoveFileIdentity(HANDLE file, MoveFileIdentity& identity, bool requireNtfs = false);
+DWORD DeleteCopiedMoveSource(const std::wstring& sourcePath, const std::wstring& targetPath,
+                             const MoveFileIdentity& source, const MoveFileIdentity& target);
+
+struct ArchiveRevision
+{
+    ULONGLONG serial = 0;
+    BYTE fileId[16]{};
+    LONGLONG size = 0;
+    LONGLONG created = 0;
+    LONGLONG modified = 0;
+    LONGLONG changed = 0;
+    DWORD attributes = 0;
+    DWORD reserved = 0;
+};
+static_assert(sizeof(ArchiveRevision) == 64);
+bool CaptureOverwriteRevision(HANDLE file, ArchiveRevision& revision);
+
+inline bool SameFileRevision(const ArchiveRevision& a, const ArchiveRevision& b)
+{
+    return a.serial == b.serial && std::memcmp(a.fileId, b.fileId, sizeof(a.fileId)) == 0 &&
+           a.size == b.size && a.created == b.created && a.modified == b.modified &&
+           a.changed == b.changed && a.attributes == b.attributes;
+}
+
+constexpr DWORD archiveReadBlock = 64 * 1024;
+constexpr DWORD archiveReadBudget = 64 * 1024 * 1024;
+constexpr ULONGLONG archiveReadTimeoutMs = 30000;
+enum class ArchiveReadControl : DWORD { Begin = 1, End = 2, Release = 3 };
+constexpr ULONGLONG maxZipUpdateBytes = 64ULL * 1024 * 1024 * 1024;
+constexpr DWORD zipUpdateTimeoutMs = 10 * 60 * 1000;
+constexpr DWORD zipUpdateCommit = 1;
+struct ArchiveReadRange
+{
+    ULONGLONG offset;
+    DWORD size;
+    DWORD reserved;
+};
+static_assert(sizeof(ArchiveReadRange) == 16);
+
+inline bool ValidArchiveRange(const ArchiveReadRange& range, ULONGLONG fileSize, DWORD remaining)
+{
+    return !range.reserved && range.size && range.size <= archiveReadBlock && range.size <= remaining &&
+           range.offset <= fileSize && range.size <= fileSize - range.offset;
+}
+
+constexpr DWORD maxViewerSnapshotBytes = 16 * 1024 * 1024;
+constexpr ULONGLONG maxPilotCopyBytes = 16 * 1024 * 1024;
+// Windows file sizes and seek offsets use signed LARGE_INTEGER values.
+constexpr ULONGLONG maxCrossVolumeMoveBytes = MAXLONGLONG;
+constexpr DWORD plainCopyAttributes = FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE |
+                                      FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM;
+inline bool IsPlainCopyFile(DWORD attributes)
+{
+    return attributes && !(attributes & ~plainCopyAttributes);
+}
+
+inline bool IsDefaultCopyFile(DWORD attributes)
+{
+    return attributes && !(attributes & ~(plainCopyAttributes | FILE_ATTRIBUTE_SPARSE_FILE));
+}
+
+constexpr DWORD compressedCopyAttributes = plainCopyAttributes | FILE_ATTRIBUTE_COMPRESSED;
+
+inline bool IsCompressedCopyFile(DWORD attributes)
+{
+    return (attributes & FILE_ATTRIBUTE_COMPRESSED) && !(attributes & ~compressedCopyAttributes);
+}
+
+inline bool IsEncryptedCopyFile(DWORD attributes)
+{
+    return (attributes & FILE_ATTRIBUTE_ENCRYPTED) && !(attributes & ~(plainCopyAttributes | FILE_ATTRIBUTE_ENCRYPTED));
+}
+
+inline bool IsEligibleFileCopy(DWORD attributes, bool copyAttributes, bool ignoreAds, bool copySecurity)
+{
+    if (IsEncryptedCopyFile(attributes))
+        return !copySecurity && !ignoreAds;
+    if (copySecurity)
+        return !ignoreAds && (copyAttributes ? IsCompressedCopyFile(attributes) : IsDefaultCopyFile(attributes));
+    if (copyAttributes)
+        return !ignoreAds && IsCompressedCopyFile(attributes);
+    return ignoreAds ? IsPlainCopyFile(attributes) : IsDefaultCopyFile(attributes);
+}
+
+inline bool IsEfsCopyFailure(DWORD attributes, DWORD error)
+{
+    return error == ERROR_FILE_ENCRYPTED || error == ERROR_NO_USER_KEYS || error == ERROR_DECRYPTION_FAILED ||
+           (error == ERROR_ACCESS_DENIED && (attributes & FILE_ATTRIBUTE_ENCRYPTED));
+}
+
+struct Result
+{
+    DWORD error = ERROR_GEN_FAILURE;
+    bool unknown = false;
+};
+
+constexpr DWORD basicAttributes = FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_READONLY |
+                                  FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM;
+inline bool IsPlainDeleteFile(DWORD attributes)
+{
+    return attributes == FILE_ATTRIBUTE_NORMAL || attributes == FILE_ATTRIBUTE_ARCHIVE;
+}
+inline bool IsPlainDeleteDirectory(DWORD attributes)
+{
+    return (attributes & FILE_ATTRIBUTE_DIRECTORY) && !(attributes & ~(FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_ARCHIVE));
+}
+
+constexpr DWORD crossVolumeMoveAttributes = FILE_ATTRIBUTE_NORMAL | FILE_ATTRIBUTE_ARCHIVE | FILE_ATTRIBUTE_SPARSE_FILE;
+inline bool IsCrossVolumeMoveFile(DWORD attributes)
+{
+    return attributes && !(attributes & ~crossVolumeMoveAttributes);
+}
+
+inline bool IsEligibleMoveFile(DWORD attributes, bool copyAttributes, bool copySecurity)
+{
+    return !copySecurity && (copyAttributes ? IsCompressedCopyFile(attributes) : IsCrossVolumeMoveFile(attributes));
+}
+
+inline bool IsPlainDeleteLink(DWORD attributes, bool directory = false)
+{
+    const DWORD required = FILE_ATTRIBUTE_REPARSE_POINT | (directory ? FILE_ATTRIBUTE_DIRECTORY : 0);
+    const DWORD allowed = required | FILE_ATTRIBUTE_ARCHIVE;
+    return (attributes & required) == required && !(attributes & ~allowed);
+}
+
+struct MetadataChange
+{
+    LONGLONG created = 0;
+    LONGLONG accessed = 0;
+    LONGLONG modified = 0;
+    DWORD expectedAttributes = 0;
+    DWORD attributes = 0;
+};
+static_assert(sizeof(MetadataChange) == 32);
+
+struct MetadataJobPolicy
+{
+    DWORD set = 0;
+    DWORD clear = 0;
+
+    bool Allows(const MetadataChange& change) const
+    {
+        if (((set | clear) & ~basicAttributes) || (set & clear))
+            return false;
+        const DWORD before = change.expectedAttributes & basicAttributes;
+        const DWORD after = (before & ~clear) | set;
+        return change.attributes == (after == before ? 0 : after ? after : FILE_ATTRIBUTE_NORMAL);
+    }
+};
+static_assert(sizeof(MetadataJobPolicy) == 8);
+
+class TransferJobSession;
+struct TransferJobScope;
+
+using BrokerActivity = void (*)(HWND owner, bool active);
+
+class PreparedLeaf
+{
+public:
+    PreparedLeaf() = default;
+    ~PreparedLeaf();
+    PreparedLeaf(const PreparedLeaf&) = delete;
+    PreparedLeaf& operator=(const PreparedLeaf&) = delete;
+
+    bool Prepare(const std::wstring& path, const std::wstring& renameTo = {});
+    static bool CaptureCreateParentIdentity(const std::wstring& directory, MoveFileIdentity& identity);
+    bool PrepareCopyDirectory(const std::wstring& path)
+    {
+        return PrepareTarget(path, Operation::CopyDirectoryEntry, {}, nullptr);
+    }
+    bool CopyDirectoryIdentity(MoveFileIdentity& identity) const
+    {
+        if (operation != Operation::CopyDirectoryEntry || (!source && !identityFromListing))
+            return false;
+        identity.serial = serial;
+        CopyMemory(identity.id, sourceId, sizeof(identity.id));
+        return true;
+    }
+    bool PrepareRenameDirectory(const std::wstring& path, const std::wstring& renameTo);
+    bool PrepareRenameLink(const std::wstring& path, const std::wstring& renameTo, bool directory);
+    bool IsJunctionRename() const { return operation == Operation::RenameJunction; }
+    bool PrepareMetadata(const std::wstring& path, const MetadataChange& change, MetadataJobPolicy policy = {});
+    bool PrepareDelete(const std::wstring& path, Operation requested);
+    bool PrepareDeleteLeaf(const std::wstring& path, DWORD attributes);
+    bool IsDirectoryDelete() const { return operation == Operation::DeleteDirectory; }
+    bool IsDirectorySymlinkDelete() const { return operation == Operation::DeleteDirectorySymlink; }
+    bool IsJunctionDelete() const { return operation == Operation::DeleteJunction; }
+    bool IsSymlinkDelete() const { return operation == Operation::DeleteSymlink; }
+    bool PrepareView(const std::wstring& path) { return PrepareTarget(path, Operation::View, {}, nullptr); }
+    bool MatchesReadSource(const ArchiveRevision& revision) const
+    {
+        return operation == Operation::View && revision.serial == serial &&
+               std::memcmp(revision.fileId, sourceId, sizeof(sourceId)) == 0;
+    }
+    Result ReadViewerSnapshot(HWND owner, std::vector<BYTE>& snapshot) const;
+    bool PrepareZipSelection(const std::wstring& directory);
+    DWORD WriteZipSelectionLocal(const std::vector<BYTE>& bytes) const;
+    Result WriteZipSelection(HWND owner, std::vector<BYTE>& bytes) const;
+    DWORD ExecuteLocal() const;
+    Result Execute(HWND owner, TransferJobSession* job = nullptr, BrokerActivity activity = nullptr) const;
+    bool IsInJob(const TransferJobSession& job) const;
+    TransferJobScope JobScope() const;
+    bool IsDirectoryMetadata() const
+    {
+        return operation == Operation::Metadata && (metadata.expectedAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+    }
+    bool ChangesAttributes() const { return (metadata.attributes | metadataPolicy.set | metadataPolicy.clear) != 0; }
+
+private:
+    friend class ProtectedRecycleSource;
+    friend class ListingSession;
+    friend class TransferJobSession;
+    friend class ArchiveReadSession;
+    friend class PreparedTransfer;
+    bool PrepareTarget(const std::wstring& path, Operation requested, const std::wstring& renameTo,
+                       const MetadataChange* change);
+    HANDLE parent = nullptr;
+    HANDLE source = nullptr;
+    bool identityFromListing = false;
+    ULONGLONG serial = 0;
+    BYTE fileId[16]{};
+    BYTE sourceId[16]{};
+    std::wstring volume, relative, leaf, sourceLeaf;
+    MetadataChange metadata{};
+    MetadataJobPolicy metadataPolicy{};
+    Operation operation = Operation::Mkdir;
+};
+
+class ProtectedRecycleSource
+{
+public:
+    ProtectedRecycleSource() = default;
+    ~ProtectedRecycleSource();
+    ProtectedRecycleSource(const ProtectedRecycleSource&) = delete;
+    ProtectedRecycleSource& operator=(const ProtectedRecycleSource&) = delete;
+
+    bool Prepare(const std::wstring& path, const MoveFileIdentity& expected);
+
+private:
+    PreparedLeaf prepared;
+    std::vector<HANDLE> parents;
+};
+
+inline constexpr bool IsMoveTransfer(Operation operation)
+{
+    return operation == Operation::Move || operation == Operation::MoveDirectory || operation == Operation::MoveAcrossVolume ||
+           operation == Operation::FinishCrossVolumeMove || operation == Operation::MoveCompressed;
+}
+
+inline constexpr bool IsCrossVolumeMove(Operation operation)
+{
+    return operation == Operation::MoveAcrossVolume || operation == Operation::FinishCrossVolumeMove ||
+           operation == Operation::MoveCompressed;
+}
+
+inline bool CanShareTransferJob(Operation operation)
+{
+    return IsFileCopy(operation) || IsMoveTransfer(operation) || operation == Operation::CopyOverwrite ||
+           IsLeafDelete(operation) || operation == Operation::Metadata ||
+           operation == Operation::CopyDirectoryEntry || operation == Operation::MergeCopyTree ||
+           operation == Operation::PlanCopyTree;
+}
+
+inline Result TransferReply(Operation operation, DWORD error, bool transferJob = false)
+{
+    const bool crossVolumeMove = IsCrossVolumeMove(operation);
+    const bool mayBePartial = transferJob || crossVolumeMove || operation == Operation::CopyTree ||
+        operation == Operation::WriteZipUpdate || operation == Operation::CopyOverwrite || operation == Operation::CopyEncrypted;
+    return {error, mayBePartial && error == ERROR_PARTIAL_COPY};
+}
+
+inline bool CanContinueTransferJob(DWORD error)
+{
+    return error != ERROR_PARTIAL_COPY && error != ERROR_CANCELLED;
+}
+
+struct TransferJobScope
+{
+    Operation operation = Operation::Mkdir;
+    struct Parent
+    {
+        ULONGLONG serial;
+        BYTE id[16];
+    };
+    Parent source{}, target{};
+    std::wstring sourcePath, targetPath;
+    MetadataJobPolicy policy{};
+    MetadataChange change{};
+    std::wstring targetSuffix{};
+    FILE_ID_128 createdTarget{};
+    bool hasCreatedTarget = false;
+
+    static std::wstring CopyTreeRoot(std::wstring_view volume, std::wstring_view parent, std::wstring_view leaf)
+    {
+        std::wstring path(volume);
+        path.append(parent);
+        if (!parent.empty() && parent.back() != L'\\')
+            path += L'\\';
+        path.append(leaf);
+        return path;
+    }
+
+    bool NeedsTreeRoot() const { return operation == Operation::PlanCopyTree; }
+    bool IsTreeCopy() const
+    {
+        return operation == Operation::CopyDirectoryEntry || operation == Operation::MergeCopyTree || NeedsTreeRoot();
+    }
+
+    bool MatchesTreeEntry(const TransferJobScope& entry, std::wstring_view leaf, std::wstring_view targetLeaf) const
+    {
+        if (!IsTreeCopy() || source.serial != entry.source.serial || target.serial != entry.target.serial ||
+            (entry.operation != Operation::CopyDirectoryEntry && entry.operation != Operation::Copy &&
+             entry.operation != Operation::CopyOverwrite))
+            return false;
+        if (NeedsTreeRoot())
+        {
+            return entry.operation == Operation::CopyDirectoryEntry &&
+                   std::memcmp(source.id, entry.source.id, sizeof(source.id)) == 0 &&
+                   std::memcmp(target.id, entry.target.id, sizeof(target.id)) == 0 &&
+                   CopyTreeRoot({}, entry.sourcePath, leaf) == sourcePath &&
+                   CopyTreeRoot({}, entry.targetPath, targetLeaf) == targetPath;
+        }
+        if (leaf != targetLeaf)
+            return false;
+        const auto relative = [](std::wstring_view root, std::wstring_view path, std::wstring_view& suffix) {
+            if (path == root)
+                return true;
+            if (path.size() <= root.size() || path[root.size()] != L'\\' || path.substr(0, root.size()) != root)
+                return false;
+            suffix = path.substr(root.size() + 1);
+            return !suffix.empty();
+        };
+        std::wstring_view sourceRelative, targetRelative;
+        return relative(sourcePath, entry.sourcePath, sourceRelative) &&
+               relative(targetPath, entry.targetPath, targetRelative) && sourceRelative == targetRelative;
+    }
+
+    bool Matches(const TransferJobScope& other) const
+    {
+        return operation == other.operation && source.serial == other.source.serial &&
+               target.serial == other.target.serial &&
+               std::memcmp(source.id, other.source.id, sizeof(source.id)) == 0 &&
+               std::memcmp(target.id, other.target.id, sizeof(target.id)) == 0 &&
+               sourcePath == other.sourcePath && targetPath == other.targetPath && targetSuffix == other.targetSuffix &&
+               policy.set == other.policy.set && policy.clear == other.policy.clear &&
+               change.created == other.change.created && change.accessed == other.change.accessed &&
+               change.modified == other.change.modified &&
+               ((change.expectedAttributes ^ other.change.expectedAttributes) & FILE_ATTRIBUTE_DIRECTORY) == 0;
+    }
+};
+
+struct TreeCopySourceEntry
+{
+    WIN32_FIND_DATAW data;
+    FILE_ID_128 id;
+};
+static_assert(sizeof(TreeCopySourceEntry) == 608);
+
+class TransferJobSession
+{
+public:
+    TransferJobSession() = default;
+    TransferJobSession(const TransferJobSession&) = delete;
+    TransferJobSession& operator=(const TransferJobSession&) = delete;
+    ~TransferJobSession();
+    bool IsOpen() const { return pipe != nullptr; }
+    void Close();
+    bool NeedsTreeRoot() const { return scope.NeedsTreeRoot(); }
+    DWORD ListTreeSource(std::wstring_view relative, const MoveFileIdentity& directory,
+                         std::vector<TreeCopySourceEntry>& entries);
+    bool PrepareTreeSource(std::wstring_view relativeParent, const MoveFileIdentity& directory,
+                           const TreeCopySourceEntry& entry, PreparedLeaf& request) const;
+
+private:
+    friend class PreparedTransfer;
+    friend class PreparedLeaf;
+    HANDLE pipe = nullptr;
+    TransferJobScope scope;
+};
+
+struct OverwriteApproval
+{
+    ArchiveRevision revision;
+    ULONGLONG sourceSerial = 0;
+    bool captured = false;
+    BYTE sourceId[16]{};
+
+    bool Matches(const OverwriteApproval& other) const
+    {
+        return captured && other.captured && sourceSerial == other.sourceSerial && revision.serial == other.revision.serial &&
+               std::memcmp(revision.fileId, other.revision.fileId, sizeof(revision.fileId)) == 0 &&
+               revision.size == other.revision.size && revision.created == other.revision.created &&
+               revision.modified == other.revision.modified && revision.changed == other.revision.changed &&
+               revision.attributes == other.revision.attributes &&
+               std::memcmp(sourceId, other.sourceId, sizeof(sourceId)) == 0;
+    }
+};
+
+using TransferProgress = void (*)(void* context, ULONGLONG bytes, ULONGLONG total);
+
+struct DeferredTransferTarget
+{
+    std::wstring ancestor;
+    std::wstring suffix;
+    MoveFileIdentity identity{};
+};
+
+class PreparedTransfer
+{
+public:
+    static bool CaptureDeferredTarget(std::wstring directory, size_t ancestorLength, DeferredTransferTarget& target);
+    bool Prepare(const std::wstring& sourcePath, const std::wstring& targetPath, ULONGLONG expectedSize, Operation operation,
+                 const PreparedLeaf* listedSource = nullptr, const DeferredTransferTarget* deferred = nullptr);
+    bool PrepareMoveCompletion(const std::wstring& sourcePath, const std::wstring& targetPath, ULONGLONG expectedSize,
+                               const MoveFileIdentity& copiedSource, const MoveFileIdentity& copiedTarget);
+    bool PrepareOverwrite(const std::wstring& sourcePath, const std::wstring& targetPath, ULONGLONG expectedSize,
+                          const PreparedLeaf* listedSource = nullptr);
+    bool PrepareTree(const std::wstring& sourcePath, std::wstring_view targetDirectory, std::wstring& destination);
+    bool PrepareTreeMerge(const std::wstring& sourcePath, const std::wstring& targetPath);
+    bool PrepareTreePlan(const std::wstring& sourcePath, const std::wstring& targetPath);
+    bool AllowsTreeEntry(const PreparedTransfer& entry) const;
+    Result Execute(HWND owner, HANDLE cancel = nullptr, TransferJobSession* job = nullptr,
+                   TransferProgress progress = nullptr, void* progressContext = nullptr,
+                   BrokerActivity activity = nullptr) const;
+    bool IsInJob(const TransferJobSession& job) const;
+    bool CanShareJob() const { return CanShareTransferJob(source.operation); }
+    bool IsMove() const { return IsMoveTransfer(source.operation); }
+    bool IsDirectoryMove() const { return source.operation == Operation::MoveDirectory; }
+    bool IsCrossVolumeMove() const { return UacF7::IsCrossVolumeMove(source.operation); }
+    bool IsMoveCompletion() const { return source.operation == Operation::FinishCrossVolumeMove; }
+    bool MatchesTargetDirectory(const MoveFileIdentity& identity) const
+    {
+        return identity.serial == target.serial &&
+               std::memcmp(identity.id, target.fileId, sizeof(identity.id)) == 0;
+    }
+    bool IsTree() const { return source.operation == Operation::CopyTree || IsScopedTree(); }
+    bool IsDirectoryCopyEntry() const { return source.operation == Operation::CopyDirectoryEntry; }
+    bool IsTreeMerge() const { return source.operation == Operation::MergeCopyTree; }
+    bool IsScopedTree() const { return IsDirectoryCopyEntry() || IsTreeMerge() || source.operation == Operation::PlanCopyTree; }
+    bool HasDeferredTarget() const { return !targetSuffix.empty(); }
+    bool MatchesOverwriteTarget(HANDLE file) const;
+    OverwriteApproval Approval() const;
+    bool MatchesApproval(const OverwriteApproval& approval) const
+    {
+        return IsOverwrite() && Approval().Matches(approval);
+    }
+    bool IsOverwrite() const { return source.operation == Operation::CopyOverwrite; }
+    bool PreservesSecurity() const { return CopiesSecurity(source.operation); }
+    bool PreservesEncryption() const { return source.operation == Operation::CopyEncrypted; }
+    bool PreservesCompression() const { return CopiesCompression(source.operation); }
+    bool IgnoresAds() const { return source.operation == Operation::CopyIgnoreAds; }
+
+private:
+    bool PrepareSource(const std::wstring& sourcePath, Operation operation, const PreparedLeaf* listedSource);
+    TransferJobScope JobScope(bool asRoot = false) const;
+    PreparedLeaf source;
+    PreparedLeaf target;
+    std::wstring targetSuffix;
+    ArchiveRevision overwriteTarget;
+    ULONGLONG size = 0;
+};
+
+class ElevatedEditor
+{
+public:
+    ElevatedEditor() = default;
+    ~ElevatedEditor();
+    ElevatedEditor(const ElevatedEditor&) = delete;
+    ElevatedEditor& operator=(const ElevatedEditor&) = delete;
+
+    bool Prepare(const std::wstring& executable);
+    const std::wstring& GetExecutable() const { return executable; }
+    DWORD Launch(HWND owner, const std::wstring& document) const;
+
+private:
+    std::wstring executable;
+    std::wstring directory;
+    std::vector<HANDLE> pinned;
+};
+
+struct TransferPrompt
+{
+    const PreparedTransfer& request;
+    const char* sourcePath;
+    const char* targetPath;
+    bool targetDenied = false;
+    Result result{ERROR_CANCELLED, false};
+    bool approved = false;
+};
+
+struct DirectoryInventory
+{
+    ULONGLONG bytes = 0;
+    DWORD files = 0;
+    DWORD directories = 0;
+    DWORD firstOmission = 0;
+    DWORD flags = 0;
+};
+static_assert(sizeof(DirectoryInventory) == 24);
+constexpr DWORD inventoryCompatibilityAlias = 1;
+
+constexpr ULONGLONG unavailableSize = MAXULONGLONG;
+
+struct DirectoryDiskSizes
+{
+    ULONGLONG compressed = 0;
+    ULONGLONG occupied = 0;
+};
+static_assert(sizeof(DirectoryDiskSizes) == 16);
+
+struct DirectorySizeDetails
+{
+    DirectoryDiskSizes disk;
+    std::vector<ULONGLONG> fileSizes;
+};
+
+struct FindRootIdentity
+{
+    std::wstring path;
+    std::wstring volume;
+    std::wstring relative;
+    ULONGLONG serial = 0;
+    FILE_ID_128 id{};
+};
+
+class ListingSession
+{
+public:
+    ListingSession() = default;
+    ~ListingSession();
+    ListingSession(const ListingSession&) = delete;
+    ListingSession& operator=(const ListingSession&) = delete;
+
+    bool Prepare(const std::wstring& path, bool findContent = false);
+    bool PrepareFile(const std::wstring& path);
+    bool PrepareFindRoot(const FindRootIdentity& identity, bool readContent);
+    DWORD CaptureFindRoot(const std::wstring& path, FindRootIdentity& identity);
+    bool PrepareInventory(const std::wstring& path);
+    bool PrepareComparison(const std::wstring& path, bool contents);
+    static bool CaptureDirectoryIdentity(const std::wstring& path, MoveFileIdentity& identity);
+    DWORD PrepareViewer(const std::wstring& path, PreparedLeaf& viewer,
+                        DWORD expectedAttributes = INVALID_FILE_ATTRIBUTES);
+    DWORD PrepareTransferSource(const std::wstring& path, DWORD attributes, bool move, PreparedLeaf& request);
+    DWORD PrepareDeleteLeaf(const std::wstring& path, DWORD attributes, PreparedLeaf& request);
+    DWORD PrepareMkdir(const std::wstring& path, PreparedLeaf& mkdir);
+    DWORD PrepareRename(const std::wstring& path, const std::wstring& renameTo, PreparedLeaf& rename, bool directory);
+    DWORD PrepareMetadata(const std::wstring& path, const MetadataChange& change, MetadataJobPolicy policy,
+                          PreparedLeaf& request);
+    DWORD Start(HWND owner, HANDLE stop = nullptr);
+    DWORD OpenContent(const std::wstring& path, ULONGLONG& size, FILETIME& modified, ArchiveRevision& revision);
+    DWORD ReadContent(ULONGLONG offset, void* buffer, DWORD bytes);
+    DWORD CloseContent();
+    bool Contains(const std::wstring& path) const;
+    const std::wstring& GetRoot() const { return root; }
+    DWORD List(const std::wstring& path, std::vector<WIN32_FIND_DATAW>& entries,
+               const MoveFileIdentity* expected = nullptr);
+    DWORD Inventory(const std::wstring& path, DirectoryInventory& inventory, DirectorySizeDetails* details = nullptr,
+                    std::wstring* firstSkipped = nullptr);
+    bool IsOpen() const { return pipe != nullptr; }
+
+private:
+    bool PrepareDirectory(const std::wstring& path, Operation operation);
+    DWORD PrepareLeaf(const std::wstring& path, Operation operation, const std::wstring& renameTo,
+                      PreparedLeaf& request, const MetadataChange* change = nullptr,
+                      DWORD expectedAttributes = INVALID_FILE_ATTRIBUTES);
+    DWORD Transfer(void* buffer, DWORD length, bool send, ULONGLONG deadline);
+    DWORD SendPath(const std::wstring& path, DWORD flags, ULONGLONG deadline);
+    void Close();
+    PreparedLeaf prepared;
+    std::wstring root;
+    HANDLE pipe = nullptr;
+    HANDLE stopEvent = nullptr; // borrowed until the Find worker joins
+    bool contentOpen = false;
+};
+
+class ArchiveReadSession
+{
+public:
+    ArchiveReadSession() = default;
+    ~ArchiveReadSession();
+    ArchiveReadSession(const ArchiveReadSession&) = delete;
+    ArchiveReadSession& operator=(const ArchiveReadSession&) = delete;
+    bool Prepare(const std::wstring& path);
+    DWORD Start(HWND owner);
+    bool IsOpen() const { return pipe != nullptr; }
+    DWORD BeginRead();
+    DWORD Read(ULONGLONG offset, void* bytes, DWORD count);
+    DWORD EndRead();
+    DWORD CopyTo(HANDLE output, HANDLE cancel = nullptr);
+    Result Replace(HWND owner, HANDLE preparedFile);
+    ULONGLONG Size() const { return static_cast<ULONGLONG>(revision.size); }
+    const ArchiveRevision& Revision() const { return revision; }
+
+private:
+    PreparedLeaf prepared;
+    HANDLE pipe = nullptr;
+    ArchiveRevision revision;
+    DWORD SendControl(ArchiveReadControl control, ULONGLONG limit);
+    void Close();
+    ULONGLONG deadline = 0;
+    DWORD remaining = 0;
+};
+
+struct LeafPrompt
+{
+    const PreparedLeaf& request;
+    const char* path;
+    bool shieldedOk;
+    Result result{ERROR_CANCELLED, false};
+    bool retryDeclined = false;
+};
+}
